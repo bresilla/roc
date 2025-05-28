@@ -1,6 +1,6 @@
 [package]
 name = "rocc"
-version = "0.1.33"
+version = "0.1.34"
 authors = ["Trim Bresilla <trim.bresilla@gmail.com>"]
 description = "Robot Operations Command Center"
 edition = "2021"

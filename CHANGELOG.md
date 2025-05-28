@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.34] - 2025-05-28
+
+### <!-- 0 -->⛰️  Features
+
+- Refactor CLI command execution pattern
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Ignore VS Code settings and clean up configuration files
+- Ignore devbox directory in version control
+- Refactor environment setup and improve devbox configuration
+
 ## [0.1.33] - 2023-11-12
 
 ### <!-- 1 -->🐛 Bug Fixes
