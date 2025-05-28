@@ -17,3 +17,6 @@ anyhow = "1.0.75"
 clap = { version = "4.3.23", features = ["derive"] }
 getset = "0.1.2"
 colored = "2.0.4"
+walkdir = "2.4"
+roxmltree = "0.18"
+num_cpus = "1.16"
