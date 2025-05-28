@@ -9,10 +9,13 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
     let frame_id = matches.get_one::<String>("frame_id").unwrap();
     let child_frame_id = matches.get_one::<String>("child_frame_id").unwrap();
     
-    // Add translation parameters
-    let x = matches.get_one::<String>("x").unwrap_or(&"0".to_string());
-    let y = matches.get_one::<String>("y").unwrap_or(&"0".to_string());
-    let z = matches.get_one::<String>("z").unwrap_or(&"0".to_string());
+    // Add translation parameters with proper string handling
+    let default_zero = "0".to_string();
+    let default_one = "1".to_string();
+    
+    let x = matches.get_one::<String>("x").unwrap_or(&default_zero);
+    let y = matches.get_one::<String>("y").unwrap_or(&default_zero);
+    let z = matches.get_one::<String>("z").unwrap_or(&default_zero);
     
     command.push_str(" ");
     command.push_str(&x.to_string());
@@ -23,9 +26,9 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
 
     // Handle rotation (quaternion vs euler)
     if let Some(qx) = matches.get_one::<String>("qx") {
-        let qy = matches.get_one::<String>("qy").unwrap_or(&"0".to_string());
-        let qz = matches.get_one::<String>("qz").unwrap_or(&"0".to_string());
-        let qw = matches.get_one::<String>("qw").unwrap_or(&"1".to_string());
+        let qy = matches.get_one::<String>("qy").unwrap_or(&default_zero);
+        let qz = matches.get_one::<String>("qz").unwrap_or(&default_zero);
+        let qw = matches.get_one::<String>("qw").unwrap_or(&default_one);
         
         command.push_str(" ");
         command.push_str(&qx.to_string());
@@ -37,9 +40,9 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
         command.push_str(&qw.to_string());
     } else {
         // Use euler angles (convert to quaternion or use default)
-        let roll = matches.get_one::<String>("roll").unwrap_or(&"0".to_string());
-        let pitch = matches.get_one::<String>("pitch").unwrap_or(&"0".to_string());
-        let yaw = matches.get_one::<String>("yaw").unwrap_or(&"0".to_string());
+        let roll = matches.get_one::<String>("roll").unwrap_or(&default_zero);
+        let pitch = matches.get_one::<String>("pitch").unwrap_or(&default_zero);
+        let yaw = matches.get_one::<String>("yaw").unwrap_or(&default_zero);
         
         command.push_str(" ");
         command.push_str(&roll.to_string());
