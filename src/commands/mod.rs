@@ -36,6 +36,27 @@ pub fn handle(matches: ArgMatches) {
         Some(("interface", submatch)) => {
             interface::handle(submatch.clone());
         }
+        Some(("frame", submatch)) => {
+            frame::handle(submatch.clone());
+        }
+        Some(("run", submatch)) => {
+            run::handle(submatch.clone());
+        }
+        Some(("launch", submatch)) => {
+            launch::handle(submatch.clone());
+        }
+        Some(("work", submatch)) => {
+            work::handle(submatch.clone());
+        }
+        Some(("bag", submatch)) => {
+            bag::handle(submatch.clone());
+        }
+        Some(("daemon", submatch)) => {
+            daemon::handle(submatch.clone());
+        }
+        Some(("middleware", submatch)) => {
+            middleware::handle(submatch.clone());
+        }
         _ => unreachable!("UNREACHABLE"),
     };
 }

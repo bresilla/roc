@@ -4,33 +4,28 @@ use tokio::process::Command;
 use tokio::io::AsyncReadExt;
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 run".to_owned();
+    let mut command = "ros2 run tf2_ros tf2_echo".to_owned();
 
-    let package_name = matches.get_one::<String>("package_name").unwrap();
-    let executable_name = matches.get_one::<String>("executable_name").unwrap();
-    
+    let frame_id = matches.get_one::<String>("frame_id").unwrap();
+    let child_frame_id = matches.get_one::<String>("child_frame_id").unwrap();
     command.push_str(" ");
-    command.push_str(&package_name.to_string());
+    command.push_str(&frame_id.to_string());
     command.push_str(" ");
-    command.push_str(&executable_name.to_string());
+    command.push_str(&child_frame_id.to_string());
 
-    if let Some(argv) = matches.get_one::<String>("argv") {
-        command.push_str(" ");
-        command.push_str(&argv.to_string());
+    if let Some(rate) = matches.get_one::<String>("rate") {
+        command.push_str(" --rate ");
+        command.push_str(&rate.to_string());
     }
-
-    if let Some(prefix) = matches.get_one::<String>("prefix") {
-        let mut prefixed_command = prefix.to_string();
-        prefixed_command.push_str(" ");
-        prefixed_command.push_str(&command);
-        command = prefixed_command;
+    
+    if matches.get_flag("once") {
+        command.push_str(" --once");
     }
 
     let mut cmd = Command::new("bash")
         .arg("-c")
         .arg(command)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
         .spawn()?;
 
     let stdout = cmd.stdout.take().unwrap();

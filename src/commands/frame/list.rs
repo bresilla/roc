@@ -4,33 +4,20 @@ use tokio::process::Command;
 use tokio::io::AsyncReadExt;
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 run".to_owned();
+    let mut command = "ros2 run tf2_tools view_frames".to_owned();
 
-    let package_name = matches.get_one::<String>("package_name").unwrap();
-    let executable_name = matches.get_one::<String>("executable_name").unwrap();
-    
-    command.push_str(" ");
-    command.push_str(&package_name.to_string());
-    command.push_str(" ");
-    command.push_str(&executable_name.to_string());
-
-    if let Some(argv) = matches.get_one::<String>("argv") {
-        command.push_str(" ");
-        command.push_str(&argv.to_string());
+    if matches.get_flag("all") {
+        command.push_str(" --all");
     }
-
-    if let Some(prefix) = matches.get_one::<String>("prefix") {
-        let mut prefixed_command = prefix.to_string();
-        prefixed_command.push_str(" ");
-        prefixed_command.push_str(&command);
-        command = prefixed_command;
+    
+    if matches.get_flag("count_frames") {
+        command.push_str(" --count-frames");
     }
 
     let mut cmd = Command::new("bash")
         .arg("-c")
         .arg(command)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
         .spawn()?;
 
     let stdout = cmd.stdout.take().unwrap();
