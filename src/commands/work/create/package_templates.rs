@@ -1,7 +1,4 @@
-// Package template generators for ROS 2 packages
-use std::fmt::Write;
 
-/// Creates a package.xml file content
 pub fn create_package_xml(
     package_name: &str,
     package_format: &str,
@@ -12,148 +9,144 @@ pub fn create_package_xml(
     build_type: &str,
     dependencies: &[&str],
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let mut xml = String::new();
-    
-    writeln!(xml, "<?xml version=\"1.0\"?>")?;
-    writeln!(xml, "<?xml-model href=\"http://download.ros.org/schema/package_format{}.xsd\" schematypens=\"http://www.w3.org/2001/XMLSchema\"?>", package_format)?;
-    writeln!(xml, "<package format=\"{}\">", package_format)?;
-    writeln!(xml, "  <name>{}</name>", package_name)?;
-    writeln!(xml, "  <version>0.0.0</version>")?;
-    writeln!(xml, "  <description>{}</description>", description)?;
-    writeln!(xml, "")?;
-    writeln!(xml, "  <maintainer email=\"{}\">{}</maintainer>", maintainer_email, maintainer_name)?;
-    writeln!(xml, "")?;
-    writeln!(xml, "  <license>{}</license>", license)?;
-    writeln!(xml, "")?;
+    let mut xml = format!(
+        r#"<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="{}">
+  <name>{}</name>
+  <version>0.0.0</version>
+  <description>{}</description>
+  <maintainer email="{}">{}</maintainer>
+  <license>{}</license>
+"#,
+        package_format, package_name, description, maintainer_email, maintainer_name, license
+    );
 
-    // Add buildtool dependencies
+    // Add dependencies
+    for dep in dependencies {
+        xml.push_str(&format!("  <depend>{}</depend>\n", dep));
+    }
+
+    // Add build type specific tags
     match build_type {
-        "ament_cmake" | "cmake" => {
-            writeln!(xml, "  <buildtool_depend>ament_cmake</buildtool_depend>")?;
+        "ament_cmake" => {
+            xml.push_str("  <buildtool_depend>ament_cmake</buildtool_depend>\n");
+            xml.push_str("  <test_depend>ament_lint_auto</test_depend>\n");
+            xml.push_str("  <test_depend>ament_lint_common</test_depend>\n");
         }
         "ament_python" => {
-            writeln!(xml, "  <buildtool_depend>ament_python</buildtool_depend>")?;
+            xml.push_str("  <test_depend>ament_flake8</test_depend>\n");
+            xml.push_str("  <test_depend>ament_pep257</test_depend>\n");
+            xml.push_str("  <test_depend>python3-pytest</test_depend>\n");
         }
         _ => {}
     }
 
-    // Add standard dependencies
-    if build_type != "cmake" {
-        writeln!(xml, "")?;
-        if build_type == "ament_cmake" {
-            writeln!(xml, "  <depend>rclcpp</depend>")?;
-        } else {
-            writeln!(xml, "  <depend>rclpy</depend>")?;
-        }
-    }
-
-    // Add user-specified dependencies
-    for dep in dependencies {
-        writeln!(xml, "  <depend>{}</depend>", dep)?;
-    }
-
-    // Add test dependencies
-    writeln!(xml, "")?;
-    writeln!(xml, "  <test_depend>ament_lint_auto</test_depend>")?;
-    writeln!(xml, "  <test_depend>ament_lint_common</test_depend>")?;
-
-    // Add export section
-    writeln!(xml, "")?;
-    writeln!(xml, "  <export>")?;
-    writeln!(xml, "    <build_type>{}</build_type>", build_type)?;
-    writeln!(xml, "  </export>")?;
-    writeln!(xml, "</package>")?;
+    xml.push_str("  <export>\n");
+    xml.push_str(&format!("    <build_type>{}</build_type>\n", build_type));
+    xml.push_str("  </export>\n");
+    xml.push_str("</package>\n");
 
     Ok(xml)
 }
 
-/// Creates CMakeLists.txt content for ament_cmake packages
 pub fn create_cmake_lists(
     package_name: &str,
     node_name: Option<&String>,
     library_name: Option<&String>,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let mut cmake = String::new();
-    
-    writeln!(cmake, "cmake_minimum_required(VERSION 3.8)")?;
-    writeln!(cmake, "project({})", package_name)?;
-    writeln!(cmake, "")?;
-    writeln!(cmake, "if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES \"Clang\")")?;
-    writeln!(cmake, "  add_compile_options(-Wall -Wextra -Wpedantic)")?;
-    writeln!(cmake, "endif()")?;
-    writeln!(cmake, "")?;
-    writeln!(cmake, "# find dependencies")?;
-    writeln!(cmake, "find_package(ament_cmake REQUIRED)")?;
-    writeln!(cmake, "find_package(rclcpp REQUIRED)")?;
-    writeln!(cmake, "")?;
+    let mut cmake = format!(
+        r#"cmake_minimum_required(VERSION 3.8)
+project({})
 
-    // Add library if specified
-    if let Some(lib_name) = library_name {
-        writeln!(cmake, "# Create library")?;
-        writeln!(cmake, "add_library({} src/{}.cpp)", lib_name, lib_name)?;
-        writeln!(cmake, "target_include_directories({} PUBLIC", lib_name)?;
-        writeln!(cmake, "  $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>")?;
-        writeln!(cmake, "  $<INSTALL_INTERFACE:include>)")?;
-        writeln!(cmake, "target_compile_features({} PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17", lib_name)?;
-        writeln!(cmake, "ament_target_dependencies({} rclcpp)", lib_name)?;
-        writeln!(cmake, "")?;
-    }
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-    // Add executable if specified
-    if let Some(exe_name) = node_name {
-        writeln!(cmake, "# Create executable")?;
-        writeln!(cmake, "add_executable({} src/{}.cpp)", exe_name, exe_name)?;
-        writeln!(cmake, "target_include_directories({} PUBLIC", exe_name)?;
-        writeln!(cmake, "  $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>")?;
-        writeln!(cmake, "  $<INSTALL_INTERFACE:include>)")?;
-        writeln!(cmake, "target_compile_features({} PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17", exe_name)?;
-        writeln!(cmake, "ament_target_dependencies({} rclcpp)", exe_name)?;
-        writeln!(cmake, "")?;
-    }
+# find dependencies
+find_package(ament_cmake REQUIRED)
+"#,
+        package_name
+    );
 
-    // Add install targets
-    if library_name.is_some() || node_name.is_some() {
-        writeln!(cmake, "# Install targets")?;
-        if let Some(lib_name) = library_name {
-            writeln!(cmake, "install(TARGETS {}", lib_name)?;
-            writeln!(cmake, "  DESTINATION lib/${{PROJECT_NAME}})")?;
+    // Add common ROS 2 dependencies
+    cmake.push_str("find_package(rclcpp REQUIRED)\n");
+    cmake.push_str("find_package(std_msgs REQUIRED)\n");
+
+    // Add executable targets if node or library is specified
+    if let Some(node_name) = node_name {
+        cmake.push_str(&format!(
+            "\n# Add executable for node\nadd_executable({} src/{}.cpp)\n",
+            node_name, node_name
+        ));
+        // Add include directories for the node if there are headers
+        if library_name.is_some() {
+            cmake.push_str(&format!(
+                "target_include_directories({}\n  PRIVATE\n    ${{CMAKE_CURRENT_SOURCE_DIR}}/include)\n",
+                node_name
+            ));
         }
-        if let Some(exe_name) = node_name {
-            writeln!(cmake, "install(TARGETS {}", exe_name)?;
-            writeln!(cmake, "  DESTINATION lib/${{PROJECT_NAME}})")?;
-        }
-        writeln!(cmake, "")?;
+        cmake.push_str(&format!(
+            "ament_target_dependencies({} rclcpp std_msgs)\n",
+            node_name
+        ));
+        cmake.push_str(&format!(
+            "\ninstall(TARGETS {}\n  DESTINATION lib/${{PROJECT_NAME}})\n",
+            node_name
+        ));
     }
 
-    // Add header installation if library is present
-    if library_name.is_some() {
-        writeln!(cmake, "# Install headers")?;
-        writeln!(cmake, "install(DIRECTORY include/")?;
-        writeln!(cmake, "  DESTINATION include)")?;
-        writeln!(cmake, "")?;
+    if let Some(library_name) = library_name {
+        cmake.push_str(&format!(
+            "\n# Add library\nadd_library({} src/{}.cpp)\ntarget_include_directories({}\n  PUBLIC\n    $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>\n    $<INSTALL_INTERFACE:include>)\nament_target_dependencies({} rclcpp std_msgs)\n",
+            library_name, library_name, library_name, library_name
+        ));
+        cmake.push_str(&format!(
+            "\n# Export targets\nament_export_targets({}_targets HAS_LIBRARY_TARGET)\nament_export_dependencies(rclcpp std_msgs)\n",
+            library_name
+        ));
+        cmake.push_str(&format!(
+            "\ninstall(TARGETS {}\n  EXPORT {}_targets\n  LIBRARY DESTINATION lib\n  ARCHIVE DESTINATION lib\n  RUNTIME DESTINATION bin)\n",
+            library_name, library_name
+        ));
+        cmake.push_str(&format!(
+            "\ninstall(DIRECTORY include/\n  DESTINATION include)\n"
+        ));
     }
 
-    // Add testing
-    writeln!(cmake, "if(BUILD_TESTING)")?;
-    writeln!(cmake, "  find_package(ament_lint_auto REQUIRED)")?;
-    writeln!(cmake, "  # the following line skips the linter which checks for copyrights")?;
-    writeln!(cmake, "  # comment the line when a copyright and license is added to all source files")?;
-    writeln!(cmake, "  set(ament_cmake_copyright_FOUND TRUE)")?;
-    writeln!(cmake, "  # the following line skips cpplint (only works in a git repo)")?;
-    writeln!(cmake, "  # comment the line when this package is in a git repo and when")?;
-    writeln!(cmake, "  # a copyright and license is added to all source files")?;
-    writeln!(cmake, "  set(ament_cmake_cpplint_FOUND TRUE)")?;
-    writeln!(cmake, "  ament_lint_auto_find_test_dependencies()")?;
-    writeln!(cmake, "endif()")?;
-    writeln!(cmake, "")?;
-    writeln!(cmake, "ament_package()")?;
+    cmake.push_str(&format!(
+        r#"
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  # the following line skips the linter which checks for copyrights
+  # comment the line when a copyright and license is added to all source files
+  set(ament_cmake_copyright_FOUND TRUE)
+  # the following line skips cpplint (only works in a git repo)
+  # comment the line when this package is in a git repo and when
+  # a copyright and license is added to all source files
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_package()
+"#
+    ));
 
     Ok(cmake)
 }
 
-/// Creates setup.py content for ament_python packages
 pub fn create_setup_py(package_name: &str, node_name: Option<&String>) -> Result<String, Box<dyn std::error::Error>> {
-    let mut setup_content = format!(r#"from setuptools import find_packages, setup
+    let mut entry_points = String::new();
+    
+    if let Some(node_name_str) = node_name {
+        entry_points = format!(
+            "            '{} = {}.{}:main',",
+            node_name_str, package_name, node_name_str
+        );
+    }
+
+    Ok(format!(
+        r#"from setuptools import find_packages, setup
 
 package_name = '{}'
 
@@ -168,45 +161,29 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='todo',
-    maintainer_email='todo@todo.todo',
+    maintainer='TODO',
+    maintainer_email='todo@example.com',
     description='TODO: Package description',
-    license='TODO: License declaration',
+    license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={{
-        'console_scripts': ["#, package_name);
-
-    if let Some(node_name_str) = node_name {
-        setup_content.push_str(&format!("\n            '{}={}.{}:main',", node_name_str, package_name, node_name_str));
-    }
-
-    setup_content.push_str(r#"
+        'console_scripts': [
+{}
         ],
     }},
 )
-"#);
-
-    Ok(setup_content)
+"#,
+        package_name, entry_points
+    ))
 }
 
-/// Creates setup.cfg content for ament_python packages
 pub fn create_setup_cfg() -> String {
-    r#"[develop]
-script_dir=$base/lib/[PROJECT_NAME]
-[install]
-install_scripts=$base/lib/[PROJECT_NAME]
-"#.to_string()
+    "[develop]\nscript_dir=$base/lib/PACKAGE_NAME\n[install]\ninstall_scripts=$base/lib/PACKAGE_NAME\n".to_string()
 }
 
-/// Creates resource file content for ament_python packages
-pub fn create_resource_file() -> String {
-    String::new() // Empty file as per ROS 2 convention
-}
-
-/// Creates a basic C++ node template
-pub fn create_cpp_node_template(package_name: &str, node_name: &str) -> String {
-    let class_name = to_camel_case(node_name);
-    format!(r#"#include <chrono>
+pub fn create_cpp_node_template(_package_name: &str, node_name: &str) -> String {
+    format!(
+        r#"#include <chrono>
 #include <functional>
 #include <memory>
 #include <string>
@@ -218,27 +195,26 @@ using namespace std::chrono_literals;
 
 class {} : public rclcpp::Node
 {{
-  public:
-    {}()
-    : Node("{}")
-    {{
-      publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
-      timer_ = this->create_wall_timer(
+public:
+  {}()
+  : Node("{}")
+  {{
+    publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
+    timer_ = this->create_wall_timer(
       500ms, std::bind(&{}::timer_callback, this));
-    }}
+  }}
 
-  private:
-    void timer_callback()
-    {{
-      auto message = std_msgs::msg::String();
-      message.data = "Hello, world! " + std::to_string(count_++);
-      RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
-      publisher_->publish(message);
-    }}
-    
-    rclcpp::TimerBase::SharedPtr timer_;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
-    size_t count_ = 0;
+private:
+  void timer_callback()
+  {{
+    auto message = std_msgs::msg::String();
+    message.data = "Hello, world! " + std::to_string(count_++);
+    RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
+    publisher_->publish(message);
+  }}
+  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+  size_t count_;
 }};
 
 int main(int argc, char * argv[])
@@ -248,20 +224,23 @@ int main(int argc, char * argv[])
   rclcpp::shutdown();
   return 0;
 }}
-"#, class_name, class_name, node_name, class_name, class_name)
+"#,
+        capitalize_first_letter(node_name),
+        capitalize_first_letter(node_name),
+        node_name,
+        capitalize_first_letter(node_name),
+        capitalize_first_letter(node_name)
+    )
 }
 
-/// Creates a basic C++ header template
-pub fn create_cpp_header_template(package_name: &str, library_name: &str) -> String {
-    let class_name = to_camel_case(library_name);
-    let header_guard = format!("{}__{}_{}_HPP_", 
-        package_name.to_uppercase().replace('-', "_"), 
-        library_name.to_uppercase().replace('-', "_"),
-        library_name.to_uppercase().replace('-', "_")
-    );
+pub fn create_cpp_header_template(package_name: &str, class_name: &str) -> String {
+    let include_guard = format!("{}__{}__HPP_", package_name.to_uppercase(), class_name.to_uppercase());
     
-    format!(r#"#ifndef {}
+    format!(
+        r#"#ifndef {}
 #define {}
+
+#include <string>
 
 namespace {}
 {{
@@ -272,26 +251,38 @@ public:
   {}();
   virtual ~{}();
 
+  void do_something();
+
 private:
-  // Add your private members here
+  std::string name_;
 }};
 
 }}  // namespace {}
 
 #endif  // {}
-"#, header_guard, header_guard, package_name, class_name, class_name, class_name, package_name, header_guard)
+"#,
+        include_guard,
+        include_guard,
+        package_name,
+        class_name,
+        class_name,
+        class_name,
+        package_name,
+        include_guard
+    )
 }
 
-/// Creates a basic C++ source template
-pub fn create_cpp_source_template(package_name: &str, library_name: &str) -> String {
-    let class_name = to_camel_case(library_name);
-    
-    format!(r#"#include "{}/{}.hpp"
+pub fn create_cpp_source_template(package_name: &str, class_name: &str) -> String {
+    format!(
+        r#"#include "{}/{}.hpp"
+
+#include <iostream>
 
 namespace {}
 {{
 
 {}::{}()
+: name_("default")
 {{
   // Constructor implementation
 }}
@@ -301,14 +292,28 @@ namespace {}
   // Destructor implementation
 }}
 
+void {}::do_something()
+{{
+  std::cout << "Doing something in " << name_ << std::endl;
+}}
+
 }}  // namespace {}
-"#, package_name, library_name, package_name, class_name, class_name, class_name, class_name, package_name)
+"#,
+        package_name,
+        class_name,
+        package_name,
+        class_name,
+        class_name,
+        class_name,
+        class_name,
+        class_name,
+        package_name
+    )
 }
 
-/// Creates a basic Python node template
-pub fn create_python_node_template(package_name: &str, node_name: &str) -> String {
-    let class_name = to_camel_case(node_name);
-    format!(r#"#!/usr/bin/env python3
+pub fn create_python_node_template(_package_name: &str, node_name: &str) -> String {
+    format!(
+        r#"#!/usr/bin/env python3
 
 import rclpy
 from rclpy.node import Node
@@ -349,17 +354,18 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-"#, class_name, node_name, node_name, class_name, node_name, node_name)
+"#,
+        capitalize_first_letter(node_name),
+        node_name,
+        node_name,
+        capitalize_first_letter(node_name),
+        node_name,
+        node_name
+    )
 }
 
-/// Creates Python __init__.py file
-pub fn create_python_init() -> String {
-    String::new() // Empty __init__.py file
-}
-
-/// Gets standard test file templates
-pub fn get_test_template(template_name: &str) -> String {
-    match template_name {
+pub fn create_python_test_template(test_file: &str) -> String {
+    match test_file {
         "test_copyright.py" => {
             r#"# Copyright 2015 Open Source Robotics Foundation, Inc.
 #
@@ -379,6 +385,8 @@ from ament_copyright.main import main
 import pytest
 
 
+# Remove the `skip` decorator once the source file(s) have a copyright header
+@pytest.mark.skip(reason='No copyright header has been placed in the generated source file.')
 @pytest.mark.copyright
 @pytest.mark.linter
 def test_copyright():
@@ -440,24 +448,74 @@ def test_pep257():
     assert rc == 0
 "#.to_string()
         }
-        _ => String::new(),
+        _ => {
+            format!(
+                r#"import pytest
+
+
+def test_{}():
+    """Test functionality."""
+    pass  # Add your tests here
+"#,
+                test_file.replace(".py", "").replace("test_", "")
+            )
+        }
     }
 }
 
-/// Creates Python test file templates (wrapper for get_test_template)
-pub fn create_python_test_template(template_name: &str) -> String {
-    get_test_template(template_name)
+fn capitalize_first_letter(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
 }
 
-/// Converts snake_case to CamelCase
-fn to_camel_case(s: &str) -> String {
-    s.split('_')
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
-            }
-        })
-        .collect()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_package_xml() {
+        let xml = create_package_xml(
+            "test_package",
+            "3",
+            "A test package",
+            "Apache-2.0",
+            "Test User",
+            "test@example.com",
+            "ament_cmake",
+            &["rclcpp", "std_msgs"],
+        ).unwrap();
+        
+        assert!(xml.contains("<name>test_package</name>"));
+        assert!(xml.contains("<description>A test package</description>"));
+        assert!(xml.contains("<build_type>ament_cmake</build_type>"));
+    }
+
+    #[test]
+    fn test_create_cmake_lists() {
+        let cmake = create_cmake_lists("test_package", Some(&"test_node".to_string()), None).unwrap();
+        
+        assert!(cmake.contains("project(test_package)"));
+        assert!(cmake.contains("find_package(rclcpp REQUIRED)"));
+        assert!(cmake.contains("ament_package()"));
+        assert!(cmake.contains("add_executable(test_node"));
+    }
+
+    #[test]
+    fn test_create_setup_py() {
+        let setup = create_setup_py("test_package", Some(&"test_node".to_string())).unwrap();
+        
+        assert!(setup.contains("name=package_name"));
+        assert!(setup.contains("test_node = test_package.test_node:main"));
+    }
+
+    #[test]
+    fn test_capitalize_first_letter() {
+        assert_eq!(capitalize_first_letter("hello"), "Hello");
+        assert_eq!(capitalize_first_letter(""), "");
+        assert_eq!(capitalize_first_letter("a"), "A");
+        assert_eq!(capitalize_first_letter("HELLO"), "HELLO");
+    }
 }
