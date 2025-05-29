@@ -1,5 +1,5 @@
 use std::collections::{HashMap, VecDeque};
-use crate::commands::work::colcon_impl::PackageMeta;
+use crate::commands::work::build::PackageMeta;
 
 pub fn topological_sort(packages: &[PackageMeta]) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
     let mut name_to_index: HashMap<String, usize> = HashMap::new();
@@ -72,7 +72,7 @@ pub fn topological_sort(packages: &[PackageMeta]) -> Result<Vec<usize>, Box<dyn 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::work::colcon_impl::{PackageMeta, BuildType};
+    use crate::commands::work::build::{PackageMeta, BuildType};
     use std::path::PathBuf;
     
     fn create_test_package(name: &str, deps: Vec<&str>) -> PackageMeta {

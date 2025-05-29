@@ -6,7 +6,7 @@ use std::time::Instant;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::commands::work::colcon_impl::{PackageMeta, BuildType, BuildConfig};
+use crate::commands::work::build::{PackageMeta, BuildType, BuildConfig};
 use super::environment_manager::EnvironmentManager;
 
 pub struct BuildExecutor<'a> {
@@ -53,9 +53,11 @@ impl<'a> BuildExecutor<'a> {
         // Create necessary directories
         self.create_workspace_directories()?;
         
-        // If parallel workers is 1, use sequential execution
+        // If parallel workers is 1, use sequential execution with filtered environment
+        // Note: We use build_sequential_filtered instead of build_sequential to avoid
+        // environment accumulation issues that can cause CMake to hang
         if self.config.parallel_workers <= 1 {
-            return self.build_sequential(packages, build_order);
+            return self.build_sequential_filtered(packages, build_order);
         }
         
         // Use parallel execution for multiple workers
@@ -95,6 +97,90 @@ impl<'a> BuildExecutor<'a> {
                     
                     // Update environment for subsequent packages
                     self.add_package_to_environment(&package.name, &install_path)?;
+                    
+                    successful_builds += 1;
+                }
+                Err(e) => {
+                    eprintln!("Failed <<< {} - {}", package.name, e);
+                    failed_builds += 1;
+                    
+                    if !self.config.continue_on_error {
+                        return Err(format!("Build failed for package {}: {}", package.name, e).into());
+                    }
+                }
+            }
+        }
+        
+        println!("\nBuild Summary:");
+        println!("  {} packages succeeded", successful_builds);
+        if failed_builds > 0 {
+            println!("  {} packages failed", failed_builds);
+        }
+        
+        // Generate environment setup scripts
+        self.generate_setup_scripts(packages)?;
+        
+        Ok(())
+    }
+    
+    /// Sequential build using filtered environment (fixed version)
+    fn build_sequential_filtered(
+        &mut self,
+        packages: &[PackageMeta],
+        build_order: &[usize],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut successful_builds = 0;
+        let mut failed_builds = 0;
+        
+        for &pkg_idx in build_order {
+            let package = &packages[pkg_idx];
+            
+            println!("Starting >>> {} ({:?})", package.name, package.build_type);
+            let start_time = Instant::now();
+            
+            // Create a fresh environment manager for this package (like parallel build does)
+            let mut package_env_manager = EnvironmentManager::new(
+                self.config.install_base.clone(),
+                self.config.isolated
+            );
+            
+            // Setup environment for this package
+            package_env_manager.setup_package_environment(&package.name, &package.path)?;
+            
+            // Add dependencies' install paths to environment
+            for dep_name in &package.build_deps {
+                if let Some(dep_path) = self.install_paths.get(dep_name) {
+                    package_env_manager.setup_package_environment(dep_name, dep_path)?;
+                }
+            }
+            
+            // Build using the clean environment (like parallel build does)
+            let build_result: Result<(), Box<dyn std::error::Error>> = match package.build_type {
+                BuildType::AmentCmake | BuildType::Cmake => {
+                    Self::build_cmake_package_with_env(package, &package_env_manager, self.config)
+                        .map_err(|e| e.into())
+                }
+                BuildType::AmentPython => {
+                    Self::build_python_package_with_env(package, &package_env_manager, self.config)
+                        .map_err(|e| e.into())
+                }
+                BuildType::Other(ref build_type) => {
+                    Err(format!("Unsupported build type: {}", build_type).into())
+                }
+            };
+            
+            match build_result {
+                Ok(_) => {
+                    let duration = start_time.elapsed();
+                    println!("Finished <<< {} [{:.2}s]", package.name, duration.as_secs_f64());
+                    
+                    // Record install path for environment setup
+                    let install_path = if self.config.merge_install {
+                        self.config.workspace_root.join("install")
+                    } else {
+                        self.config.workspace_root.join("install").join(&package.name)
+                    };
+                    self.install_paths.insert(package.name.clone(), install_path.clone());
                     
                     successful_builds += 1;
                 }

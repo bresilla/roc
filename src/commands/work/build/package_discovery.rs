@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::fs;
-use crate::commands::work::colcon_impl::{PackageMeta, BuildType};
+use crate::commands::work::build::{PackageMeta, BuildType};
 
 pub fn discover_packages(base_paths: &[PathBuf]) -> Result<Vec<PackageMeta>, Box<dyn std::error::Error>> {
     let mut packages = Vec::new();

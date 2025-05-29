@@ -1,10 +1,14 @@
 // Colcon replacement implementation
 // This module provides functionality to replace colcon build for ROS 2 workspaces
 
+pub mod command;
 pub mod package_discovery;
 pub mod dependency_graph;
 pub mod build_executor;
 pub mod environment_manager;
+
+// Re-export the handle function for easier access
+pub use command::handle;
 
 use std::path::PathBuf;
 
@@ -133,7 +137,7 @@ impl ColconBuilder {
     
     /// Generate setup scripts for the workspace
     pub fn generate_setup_scripts(&self) -> Result<(), Box<dyn std::error::Error>> {
-        use crate::commands::work::colcon_impl::environment_manager::EnvironmentManager;
+        use crate::commands::work::build::environment_manager::EnvironmentManager;
         
         let env_manager = EnvironmentManager::new(
             self.config.install_base.clone(),

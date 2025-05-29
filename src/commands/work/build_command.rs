@@ -1,7 +1,7 @@
 use clap::ArgMatches;
 use std::path::PathBuf;
 
-use crate::commands::work::colcon_impl::{ColconBuilder, BuildConfig};
+use crate::commands::work::build::{ColconBuilder, BuildConfig};
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = BuildConfig::default();
