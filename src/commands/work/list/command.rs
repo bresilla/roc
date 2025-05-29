@@ -1,42 +1,102 @@
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
+use colored::*;
+use std::path::PathBuf;
+use std::fs;
+use crate::commands::work::build::{package_discovery, BuildType};
+
+fn format_build_status(package_path: &PathBuf, build_base: &PathBuf, install_base: &PathBuf) -> String {
+    let package_name = package_path.file_name().unwrap().to_string_lossy();
+    let build_dir = build_base.join(&*package_name);
+    let install_dir = install_base.join(&*package_name);
+    
+    if install_dir.exists() {
+        "✓ Built".green().to_string()
+    } else if build_dir.exists() {
+        "⚠ Partial".yellow().to_string()
+    } else {
+        "✗ Not built".red().to_string()
+    }
+}
+
+fn format_build_type(build_type: &BuildType) -> String {
+    match build_type {
+        BuildType::AmentCmake => "ament_cmake".blue().to_string(),
+        BuildType::AmentPython => "ament_python".green().to_string(),
+        BuildType::Cmake => "cmake".cyan().to_string(),
+        BuildType::Other(s) => s.purple().to_string(),
+    }
+}
+
+fn get_creation_time(package_path: &PathBuf) -> String {
+    if let Ok(metadata) = fs::metadata(package_path.join("package.xml")) {
+        if let Ok(created) = metadata.created() {
+            if let Ok(duration) = created.duration_since(std::time::UNIX_EPOCH) {
+                let datetime = chrono::DateTime::from_timestamp(duration.as_secs() as i64, 0);
+                if let Some(dt) = datetime {
+                    return dt.format("%Y-%m-%d %H:%M").to_string();
+                }
+            }
+        }
+    }
+    "Unknown".to_string()
+}
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 pkg list".to_owned();
-
-    if matches.get_flag("all") {
-        command.push_str(" --all");
+    let workspace_root = std::env::current_dir()?;
+    let base_paths = vec![PathBuf::from("src")];
+    let build_base = workspace_root.join("build");
+    let install_base = workspace_root.join("install");
+    
+    // Discover packages using the existing package discovery
+    let packages = package_discovery::discover_packages(&base_paths)?;
+    
+    if packages.is_empty() {
+        println!("{}", "No ROS 2 packages found in the workspace.".yellow());
+        return Ok(());
     }
     
+    // Check if user wants count only
     if matches.get_flag("count_packages") {
-        command.push_str(" --count-packages");
+        println!("{}", packages.len());
+        return Ok(());
     }
-
-    let mut cmd = Command::new("bash")
-        .arg("-c")
-        .arg(command)
-        .stdout(Stdio::piped())
-        .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
+    
+    // Print header
+    println!("{}", "ROS 2 Packages in Workspace".bright_cyan().bold());
+    println!("{}", "=".repeat(80).bright_black());
+    
+    // Sort packages by name for consistent output
+    let mut sorted_packages = packages.clone();
+    sorted_packages.sort_by(|a, b| a.name.cmp(&b.name));
+    
+    for package in &sorted_packages {
+        let status = format_build_status(&package.path, &build_base, &install_base);
+        let build_type = format_build_type(&package.build_type);
+        let created = get_creation_time(&package.path);
+        
+        println!(
+            "{:<25} {:<15} {:<20} {}",
+            package.name.bright_white().bold(),
+            build_type,
+            status,
+            created.bright_black()
+        );
     }
+    
+    println!();
+    println!(
+        "{} {} packages found",
+        "Total:".bright_cyan(),
+        packages.len().to_string().bright_white().bold()
+    );
+    
     Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+    if let Err(e) = rt.block_on(run_command(matches)) {
+        eprintln!("{}: {}", "Error".red().bold(), e);
+        std::process::exit(1);
+    }
 }

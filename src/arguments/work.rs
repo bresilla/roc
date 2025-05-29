@@ -30,7 +30,6 @@ pub fn cmd() -> Command {
             Command::new("list")
             .about("List all packages")
             .aliases(["l", "ls"])
-            .arg_required_else_help(true)
             .arg(arg!(-a --all "Display all packages even hidden ones"))
             .arg(arg!(-c --count_packages "Only display the number of packages discovered"))
         )
@@ -38,7 +37,6 @@ pub fn cmd() -> Command {
             Command::new("info")
             .about("Print information about a package")
             .aliases(["i", "show"])
-            .arg_required_else_help(true)
             .arg(
                 arg!(<PACKAGE_NAME> "Name of the ROS package to get info (e.g. 'demo_nodes_cpp')")
                 .required(true)
