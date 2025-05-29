@@ -36,12 +36,17 @@ pub struct PackageMeta {
     pub name: String,
     pub path: PathBuf,
     pub build_type: BuildType,
+    #[allow(dead_code)]
     pub version: String,
+    #[allow(dead_code)]
     pub description: String,
+    #[allow(dead_code)]
     pub maintainers: Vec<String>,
     pub build_deps: Vec<String>,
     pub buildtool_deps: Vec<String>,
+    #[allow(dead_code)]
     pub exec_deps: Vec<String>,
+    #[allow(dead_code)]
     pub test_deps: Vec<String>,
 }
 

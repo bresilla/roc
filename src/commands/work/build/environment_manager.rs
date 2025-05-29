@@ -219,6 +219,7 @@ impl EnvironmentManager {
     }
     
     /// Generate a local setup script for a specific package
+    #[allow(dead_code)]
     pub fn generate_package_setup(&self, package_name: &str, package_install_dir: &Path) -> Result<String, Box<dyn std::error::Error>> {
         let script_content = if cfg!(windows) {
             format!(
@@ -258,6 +259,7 @@ impl EnvironmentManager {
     }
     
     /// Reset environment to clean state
+    #[allow(dead_code)]
     pub fn reset_environment(&mut self) {
         self.env_vars.clear();
         for (key, value) in env::vars() {
@@ -266,11 +268,13 @@ impl EnvironmentManager {
     }
     
     /// Set a specific environment variable
+    #[allow(dead_code)]
     pub fn set_env_var(&mut self, key: String, value: String) {
         self.env_vars.insert(key, value);
     }
     
     /// Get the value of an environment variable
+    #[allow(dead_code)]
     pub fn get_env_var(&self, key: &str) -> Option<&String> {
         self.env_vars.get(key)
     }
