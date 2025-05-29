@@ -4,21 +4,19 @@ pub fn cmd() -> Command {
     Command::new("run")
         .about( "Run an executable")
         .aliases(&["r"])
-        .subcommand_required(true)
         .arg_required_else_help(true)
         .arg(
-            arg!(<PACKAGE_NAME> "Name of the ROS package to run (e.g. 'demo_nodes_cpp')")
+            arg!(<package_name> "Name of the ROS package to run (e.g. 'demo_nodes_cpp')")
             .required(true)
             .value_parser(package_value_parser)
         )
         .arg(
-            arg!(<EXECUTABLE_NAME> "Name of the ROS executable to run (e.g. 'talker')")
+            arg!(<executable_name> "Name of the ROS executable to run (e.g. 'talker')")
             .required(true)
             .value_parser(executable_value_parser)
         )
         .arg(
-            arg!(<ARGV> "Pass arbitrary arguments to the executable (e.g. '__log_level:=debug')")
-            .required(true)
+            arg!([argv] "Pass arbitrary arguments to the executable (e.g. '__log_level:=debug')")
         )
         .arg(arg!(--prefix <PREFIX> "Prefix command, which should go before the executable (e.g. --prefix 'gdb -ex run --args')"))
 }
