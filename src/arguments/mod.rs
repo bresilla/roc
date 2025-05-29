@@ -14,8 +14,9 @@ pub mod work;
 pub mod bag;
 pub mod daemon;
 pub mod middleware;
-pub mod completion;
-pub mod complete;
+// completion subcommands consolidated under src/completions
+pub use crate::completions::args as completion;
+pub use crate::completions::internal as complete;
 
 use clap::{Command, builder::styling, arg};
 use colored::Colorize;

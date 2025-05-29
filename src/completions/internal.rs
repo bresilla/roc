@@ -1,5 +1,6 @@
 use clap::{Command, Arg};
 
+/// Internal callback for dynamic completion (invoked by shell scripts)
 pub fn cmd() -> Command {
     Command::new("_complete")
         .about("Internal command for shell completion - do not use directly")
@@ -11,14 +12,14 @@ pub fn cmd() -> Command {
                 .index(1)
         )
         .arg(
-            Arg::new("subcommand") 
+            Arg::new("subcommand")
                 .help("The subcommand being completed")
                 .required(false)
                 .index(2)
         )
         .arg(
             Arg::new("position")
-                .help("The position of the argument being completed")
+                .help("The argument position to complete")
                 .required(false)
                 .index(3)
         )

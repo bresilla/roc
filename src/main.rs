@@ -1,6 +1,6 @@
 mod arguments;
 mod commands;
-mod completion;
+mod completions;
 use std::env;
 
 fn main() {

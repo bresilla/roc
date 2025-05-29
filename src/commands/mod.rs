@@ -13,10 +13,10 @@ pub mod work;
 pub mod bag;
 pub mod daemon;
 pub mod middleware;
-pub mod completion;
-pub mod complete;
 
 use clap::ArgMatches;
+
+use crate::completions::handler as completion_handler;
 
 pub fn handle(matches: ArgMatches) {
     match matches.subcommand() {
@@ -60,10 +60,10 @@ pub fn handle(matches: ArgMatches) {
             middleware::handle(submatch.clone());
         }
         Some(("completion", submatch)) => {
-            completion::handle(submatch.clone());
+            completion_handler::handle(submatch.clone());
         }
         Some(("_complete", submatch)) => {
-            complete::handle(submatch.clone());
+            completion_handler::internal(submatch.clone());
         }
         _ => unreachable!("UNREACHABLE"),
     };
