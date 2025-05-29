@@ -41,7 +41,7 @@ pub struct PackageMeta {
     pub test_deps: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BuildConfig {
     pub base_paths: Vec<PathBuf>,
     pub packages_select: Option<Vec<String>>,
