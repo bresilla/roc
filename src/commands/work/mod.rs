@@ -21,5 +21,4 @@ pub fn handle(matches: ArgMatches) {
 pub mod create;
 pub mod list;
 pub mod info;
-pub mod build_command;
 pub mod build;

@@ -64,64 +64,8 @@ impl<'a> BuildExecutor<'a> {
         self.build_parallel(packages, build_order)
     }
     
-    /// Sequential build (original implementation)
-    fn build_sequential(
-        &mut self,
-        packages: &[PackageMeta],
-        build_order: &[usize],
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut successful_builds = 0;
-        let mut failed_builds = 0;
-        
-        for &pkg_idx in build_order {
-            let package = &packages[pkg_idx];
-            
-            println!("Starting >>> {} ({:?})", package.name, package.build_type);
-            let start_time = Instant::now();
-            
-            // Update environment for this package's dependencies
-            self.update_environment_for_package(package)?;
-            
-            match self.build_package(package) {
-                Ok(_) => {
-                    let duration = start_time.elapsed();
-                    println!("Finished <<< {} [{:.2}s]", package.name, duration.as_secs_f64());
-                    
-                    // Record install path for environment setup
-                    let install_path = if self.config.merge_install {
-                        self.config.workspace_root.join("install")
-                    } else {
-                        self.config.workspace_root.join("install").join(&package.name)
-                    };
-                    self.install_paths.insert(package.name.clone(), install_path.clone());
-                    
-                    // Update environment for subsequent packages
-                    self.add_package_to_environment(&package.name, &install_path)?;
-                    
-                    successful_builds += 1;
-                }
-                Err(e) => {
-                    eprintln!("Failed <<< {} - {}", package.name, e);
-                    failed_builds += 1;
-                    
-                    if !self.config.continue_on_error {
-                        return Err(format!("Build failed for package {}: {}", package.name, e).into());
-                    }
-                }
-            }
-        }
-        
-        println!("\nBuild Summary:");
-        println!("  {} packages succeeded", successful_builds);
-        if failed_builds > 0 {
-            println!("  {} packages failed", failed_builds);
-        }
-        
-        // Generate environment setup scripts
-        self.generate_setup_scripts(packages)?;
-        
-        Ok(())
-    }
+    // Note: Legacy sequential build method removed to clean up unused code.
+    // The active implementation uses build_sequential_filtered for sequential builds.
     
     /// Sequential build using filtered environment (fixed version)
     fn build_sequential_filtered(
