@@ -33,39 +33,39 @@ _roc_completion() {{
 
     case "${{words[1]}}" in
         launch)
-            case "$cword" in
+             case "$cword" in
                 2)
                     # Complete package names
                     local packages=$(roc _complete launch "" 1 2>/dev/null || echo "")
                     COMPREPLY=($(compgen -W "$packages" -- "$cur"))
-                    ;;
+                    ;; 
                 3)
                     # Complete launch files for the given package
                     local launch_files=$(roc _complete launch "" 2 2>/dev/null || echo "")
                     COMPREPLY=($(compgen -W "$launch_files" -- "$cur"))
-                    ;;
-            esac
-            ;;
+                    ;; 
+             esac
+             ;; 
         run)
-            case "$cword" in
+             case "$cword" in
                 2)
                     # Complete package names
                     local packages=$(roc _complete run "" 1 2>/dev/null || echo "")
                     COMPREPLY=($(compgen -W "$packages" -- "$cur"))
-                    ;;
+                    ;; 
                 3)
                     # Complete executables for the given package
                     local executables=$(roc _complete run "" 2 2>/dev/null || echo "")
                     COMPREPLY=($(compgen -W "$executables" -- "$cur"))
-                    ;;
-            esac
-            ;;
-        *)
+                    ;; 
+             esac
+             ;; 
+         *)
             # Default completion for other commands
             local commands="action topic service param node interface frame run launch work bag daemon middleware completion"
             COMPREPLY=($(compgen -W "$commands" -- "$cur"))
-            ;;
-    esac
+            ;; 
+     esac
 }}
 
 complete -F _roc_completion roc
@@ -105,32 +105,32 @@ _roc() {{
             ;;
         args)
             case $words[1] in
-                launch)
+               launch)
                     case $CURRENT in
                         2)
                             # Complete package names
                             local packages=($(roc _complete launch "" 1 2>/dev/null))
                             _describe 'packages' packages
-                            ;;
+                            ;; 
                         3)
                             # Complete launch files
                             local launch_files=($(roc _complete launch "" 2 2>/dev/null))
                             _describe 'launch files' launch_files
-                            ;;
+                            ;; 
                     esac
                     ;;
-                run)
+               run)
                     case $CURRENT in
                         2)
                             # Complete package names
                             local packages=($(roc _complete run "" 1 2>/dev/null))
                             _describe 'packages' packages
-                            ;;
+                            ;; 
                         3)
                             # Complete executables
                             local executables=($(roc _complete run "" 2 2>/dev/null))
                             _describe 'executables' executables
-                            ;;
+                            ;; 
                     esac
                     ;;
             esac
@@ -138,8 +138,11 @@ _roc() {{
     esac
 }}
 
-_roc "$@"
+# ensure _roc is registered
+compdef _roc roc
 "#);
+    // ensure the `_roc` function is registered for the `roc` command
+    println!("compdef _roc roc");
 }
 
 fn print_fish_completions() {
@@ -181,39 +184,39 @@ _roc_completion() {
 
     case "${words[1]}" in
         launch)
-            case "$cword" in
+             case "$cword" in
                 2)
                     # Complete package names
                     local packages=$(roc _complete launch "" 1 2>/dev/null || echo "")
                     COMPREPLY=($(compgen -W "$packages" -- "$cur"))
-                    ;;
+                    ;; 
                 3)
                     # Complete launch files for the given package
                     local launch_files=$(roc _complete launch "" 2 2>/dev/null || echo "")
                     COMPREPLY=($(compgen -W "$launch_files" -- "$cur"))
-                    ;;
-            esac
-            ;;
+                    ;; 
+             esac
+             ;; 
         run)
-            case "$cword" in
+             case "$cword" in
                 2)
                     # Complete package names
                     local packages=$(roc _complete run "" 1 2>/dev/null || echo "")
                     COMPREPLY=($(compgen -W "$packages" -- "$cur"))
-                    ;;
+                    ;; 
                 3)
                     # Complete executables for the given package
                     local executables=$(roc _complete run "" 2 2>/dev/null || echo "")
                     COMPREPLY=($(compgen -W "$executables" -- "$cur"))
-                    ;;
-            esac
-            ;;
-        *)
+                    ;; 
+             esac
+             ;; 
+         *)
             # Default completion for other commands
             local commands="action topic service param node interface frame run launch work bag daemon middleware completion"
             COMPREPLY=($(compgen -W "$commands" -- "$cur"))
-            ;;
-    esac
+             ;; 
+     esac
 }
 
 complete -F _roc_completion roc
@@ -253,32 +256,32 @@ _roc() {
             ;;
         args)
             case $words[1] in
-                launch)
+               launch)
                     case $CURRENT in
                         2)
                             # Complete package names
                             local packages=($(roc _complete launch "" 1 2>/dev/null))
                             _describe 'packages' packages
-                            ;;
+                            ;; 
                         3)
                             # Complete launch files
                             local launch_files=($(roc _complete launch "" 2 2>/dev/null))
                             _describe 'launch files' launch_files
-                            ;;
+                            ;; 
                     esac
                     ;;
-                run)
+               run)
                     case $CURRENT in
                         2)
                             # Complete package names
                             local packages=($(roc _complete run "" 1 2>/dev/null))
                             _describe 'packages' packages
-                            ;;
+                            ;; 
                         3)
                             # Complete executables
                             local executables=($(roc _complete run "" 2 2>/dev/null))
                             _describe 'executables' executables
-                            ;;
+                            ;; 
                     esac
                     ;;
             esac
@@ -286,7 +289,6 @@ _roc() {
     esac
 }
 
-_roc "$@"
 "#.to_string()
 }
 
