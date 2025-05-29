@@ -9,14 +9,28 @@ pub fn cmd() -> Command {
         .arg(
             arg!(<PACKAGE_NAME> "Name of the ROS package to run (e.g. 'demo_nodes_cpp')")
             .required(true)
+            .value_parser(package_value_parser)
         )
         .arg(
             arg!(<EXECUTABLE_NAME> "Name of the ROS executable to run (e.g. 'talker')")
             .required(true)
+            .value_parser(executable_value_parser)
         )
         .arg(
             arg!(<ARGV> "Pass arbitrary arguments to the executable (e.g. '__log_level:=debug')")
             .required(true)
         )
         .arg(arg!(--prefix <PREFIX> "Prefix command, which should go before the executable (e.g. --prefix 'gdb -ex run --args')"))
+}
+
+fn package_value_parser(s: &str) -> Result<String, String> {
+    // This is where we could add validation for package names
+    // For now, just return the string as-is
+    Ok(s.to_string())
+}
+
+fn executable_value_parser(s: &str) -> Result<String, String> {
+    // This is where we could add validation for executable names
+    // For now, just return the string as-is
+    Ok(s.to_string())
 }

@@ -14,6 +14,8 @@ pub mod work;
 pub mod bag;
 pub mod daemon;
 pub mod middleware;
+pub mod completion;
+pub mod complete;
 
 use clap::{Command, builder::styling, arg};
 use colored::Colorize;
@@ -74,7 +76,10 @@ Workspace Commands:".bright_blue().bold().to_string().as_str()+"
 Communication Commands:".bright_blue().bold().to_string().as_str()+"     
   "+ &command_str("bag") + "         "+&letter_str("b")+ &descriptin_str("ROS bag tools") + "
   "+ &command_str("daemon") + "      "+&letter_str("d")+ &descriptin_str("Deamon and bridge [WIP]") + "
-  "+ &command_str("middleware") + "  "+&letter_str("m")+ &descriptin_str("Middleware settings [WIP]");
+  "+ &command_str("middleware") + "  "+&letter_str("m")+ &descriptin_str("Middleware settings [WIP]") + "
+
+Shell Integration:".bright_blue().bold().to_string().as_str()+"
+  "+ &command_str("completion") + "  "+&letter_str("c")+ &descriptin_str("Generate shell completions");
 
     let styles = styling::Styles::styled()
         .header(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
@@ -107,5 +112,7 @@ Communication Commands:".bright_blue().bold().to_string().as_str()+"
         .subcommand(bag::cmd())
         .subcommand(daemon::cmd())
         .subcommand(middleware::cmd())
+        .subcommand(completion::cmd())
+        .subcommand(complete::cmd())
         .arg(arg!(--about "about"))
 }

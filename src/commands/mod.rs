@@ -13,6 +13,8 @@ pub mod work;
 pub mod bag;
 pub mod daemon;
 pub mod middleware;
+pub mod completion;
+pub mod complete;
 
 use clap::ArgMatches;
 
@@ -56,6 +58,12 @@ pub fn handle(matches: ArgMatches) {
         }
         Some(("middleware", submatch)) => {
             middleware::handle(submatch.clone());
+        }
+        Some(("completion", submatch)) => {
+            completion::handle(submatch.clone());
+        }
+        Some(("_complete", submatch)) => {
+            complete::handle(submatch.clone());
         }
         _ => unreachable!("UNREACHABLE"),
     };

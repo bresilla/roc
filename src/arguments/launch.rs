@@ -9,10 +9,12 @@ pub fn cmd() -> Command {
         .arg(
             arg!(<PACKAGE_NAME> "Name of the ROS package which contains the launch file")
             .required(true)
+            .value_parser(package_value_parser)
         )
         .arg(
             arg!(<LAUNCH_FILE_NAME> "Name of the launch file")
             .required(true)
+            .value_parser(launch_file_value_parser)
         )
         .arg(
             arg!(<LAUNCH_ARGUMENTS> "Arguments to the launch file; '<name>:=<value>' (for duplicates, last one wins)")
@@ -25,4 +27,16 @@ pub fn cmd() -> Command {
         .arg(arg!(-a --show_all "Show all launched subprocesses' output"))
         .arg(arg!(--launch_prefix <LAUNCH_PREFIX> "Prefix command before executables (e.g. --launch-prefix 'xterm -e gdb -ex run --args')."))
         .arg(arg!(--launch_prefix_filter <LAUNCH_PREFIX_FILTER> "Regex pattern for executable filtering with --launch-prefix."))
+}
+
+fn package_value_parser(s: &str) -> Result<String, String> {
+    // This is where we could add validation for package names
+    // For now, just return the string as-is
+    Ok(s.to_string())
+}
+
+fn launch_file_value_parser(s: &str) -> Result<String, String> {
+    // This is where we could add validation for launch file names
+    // For now, just return the string as-is
+    Ok(s.to_string())
 }
