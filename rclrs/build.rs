@@ -5,8 +5,9 @@ fn main() {
     // Tell cargo to look for shared libraries in the ROS 2 installation
     println!("cargo:rustc-link-search=native=/opt/ros/jazzy/lib");
     
-    // Link to the RCL library
+    // Link to the RCL and RMW libraries
     println!("cargo:rustc-link-lib=rcl");
+    println!("cargo:rustc-link-lib=rmw");
     
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=wrapper.h");
@@ -35,10 +36,19 @@ fn main() {
         .allowlist_function("rcl_init")
         .allowlist_function("rcl_shutdown")
         .allowlist_function("rcl_context_is_valid")
+        // RMW basic functions
+        .allowlist_function("rmw_get_zero_initialized_init_options")
+        .allowlist_function("rmw_init")
+        .allowlist_function("rmw_shutdown")
         // Also include the basic types we need
         .allowlist_type("rcl_context_t")
         .allowlist_type("rcl_allocator_t")
         .allowlist_type("rcl_init_options_t")
+        // RMW basic types
+        .allowlist_type("rmw_init_options_t")
+        .allowlist_type("rmw_context_t")
+        .allowlist_type("rmw_allocator_t")
+        .allowlist_type("rmw_ret_t")
         // Generate the bindings
         .generate()
         // Unwrap the Result and panic on failure

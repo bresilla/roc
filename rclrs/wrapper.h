@@ -7,4 +7,11 @@
 #include "rcl/rcl/init_options.h"
 #include "rcl/rcl/init.h"
 
+// Basic RMW headers
+#include "rmw/rmw/types.h"
+#include "rmw/rmw/init.h"
+#include "rmw/rmw/init_options.h"
+#include "rmw/rmw/ret_types.h"
+#include "rmw/rmw/allocators.h"
+
 #endif // WRAPPER_H
