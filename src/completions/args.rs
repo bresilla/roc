@@ -10,5 +10,6 @@ pub fn cmd() -> Command {
             .value_parser(["bash", "zsh", "fish"]))
         .arg(Arg::new("install")
             .long("install")
-            .help("Install the generated completions to a default location"))
+            .help("Install the generated completions to a default location")
+            .action(clap::ArgAction::SetTrue))
 }
