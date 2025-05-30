@@ -9,19 +9,23 @@ use crate::utils::{get_ros_workspace_paths, is_executable};
 pub fn handle(matches: ArgMatches) {
     let command = matches.get_one::<String>("command").unwrap();
     let sub = matches.get_one::<String>("subcommand");
+    let subsub = matches.get_one::<String>("subsubcommand");
     let pos = matches.get_one::<String>("position").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
     let current_args: Vec<String> = matches.get_many::<String>("current_args")
         .map(|values| values.cloned().collect())
         .unwrap_or_default();
 
-    match (command.as_str(), sub.map(|s| s.as_str()).filter(|s| !s.is_empty()), pos) {
-        ("launch", None, 1) => {
+    let sub_clean = sub.map(|s| s.as_str()).filter(|s| !s.is_empty());
+    let subsub_clean = subsub.map(|s| s.as_str()).filter(|s| !s.is_empty());
+
+    match (command.as_str(), sub_clean, subsub_clean, pos) {
+        // roc launch completion
+        ("launch", None, None, 1) => {
             for package in find_packages_with_launch_files() {
                 println!("{}", package);
             }
         }
-        ("launch", None, 2) => {
-            // Filter launch files by the package specified in position 1
+        ("launch", None, None, 2) => {
             let package_filter = current_args.get(0).map(|s| s.as_str());
             for launch_file in find_launch_files_for_package(package_filter) {
                 if let Some((_, file)) = launch_file.split_once(':') {
@@ -29,13 +33,14 @@ pub fn handle(matches: ArgMatches) {
                 }
             }
         }
-        ("run", None, 1) => {
+        
+        // roc run completion
+        ("run", None, None, 1) => {
             for package in find_packages() {
                 println!("{}", package);
             }
         }
-        ("run", None, 2) => {
-            // Filter executables by the package specified in position 1
+        ("run", None, None, 2) => {
             let package_filter = current_args.get(0).map(|s| s.as_str());
             for executable in find_executables_for_package(package_filter) {
                 if let Some((_, name)) = executable.split_once(':') {
@@ -43,8 +48,172 @@ pub fn handle(matches: ArgMatches) {
                 }
             }
         }
+        
+        // roc topic completion
+        ("topic", None, None, 1) => {
+            // Complete topic subcommands
+            let subcommands = ["echo", "info", "list", "pub", "bw", "delay", "find", "hz", "type"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("topic", Some("echo" | "info" | "bw" | "delay" | "hz" | "type"), None, 1) => {
+            // Complete topic names
+            for topic in find_topics() {
+                println!("{}", topic);
+            }
+        }
+        ("topic", Some("pub"), None, 1) => {
+            // Complete topic names for publishing
+            for topic in find_topics() {
+                println!("{}", topic);
+            }
+        }
+        ("topic", Some("pub"), None, 2) => {
+            // Complete message types
+            for msg_type in find_message_types() {
+                println!("{}", msg_type);
+            }
+        }
+        ("topic", Some("find"), None, 1) => {
+            // Complete message types for find
+            for msg_type in find_message_types() {
+                println!("{}", msg_type);
+            }
+        }
+        
+        // roc service completion
+        ("service", None, None, 1) => {
+            let subcommands = ["call", "find", "list", "type"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("service", Some("call" | "type"), None, 1) => {
+            for service in find_services() {
+                println!("{}", service);
+            }
+        }
+        ("service", Some("find"), None, 1) => {
+            for service_type in find_service_types() {
+                println!("{}", service_type);
+            }
+        }
+        
+        // roc param completion
+        ("param", None, None, 1) => {
+            let subcommands = ["get", "set", "list", "describe", "remove", "export", "import"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("param", Some("get" | "set" | "describe" | "remove"), None, 1) => {
+            for param in find_parameters() {
+                println!("{}", param);
+            }
+        }
+        
+        // roc node completion
+        ("node", None, None, 1) => {
+            let subcommands = ["list", "info"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("node", Some("info"), None, 1) => {
+            for node in find_nodes() {
+                println!("{}", node);
+            }
+        }
+        
+        // roc action completion
+        ("action", None, None, 1) => {
+            let subcommands = ["list", "info", "goal"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("action", Some("info" | "goal"), None, 1) => {
+            for action in find_actions() {
+                println!("{}", action);
+            }
+        }
+        
+        // roc interface completion
+        ("interface", None, None, 1) => {
+            let subcommands = ["list", "show", "package", "model"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("interface", Some("show"), None, 1) => {
+            for interface in find_interfaces() {
+                println!("{}", interface);
+            }
+        }
+        ("interface", Some("package"), None, 1) => {
+            for package in find_packages() {
+                println!("{}", package);
+            }
+        }
+        
+        // roc bag completion
+        ("bag", None, None, 1) => {
+            let subcommands = ["record", "play", "info", "list"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("bag", Some("play" | "info"), None, 1) => {
+            for bag in find_bag_files() {
+                println!("{}", bag);
+            }
+        }
+        
+        // roc work completion
+        ("work", None, None, 1) => {
+            let subcommands = ["build", "create", "info", "list"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("work", Some("build"), None, 1) => {
+            for package in find_packages() {
+                println!("{}", package);
+            }
+        }
+        
+        // roc frame completion
+        ("frame", None, None, 1) => {
+            let subcommands = ["list", "echo", "info", "pub"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        ("frame", Some("echo" | "info"), None, 1) => {
+            for frame in find_frames() {
+                println!("{}", frame);
+            }
+        }
+        
+        // roc daemon completion
+        ("daemon", None, None, 1) => {
+            let subcommands = ["start", "stop", "status"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        
+        // roc middleware completion
+        ("middleware", None, None, 1) => {
+            let subcommands = ["get", "set", "list"];
+            for subcommand in subcommands {
+                println!("{}", subcommand);
+            }
+        }
+        
         _ => {
-            // No completions for other positions
+            // No completions for other positions/commands
         }
     }
 }
@@ -344,4 +513,67 @@ fn find_package_name(dir: &PathBuf) -> Option<String> {
         } else { break; }
     }
     None
+}
+
+// Stub functions for ROS runtime completions
+// These would typically query running ROS systems, but for now return empty lists
+
+/// Find active ROS topics
+fn find_topics() -> Vec<String> {
+    // In a real implementation, this would run `ros2 topic list`
+    vec![]
+}
+
+/// Find available message types
+fn find_message_types() -> Vec<String> {
+    // In a real implementation, this would run `ros2 interface list` and filter for msg types
+    vec![]
+}
+
+/// Find active ROS services
+fn find_services() -> Vec<String> {
+    // In a real implementation, this would run `ros2 service list`
+    vec![]
+}
+
+/// Find available service types
+fn find_service_types() -> Vec<String> {
+    // In a real implementation, this would run `ros2 interface list` and filter for srv types
+    vec![]
+}
+
+/// Find ROS parameters
+fn find_parameters() -> Vec<String> {
+    // In a real implementation, this would run `ros2 param list`
+    vec![]
+}
+
+/// Find active ROS nodes
+fn find_nodes() -> Vec<String> {
+    // In a real implementation, this would run `ros2 node list`
+    vec![]
+}
+
+/// Find active ROS actions
+fn find_actions() -> Vec<String> {
+    // In a real implementation, this would run `ros2 action list`
+    vec![]
+}
+
+/// Find available interfaces (msg/srv/action types)
+fn find_interfaces() -> Vec<String> {
+    // In a real implementation, this would run `ros2 interface list`
+    vec![]
+}
+
+/// Find ROS bag files in current directory
+fn find_bag_files() -> Vec<String> {
+    // In a real implementation, this would scan for .db3 or bag files
+    vec![]
+}
+
+/// Find TF frames
+fn find_frames() -> Vec<String> {
+    // In a real implementation, this would run `ros2 run tf2_tools view_frames.py` or similar
+    vec![]
 }

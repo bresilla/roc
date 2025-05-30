@@ -2,7 +2,5 @@
 pub mod args;
 pub mod internal;
 pub mod handler;
-pub mod bash;
-pub mod zsh;
-pub mod fish;
+pub mod shells;
 pub mod dynamic;

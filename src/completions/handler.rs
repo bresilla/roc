@@ -1,5 +1,5 @@
 use clap::ArgMatches;
-use crate::completions::{bash, zsh, fish, dynamic};
+use crate::completions::{shells, dynamic};
 
 /// Handle `roc completion` (print or install)
 pub fn handle(matches: ArgMatches) {
@@ -8,23 +8,23 @@ pub fn handle(matches: ArgMatches) {
     match shell.as_str() {
         "bash" => {
             if install {
-                bash::install_completion();
+                shells::bash::install_completion();
             } else {
-                bash::print_completions();
+                shells::bash::print_completions();
             }
         }
         "zsh" => {
             if install {
-                zsh::install_completion();
+                shells::zsh::install_completion();
             } else {
-                zsh::print_completions();
+                shells::zsh::print_completions();
             }
         }
         "fish" => {
             if install {
-                fish::install_completion();
+                shells::fish::install_completion();
             } else {
-                fish::print_completions();
+                shells::fish::print_completions();
             }
         }
         other => eprintln!("Unknown shell: {}", other),

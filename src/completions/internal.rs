@@ -18,15 +18,21 @@ pub fn cmd() -> Command {
                 .index(2)
         )
         .arg(
+            Arg::new("subsubcommand")
+                .help("The sub-subcommand being completed")
+                .required(false)
+                .index(3)
+        )
+        .arg(
             Arg::new("position")
                 .help("The argument position to complete")
                 .required(false)
-                .index(3)
+                .index(4)
         )
         .arg(
             Arg::new("current_args")
                 .help("Current arguments on the command line")
                 .num_args(0..)
-                .index(4)
+                .index(5)
         )
 }
