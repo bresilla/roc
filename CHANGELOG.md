@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.2.0] - 2025-05-30
+
+### <!-- 0 -->⛰️  Features
+
+- Feat: Implement dynamic shell completions
+- Improve ROS 2 launch and run completion with package filtering
+- Improve ROS completion path discovery
+- Add command completions for `_roc`
+- Support finding sourced package executables
+- Add shell command completion support
+- Introduce RMW bindings and basic examples
+- Initial import of the rclrs Rust client library
+- Add Rust package templating support
+- Implement package parallel builds
+- Replace colcon with custom build tool
+- Implement workspace and command stubs
+- Refactor CLI command execution pattern
+
+### <!-- 2 -->🚜 Refactor
+
+- Refactor completion logic into dedicated module
+- Enhance `info` and `list` commands with package data
+- Refactor package creation and add new template files
+
+### <!-- 3 -->📚 Documentation
+
+- Add a README for the rclrs crate
+
+### <!-- 6 -->🧪 Testing
+
+- Simplify and test package template generation
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Ignore VS Code settings and clean up configuration files
+- Ignore devbox directory in version control
+- Refactor environment setup and improve devbox configuration
+
+### Build
+
+- Remove deprecated ROS 2 templates
+- Remove unused build code
+- Build refactorings
+
 ## [0.1.34] - 2025-05-28
 
 ### <!-- 0 -->⛰️  Features
