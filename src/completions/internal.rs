@@ -23,4 +23,10 @@ pub fn cmd() -> Command {
                 .required(false)
                 .index(3)
         )
+        .arg(
+            Arg::new("current_args")
+                .help("Current arguments on the command line")
+                .num_args(0..)
+                .index(4)
+        )
 }

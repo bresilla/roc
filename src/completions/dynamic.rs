@@ -3,21 +3,27 @@ use std::{fs, env};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 use std::collections::HashSet;
+use crate::utils::{get_ros_workspace_paths, is_executable};
 
 /// Handle internal dynamic completion (_complete)
 pub fn handle(matches: ArgMatches) {
     let command = matches.get_one::<String>("command").unwrap();
     let sub = matches.get_one::<String>("subcommand");
     let pos = matches.get_one::<String>("position").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+    let current_args: Vec<String> = matches.get_many::<String>("current_args")
+        .map(|values| values.cloned().collect())
+        .unwrap_or_default();
 
     match (command.as_str(), sub.map(|s| s.as_str()).filter(|s| !s.is_empty()), pos) {
         ("launch", None, 1) => {
-            for package in find_packages() {
+            for package in find_packages_with_launch_files() {
                 println!("{}", package);
             }
         }
         ("launch", None, 2) => {
-            for launch_file in find_launch_files() {
+            // Filter launch files by the package specified in position 1
+            let package_filter = current_args.get(0).map(|s| s.as_str());
+            for launch_file in find_launch_files_for_package(package_filter) {
                 if let Some((_, file)) = launch_file.split_once(':') {
                     println!("{}", file);
                 }
@@ -29,7 +35,9 @@ pub fn handle(matches: ArgMatches) {
             }
         }
         ("run", None, 2) => {
-            for executable in find_executables() {
+            // Filter executables by the package specified in position 1
+            let package_filter = current_args.get(0).map(|s| s.as_str());
+            for executable in find_executables_for_package(package_filter) {
                 if let Some((_, name)) = executable.split_once(':') {
                     println!("{}", name);
                 }
@@ -57,20 +65,15 @@ fn find_launch_files() -> Vec<String> {
             {
                 if entry.file_type().is_file() {
                     let path = entry.path();
-                    if let Some(ext) = path.extension() {
-                        if (ext == "py" || ext == "launch" || ext == "xml") 
-                            && (path.to_string_lossy().contains("/launch/")
-                                || path.to_string_lossy().contains("launch.py")
-                                || path.to_string_lossy().contains("launch.xml")) {
-                            
-                            // Extract package name from path like /opt/ros/humble/share/package_name/launch/file.launch.py
-                            if let Some(share_idx) = path.to_string_lossy().find("/share/") {
-                                let after_share = &path.to_string_lossy()[share_idx + 7..];
-                                if let Some(next_slash) = after_share.find('/') {
-                                    let package_name = &after_share[..next_slash];
-                                    if let Some(stem) = path.file_stem() {
-                                        launch_files.insert(format!("{}:{}", package_name, stem.to_string_lossy()));
-                                    }
+                    // Check if the file is in a launch directory
+                    if path.to_string_lossy().contains("/launch/") {
+                        // Extract package name from path like /opt/ros/humble/share/package_name/launch/file.launch.py
+                        if let Some(share_idx) = path.to_string_lossy().find("/share/") {
+                            let after_share = &path.to_string_lossy()[share_idx + 7..];
+                            if let Some(next_slash) = after_share.find('/') {
+                                let package_name = &after_share[..next_slash];
+                                if let Some(file_name) = path.file_name() {
+                                    launch_files.insert(format!("{}:{}", package_name, file_name.to_string_lossy()));
                                 }
                             }
                         }
@@ -91,23 +94,18 @@ fn find_launch_files() -> Vec<String> {
             {
                 if entry.file_type().is_file() {
                     let path = entry.path();
-                    if let Some(ext) = path.extension() {
-                        if (ext == "py" || ext == "launch" || ext == "xml")
-                            && (path.to_string_lossy().contains("/launch/")
-                                || path.to_string_lossy().contains("launch.py")
-                                || path.to_string_lossy().contains("launch.xml")) {
-                            
-                            // Try to find package name by looking for package.xml
-                            let mut current_path = path.parent();
-                            while let Some(dir) = current_path {
-                                if let Some(pkg_name) = find_package_name(&dir.to_path_buf()) {
-                                    if let Some(stem) = path.file_stem() {
-                                        launch_files.insert(format!("{}:{}", pkg_name, stem.to_string_lossy()));
-                                    }
-                                    break;
+                    // Check if the file is in a launch directory
+                    if path.to_string_lossy().contains("/launch/") {
+                        // Try to find package name by looking for package.xml
+                        let mut current_path = path.parent();
+                        while let Some(dir) = current_path {
+                            if let Some(pkg_name) = find_package_name(&dir.to_path_buf()) {
+                                if let Some(file_name) = path.file_name() {
+                                    launch_files.insert(format!("{}:{}", pkg_name, file_name.to_string_lossy()));
                                 }
-                                current_path = dir.parent();
+                                break;
                             }
+                            current_path = dir.parent();
                         }
                     }
                 }
@@ -116,6 +114,58 @@ fn find_launch_files() -> Vec<String> {
     }
     
     launch_files.into_iter().collect()
+}
+
+/// Get packages that have launch files
+fn find_packages_with_launch_files() -> Vec<String> {
+    let launch_files = find_launch_files();
+    let mut packages = HashSet::new();
+    
+    for launch_file in launch_files {
+        if let Some((package, _)) = launch_file.split_once(':') {
+            packages.insert(package.to_string());
+        }
+    }
+    
+    packages.into_iter().collect()
+}
+
+/// Get launch files for a specific package (or all if no package specified)
+fn find_launch_files_for_package(package_filter: Option<&str>) -> Vec<String> {
+    let all_launch_files = find_launch_files();
+    
+    if let Some(package) = package_filter {
+        all_launch_files.into_iter()
+            .filter(|launch_file| {
+                if let Some((pkg, _)) = launch_file.split_once(':') {
+                    pkg == package
+                } else {
+                    false
+                }
+            })
+            .collect()
+    } else {
+        all_launch_files
+    }
+}
+
+/// Get executables for a specific package (or all if no package specified)
+fn find_executables_for_package(package_filter: Option<&str>) -> Vec<String> {
+    let all_executables = find_executables();
+    
+    if let Some(package) = package_filter {
+        all_executables.into_iter()
+            .filter(|executable| {
+                if let Some((pkg, _)) = executable.split_once(':') {
+                    pkg == package
+                } else {
+                    false
+                }
+            })
+            .collect()
+    } else {
+        all_executables
+    }
 }
 
 /// Scan ROS workspaces for executables
@@ -275,42 +325,6 @@ fn find_packages() -> Vec<String> {
     packages.into_iter().collect()
 }
 
-/// Common ROS workspace paths
-fn get_ros_workspace_paths() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    if let Ok(distro) = env::var("ROS_DISTRO") {
-        paths.push(PathBuf::from(format!("/opt/ros/{}", distro)));
-    }
-    if let Ok(dir) = env::current_dir() {
-        paths.push(dir.clone());
-        let mut p = dir.clone();
-        for _ in 0..5 {
-            if let Some(parent) = p.parent() {
-                p = parent.to_path_buf();
-                if p.join("src").exists() || p.join("install").exists() || p.join("devel").exists() {
-                    paths.push(p.clone());
-                }
-            }
-        }
-    }
-    if let Ok(prefix) = env::var("COLCON_PREFIX_PATH") {
-        for part in prefix.split(':') {
-            if let Some(parent) = PathBuf::from(part).parent() {
-                paths.push(parent.to_path_buf());
-            }
-        }
-    }
-    if let Ok(prefix) = env::var("AMENT_PREFIX_PATH") {
-        for part in prefix.split(':') {
-            if let Some(parent) = PathBuf::from(part).parent() {
-                paths.push(parent.to_path_buf());
-            }
-        }
-    }
-    paths.sort(); paths.dedup();
-    paths
-}
-
 /// Find ROS package name
 fn find_package_name(dir: &PathBuf) -> Option<String> {
     let mut current = dir.clone();
@@ -330,21 +344,4 @@ fn find_package_name(dir: &PathBuf) -> Option<String> {
         } else { break; }
     }
     None
-}
-
-/// Check executable bit or extension
-fn is_executable(path: &std::path::Path) -> bool {
-    #[cfg(unix)] {
-        use std::os::unix::fs::PermissionsExt;
-        if let Ok(meta) = fs::metadata(path) {
-            return meta.permissions().mode() & 0o111 != 0;
-        }
-    }
-    #[cfg(not(unix))] {
-        if let Some(ext) = path.extension() {
-            let e = ext.to_string_lossy().to_lowercase();
-            return matches!(e.as_str(), "exe" | "bat" | "cmd");
-        }
-    }
-    false
 }

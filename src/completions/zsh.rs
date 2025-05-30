@@ -42,8 +42,8 @@ _roc() {
                             _describe 'packages' packages
                             ;; 
                         3)
-                            # Complete launch files
-                            local launch_files=($(roc _complete launch "" 2 2>/dev/null))
+                            # Complete launch files for specific package
+                            local launch_files=($(roc _complete launch "" 2 "${words[2]}" 2>/dev/null))
                             _describe 'launch files' launch_files
                             ;; 
                     esac
@@ -56,8 +56,8 @@ _roc() {
                             _describe 'packages' packages
                             ;; 
                         3)
-                            # Complete executables
-                            local executables=($(roc _complete run "" 2 2>/dev/null))
+                            # Complete executables for specific package
+                            local executables=($(roc _complete run "" 2 "${words[2]}" 2>/dev/null))
                             _describe 'executables' executables
                             ;; 
                     esac
