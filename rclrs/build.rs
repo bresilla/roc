@@ -43,11 +43,13 @@ fn main() {
         .allowlist_function("rcutils_get_default_allocator")
         .allowlist_function("rcl_get_zero_initialized_init_options")
         .allowlist_function("rcl_init_options_init")
+        .allowlist_function("rcl_init_options_get_rmw_init_options")
         .allowlist_function("rcl_init")
         .allowlist_function("rcl_shutdown")
         .allowlist_function("rcl_context_is_valid")
         // RMW basic functions
         .allowlist_function("rmw_get_zero_initialized_init_options")
+        .allowlist_function("rmw_init_options_init")
         .allowlist_function("rmw_init")
         .allowlist_function("rmw_shutdown")
         // Node functions
