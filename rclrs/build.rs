@@ -50,10 +50,27 @@ fn main() {
         .allowlist_function("rmw_get_zero_initialized_init_options")
         .allowlist_function("rmw_init")
         .allowlist_function("rmw_shutdown")
+        // Node functions
+        .allowlist_function("rcl_get_zero_initialized_node")
+        .allowlist_function("rcl_node_init")
+        .allowlist_function("rcl_node_fini")
+        .allowlist_function("rcl_node_is_valid")
+        // Graph discovery functions
+        .allowlist_function("rcl_get_node_names")
+        .allowlist_function("rcl_get_node_names_with_enclaves")
+        .allowlist_function("rcl_get_topic_names_and_types")
+        .allowlist_function("rcl_get_service_names_and_types")
+        .allowlist_function("rcl_names_and_types_fini")
         // Also include the basic types we need
         .allowlist_type("rcl_context_t")
         .allowlist_type("rcl_allocator_t")
         .allowlist_type("rcl_init_options_t")
+        // Node types
+        .allowlist_type("rcl_node_t")
+        .allowlist_type("rcl_node_options_t")
+        // Graph discovery types
+        .allowlist_type("rcl_names_and_types_t")
+        .allowlist_type("rcutils_string_array_t")
         // RMW basic types
         .allowlist_type("rmw_init_options_t")
         .allowlist_type("rmw_context_t")
