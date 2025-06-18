@@ -29,8 +29,36 @@ fn run_command(matches: ArgMatches) -> Result<()> {
 
     // Handle --show-types flag
     if matches.get_flag("show_types") {
-        eprintln!("Error: --show-types flag not yet implemented in direct RCL mode");
-        return Err(anyhow::anyhow!("--show-types not implemented"));
+        // Get topics with their type information
+        let topics_with_types = graph_context.get_topics_with_types()
+            .map_err(|e| anyhow::anyhow!("Failed to get topic types: {}", e))?;
+        
+        // Filter hidden topics if needed
+        let filtered_topics: Vec<_> = if matches.get_flag("include_hidden_topics") {
+            topics_with_types
+        } else {
+            topics_with_types.into_iter()
+                .filter(|topic| !topic.name.starts_with("/_"))
+                .collect()
+        };
+        
+        // Display topics with types
+        for topic in &filtered_topics {
+            if topic.types.is_empty() {
+                println!("{} [unknown type]", topic.name);
+            } else if topic.types.len() == 1 {
+                println!("{} [{}]", topic.name, topic.types[0]);
+            } else {
+                // Multiple types (rare but possible)
+                println!("{} [{}]", topic.name, topic.types.join(", "));
+            }
+        }
+        
+        if filtered_topics.is_empty() {
+            eprintln!("No topics found.");
+        }
+        
+        return Ok(());
     }
 
     // Simple topic list (default behavior)

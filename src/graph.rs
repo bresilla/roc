@@ -215,6 +215,74 @@ impl RclGraphContext {
             Ok(result)
         }
     }
+
+    /// Get all topics in the ROS graph with their type information using direct RCL API calls
+    pub fn get_topics_with_types(&self) -> Result<Vec<TopicInfo>> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+        
+        unsafe {
+            let mut allocator = rcutils_get_default_allocator();
+            let mut topic_names_and_types = rcl_names_and_types_t { 
+                names: rcutils_get_zero_initialized_string_array(),
+                types: ptr::null_mut(),
+            };
+            
+            let ret = rcl_get_topic_names_and_types(
+                &self.node,
+                &mut allocator,
+                false, // no_demangle
+                &mut topic_names_and_types,
+            );
+            
+            if ret != 0 {
+                return Err(anyhow!("Failed to get topic names and types: {}", ret));
+            }
+            
+            // Convert the topic names and types to Vec<TopicInfo>
+            let mut result = Vec::new();
+            for i in 0..topic_names_and_types.names.size {
+                if !topic_names_and_types.names.data.add(i).is_null() {
+                    let name_ptr = *topic_names_and_types.names.data.add(i);
+                    if !name_ptr.is_null() {
+                        let name_cstr = std::ffi::CStr::from_ptr(name_ptr);
+                        if let Ok(name_str) = name_cstr.to_str() {
+                            // Get the types for this topic
+                            let mut topic_types = Vec::new();
+                            if !topic_names_and_types.types.is_null() {
+                                let types_array = topic_names_and_types.types.add(i);
+                                if !types_array.is_null() {
+                                    let types_for_topic = &*types_array;
+                                    for j in 0..types_for_topic.size {
+                                        if !types_for_topic.data.add(j).is_null() {
+                                            let type_ptr = *types_for_topic.data.add(j);
+                                            if !type_ptr.is_null() {
+                                                let type_cstr = std::ffi::CStr::from_ptr(type_ptr);
+                                                if let Ok(type_str) = type_cstr.to_str() {
+                                                    topic_types.push(type_str.to_string());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            result.push(TopicInfo {
+                                name: name_str.to_string(),
+                                types: topic_types,
+                            });
+                        }
+                    }
+                }
+            }
+            
+            // Clean up
+            rcl_names_and_types_fini(&mut topic_names_and_types);
+            
+            Ok(result)
+        }
+    }
 }
 
 impl Drop for RclGraphContext {
@@ -227,6 +295,13 @@ impl Drop for RclGraphContext {
             self.is_initialized = false;
         }
     }
+}
+
+/// Topic information including name and types
+#[derive(Debug, Clone)]
+pub struct TopicInfo {
+    pub name: String,
+    pub types: Vec<String>,
 }
 
 #[cfg(test)]
