@@ -25,6 +25,13 @@ fn main() {
         .clang_arg("-I/opt/ros/jazzy/include/rcl_yaml_param_parser")
         .clang_arg("-I/opt/ros/jazzy/include/rosidl_runtime_c")
         .clang_arg("-I/opt/ros/jazzy/include/rosidl_typesupport_interface")
+        .clang_arg("-I/opt/ros/jazzy/include/type_description_interfaces")
+        .clang_arg("-I/opt/ros/jazzy/include/service_msgs")
+        .clang_arg("-I/opt/ros/jazzy/include/builtin_interfaces")
+        .clang_arg("-I/opt/ros/jazzy/include/std_msgs")
+        .clang_arg("-I/opt/ros/jazzy/include/sensor_msgs")
+        .clang_arg("-I/opt/ros/jazzy/include/geometry_msgs")
+        .clang_arg("-I/opt/ros/jazzy/include/action_msgs")
         // Suppress warnings and use C11
         .clang_arg("-Wno-everything")
         .clang_arg("-std=c11")
