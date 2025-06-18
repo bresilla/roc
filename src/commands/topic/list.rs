@@ -1,55 +1,73 @@
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
+use crate::graph::RclGraphContext;
+use anyhow::Result;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 topic list".to_owned();
+fn run_command(matches: ArgMatches) -> Result<()> {
+    // Create RCL graph context for direct API access
+    let graph_context = RclGraphContext::new()
+        .map_err(|e| anyhow::anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
-    if matches.get_flag("show_types") {
-        command.push_str(" --show-types");
-    }
+    // Get topic names using direct RCL API calls
+    let topics = graph_context.get_topic_names()
+        .map_err(|e| anyhow::anyhow!("Failed to get topic names: {}", e))?;
+
+    // Handle --count-topics flag
     if matches.get_flag("count_topics") {
-        command.push_str(" --count-topics");
+        println!("{}", topics.len());
+        return Ok(());
     }
-    if matches.get_flag("include_hidden_topics") {
-        command.push_str(" --include-hidden-topics");
+
+    // Handle --include-hidden-topics flag
+    let filtered_topics: Vec<String> = if matches.get_flag("include_hidden_topics") {
+        topics
+    } else {
+        // Filter out hidden topics (those starting with underscore)
+        topics.into_iter()
+            .filter(|topic| !topic.starts_with("/_"))
+            .collect()
+    };
+
+    // Handle --show-types flag
+    if matches.get_flag("show_types") {
+        eprintln!("Error: --show-types flag not yet implemented in direct RCL mode");
+        return Err(anyhow::anyhow!("--show-types not implemented"));
     }
+
+    // Simple topic list (default behavior)
+    for topic in &filtered_topics {
+        println!("{}", topic);
+    }
+
+    // Handle other flags (for future implementation)
     if matches.get_flag("use_sim_time") {
-        command.push_str(" --use-sim-time");
+        // TODO: Implement simulation time handling when needed
+        eprintln!("Warning: --use-sim-time flag not yet implemented in direct RCL mode");
     }
+    
     if matches.get_flag("no_daemon") {
-        command.push_str(" --no-daemon");
+        // TODO: Our implementation already bypasses daemon, so this is effectively handled
+        // We could add logic here to ensure no daemon interaction if needed
     }
-    if matches.get_one::<String>("spin_time") != None {
-        let spin_time_value = matches.get_one::<String>("spin_time").unwrap();
-        command.push_str(" --spin-time ");
-        command.push_str(&spin_time_value.to_string());
+    
+    if let Some(spin_time_value) = matches.get_one::<String>("spin_time") {
+        // TODO: Implement spin time logic when needed for live topic discovery
+        eprintln!("Warning: --spin-time {} flag not yet implemented in direct RCL mode", spin_time_value);
     }
 
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
+    // Show helpful message if no topics found
+    if filtered_topics.is_empty() {
+        eprintln!("No topics found.");
     }
+
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+pub fn handle(matches: ArgMatches) {
+    match run_command(matches) {
+        Ok(()) => {},
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
