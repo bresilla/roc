@@ -2,6 +2,7 @@ mod arguments;
 mod commands;
 mod completions;
 mod utils;
+mod graph;
 use std::env;
 
 fn main() {
