@@ -29,7 +29,7 @@ pub fn handle(matches: ArgMatches){
             pub_::handle(args.clone(), common_args);
         }
         Some(("info", args)) => {
-            info::handle(args.clone(), common_args);
+            info::handle(args.clone());
         }
         Some(("kind", args)) => {
             kind::handle(args.clone(), common_args);

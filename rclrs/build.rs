@@ -64,6 +64,11 @@ fn main() {
         .allowlist_function("rcl_get_topic_names_and_types")
         .allowlist_function("rcl_get_service_names_and_types")
         .allowlist_function("rcl_names_and_types_fini")
+        // Topic info functions
+        .allowlist_function("rcl_count_publishers")
+        .allowlist_function("rcl_count_subscribers")
+        .allowlist_function("rcl_get_publishers_info_by_topic")
+        .allowlist_function("rcl_get_subscriptions_info_by_topic")
         // String array functions
         .allowlist_function("rcutils_get_zero_initialized_string_array")
         .allowlist_function("rcutils_string_array_fini")
@@ -77,6 +82,9 @@ fn main() {
         // Graph discovery types
         .allowlist_type("rcl_names_and_types_t")
         .allowlist_type("rcutils_string_array_t")
+        // Topic info types
+        .allowlist_type("rcl_topic_endpoint_info_array_t")
+        .allowlist_type("rcl_topic_endpoint_info_t")
         // RMW basic types
         .allowlist_type("rmw_init_options_t")
         .allowlist_type("rmw_context_t")

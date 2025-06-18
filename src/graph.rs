@@ -12,6 +12,16 @@ pub struct RclGraphContext {
     is_initialized: bool,
 }
 
+/// Information about a topic endpoint (publisher or subscriber)
+#[derive(Debug, Clone)]
+pub struct TopicEndpointInfo {
+    pub node_name: String,
+    pub node_namespace: String,
+    pub topic_type: String,
+    pub gid: Vec<u8>,
+    // We'll skip QoS for now as it's more complex to extract
+}
+
 impl RclGraphContext {
     /// Create a new RCL context for graph operations
     pub fn new() -> Result<Self> {
@@ -279,6 +289,246 @@ impl RclGraphContext {
             
             // Clean up
             rcl_names_and_types_fini(&mut topic_names_and_types);
+            
+            Ok(result)
+        }
+    }
+
+    /// Get all topics and their types as tuples
+    pub fn get_topic_names_and_types(&self) -> Result<Vec<(String, String)>> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+        
+        unsafe {
+            let mut allocator = rcutils_get_default_allocator();
+            let mut topic_names_and_types = rcl_names_and_types_t { 
+                names: rcutils_get_zero_initialized_string_array(),
+                types: ptr::null_mut(),
+            };
+            
+            let ret = rcl_get_topic_names_and_types(
+                &self.node,
+                &mut allocator as *mut _,
+                false, // no_demangle
+                &mut topic_names_and_types,
+            );
+            
+            if ret != 0 {
+                return Err(anyhow!("Failed to get topic names and types: {}", ret));
+            }
+            
+            // Convert the topics and types to Vec<(String, String)>
+            let mut result = Vec::new();
+            for i in 0..topic_names_and_types.names.size {
+                if !topic_names_and_types.names.data.add(i).is_null() {
+                    let name_ptr = *topic_names_and_types.names.data.add(i);
+                    if !name_ptr.is_null() {
+                        let name_cstr = std::ffi::CStr::from_ptr(name_ptr);
+                        if let Ok(name_str) = name_cstr.to_str() {
+                            // Get the corresponding type(s) - there may be multiple types per topic
+                            if !topic_names_and_types.types.add(i).is_null() {
+                                let types_array = &*topic_names_and_types.types.add(i);
+                                for j in 0..types_array.size {
+                                    if !types_array.data.add(j).is_null() {
+                                        let type_ptr = *types_array.data.add(j);
+                                        if !type_ptr.is_null() {
+                                            let type_cstr = std::ffi::CStr::from_ptr(type_ptr);
+                                            if let Ok(type_str) = type_cstr.to_str() {
+                                                result.push((name_str.to_string(), type_str.to_string()));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Clean up
+            rcl_names_and_types_fini(&mut topic_names_and_types);
+            
+            Ok(result)
+        }
+    }
+
+    /// Count the number of publishers for a given topic
+    pub fn count_publishers(&self, topic_name: &str) -> Result<usize> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+        
+        let topic_name_c = CString::new(topic_name).map_err(|e| anyhow!("Invalid topic name: {}", e))?;
+        
+        unsafe {
+            let mut count: usize = 0;
+            let ret = rcl_count_publishers(
+                &self.node,
+                topic_name_c.as_ptr(),
+                &mut count,
+            );
+            
+            if ret != 0 {
+                return Err(anyhow!("Failed to count publishers for topic '{}': {}", topic_name, ret));
+            }
+            
+            Ok(count)
+        }
+    }
+
+    /// Count the number of subscribers for a given topic
+    pub fn count_subscribers(&self, topic_name: &str) -> Result<usize> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+        
+        let topic_name_c = CString::new(topic_name).map_err(|e| anyhow!("Invalid topic name: {}", e))?;
+        
+        unsafe {
+            let mut count: usize = 0;
+            let ret = rcl_count_subscribers(
+                &self.node,
+                topic_name_c.as_ptr(),
+                &mut count,
+            );
+            
+            if ret != 0 {
+                return Err(anyhow!("Failed to count subscribers for topic '{}': {}", topic_name, ret));
+            }
+            
+            Ok(count)
+        }
+    }
+
+    /// Get detailed information about all publishers to a topic
+    pub fn get_publishers_info(&self, topic_name: &str) -> Result<Vec<TopicEndpointInfo>> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+        
+        let topic_name_c = CString::new(topic_name).map_err(|e| anyhow!("Invalid topic name: {}", e))?;
+        
+        unsafe {
+            let mut allocator = rcutils_get_default_allocator();
+            
+            // Initialize the array - we need to use the RMW function since that's what RCL uses
+            let mut publishers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+            
+            let ret = rcl_get_publishers_info_by_topic(
+                &self.node,
+                &mut allocator,
+                topic_name_c.as_ptr(),
+                false, // no_mangle
+                &mut publishers_info,
+            );
+            
+            if ret != 0 {
+                return Err(anyhow!("Failed to get publishers info for topic '{}': {}", topic_name, ret));
+            }
+            
+            // Convert to our Rust struct
+            let mut result = Vec::new();
+            for i in 0..publishers_info.size {
+                let info = &*(publishers_info.info_array.add(i));
+                
+                // Extract strings safely
+                let node_name = if info.node_name.is_null() {
+                    "unknown".to_string()
+                } else {
+                    std::ffi::CStr::from_ptr(info.node_name).to_string_lossy().to_string()
+                };
+                
+                let node_namespace = if info.node_namespace.is_null() {
+                    "/".to_string()
+                } else {
+                    std::ffi::CStr::from_ptr(info.node_namespace).to_string_lossy().to_string()
+                };
+                
+                let topic_type = if info.topic_type.is_null() {
+                    "unknown".to_string()
+                } else {
+                    std::ffi::CStr::from_ptr(info.topic_type).to_string_lossy().to_string()
+                };
+                
+                // Extract GID (Global ID) - it's a fixed-size array in RMW
+                let gid = std::slice::from_raw_parts(info.endpoint_gid.as_ptr(), info.endpoint_gid.len()).to_vec();
+                
+                result.push(TopicEndpointInfo {
+                    node_name,
+                    node_namespace,
+                    topic_type,
+                    gid,
+                });
+            }
+            
+            // We should clean up the array, but RCL doesn't provide a specific cleanup function
+            // The allocator will handle it when the context is destroyed
+            
+            Ok(result)
+        }
+    }
+
+    /// Get detailed information about all subscribers to a topic
+    pub fn get_subscribers_info(&self, topic_name: &str) -> Result<Vec<TopicEndpointInfo>> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+        
+        let topic_name_c = CString::new(topic_name).map_err(|e| anyhow!("Invalid topic name: {}", e))?;
+        
+        unsafe {
+            let mut allocator = rcutils_get_default_allocator();
+            
+            // Initialize the array
+            let mut subscribers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+            
+            let ret = rcl_get_subscriptions_info_by_topic(
+                &self.node,
+                &mut allocator,
+                topic_name_c.as_ptr(),
+                false, // no_mangle
+                &mut subscribers_info,
+            );
+            
+            if ret != 0 {
+                return Err(anyhow!("Failed to get subscribers info for topic '{}': {}", topic_name, ret));
+            }
+            
+            // Convert to our Rust struct
+            let mut result = Vec::new();
+            for i in 0..subscribers_info.size {
+                let info = &*(subscribers_info.info_array.add(i));
+                
+                // Extract strings safely
+                let node_name = if info.node_name.is_null() {
+                    "unknown".to_string()
+                } else {
+                    std::ffi::CStr::from_ptr(info.node_name).to_string_lossy().to_string()
+                };
+                
+                let node_namespace = if info.node_namespace.is_null() {
+                    "/".to_string()
+                } else {
+                    std::ffi::CStr::from_ptr(info.node_namespace).to_string_lossy().to_string()
+                };
+                
+                let topic_type = if info.topic_type.is_null() {
+                    "unknown".to_string()
+                } else {
+                    std::ffi::CStr::from_ptr(info.topic_type).to_string_lossy().to_string()
+                };
+                
+                // Extract GID (Global ID)
+                let gid = std::slice::from_raw_parts(info.endpoint_gid.as_ptr(), info.endpoint_gid.len()).to_vec();
+                
+                result.push(TopicEndpointInfo {
+                    node_name,
+                    node_namespace,
+                    topic_type,
+                    gid,
+                });
+            }
             
             Ok(result)
         }

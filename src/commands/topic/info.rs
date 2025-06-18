@@ -2,23 +2,23 @@ use clap::ArgMatches;
 use std::process::Stdio;
 use tokio::process::Command;
 use tokio::io::AsyncReadExt;
-use crate::arguments::topic::CommonTopicArgs;
 
-async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let mut command = "ros2 topic info".to_owned();
 
     let topic_name = matches.get_one::<String>("topic_name").unwrap();
     command.push_str(" ");
     command.push_str(&topic_name.to_string());
 
-    if let Some(spin_time_value) = &common_args.spin_time {
+    if matches.get_one::<String>("spin_time") != None {
+        let spin_time_value = matches.get_one::<String>("spin_time").unwrap();
         command.push_str(" --spin-time ");
-        command.push_str(spin_time_value);
+        command.push_str(&spin_time_value.to_string());
     }
-    if common_args.use_sim_time {
+    if matches.get_flag("use_sim_time") {
         command.push_str(" --use-sim-time");
     }
-    if common_args.no_daemon {
+    if matches.get_flag("no_daemon") {
         command.push_str(" --no-daemon");
     }
     if matches.get_flag("verbose") {
@@ -47,7 +47,7 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs){
+pub fn handle(matches: ArgMatches){
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches, common_args));
+    let _ = rt.block_on(run_command(matches));
 }
