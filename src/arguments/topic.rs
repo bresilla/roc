@@ -25,7 +25,7 @@ pub fn cmd() -> Command {
         .aliases(&["t", "top"])
         .subcommand_required(true)
         .arg_required_else_help(true)
-        // Common flags that apply to all topic subcommands
+        // Common flags that ONLY exist at the top level
         .arg(
             Arg::new("spin_time")
             .long("spin-time")
@@ -34,7 +34,6 @@ pub fn cmd() -> Command {
             .num_args(1)
             .help("Spin time for discovery (if daemon not in use)")
             .action(ArgAction::Append)
-            .global(true)
         )
         .arg(
             Arg::new("use_sim_time")
@@ -43,7 +42,6 @@ pub fn cmd() -> Command {
             .aliases(&["use_sim_time", "use_simtime", "sim"])
             .help("Enable ROS simulation time")
             .action(ArgAction::SetTrue)
-            .global(true)
         )
         .arg(
             Arg::new("no_daemon")
@@ -51,7 +49,6 @@ pub fn cmd() -> Command {
             .aliases(&["no_daemon"])
             .help("Don't spawn or use a running daemon")
             .action(ArgAction::SetTrue)
-            .global(true)
         )
         .subcommand(
             Command::new("echo")
@@ -269,30 +266,6 @@ pub fn cmd() -> Command {
                 .visible_aliases(&["all"])
                 .help("Consider hidden topics as well")
                 .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
             )
         )
         .subcommand(
