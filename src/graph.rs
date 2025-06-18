@@ -90,25 +90,18 @@ impl RclGraphContext {
         }
         
         unsafe {
-            println!("Debug: About to call rcl_get_topic_names_and_types");
-            println!("Debug: Node valid: {}", rcl_node_is_valid(&self.node));
-            println!("Debug: Context valid: {}", rcl_context_is_valid(&self.context));
-            
             let mut allocator = rcutils_get_default_allocator();
             let mut topic_names_and_types = rcl_names_and_types_t { 
                 names: rcutils_get_zero_initialized_string_array(),
                 types: ptr::null_mut(),
             };
             
-            println!("Debug: Calling rcl_get_topic_names_and_types...");
             let ret = rcl_get_topic_names_and_types(
                 &self.node,
                 &mut allocator as *mut _,
                 false, // no_demangle
                 &mut topic_names_and_types,
             );
-            
-            println!("Debug: rcl_get_topic_names_and_types returned: {}", ret);
             
             if ret != 0 {
                 return Err(anyhow!("Failed to get topic names: {}", ret));
