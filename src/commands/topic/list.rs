@@ -1,8 +1,9 @@
 use clap::ArgMatches;
 use crate::graph::RclGraphContext;
+use crate::arguments::topic::CommonTopicArgs;
 use anyhow::Result;
 
-fn run_command(matches: ArgMatches) -> Result<()> {
+fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()> {
     // Create RCL graph context for direct API access
     let graph_context = RclGraphContext::new()
         .map_err(|e| anyhow::anyhow!("Failed to initialize RCL graph context: {}", e))?;
@@ -90,8 +91,8 @@ fn run_command(matches: ArgMatches) -> Result<()> {
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches) {
-    match run_command(matches) {
+pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
+    match run_command(matches, common_args) {
         Ok(()) => {},
         Err(e) => {
             eprintln!("Error: {}", e);

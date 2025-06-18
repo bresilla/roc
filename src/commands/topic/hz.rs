@@ -2,8 +2,9 @@ use clap::ArgMatches;
 use std::process::Stdio;
 use tokio::process::Command;
 use tokio::io::AsyncReadExt;
+use crate::arguments::topic::CommonTopicArgs;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<(), Box<dyn std::error::Error>> {
     let mut command = "ros2 topic hz".to_owned();
 
     let topic_name = matches.get_one::<String>("topic_name").unwrap();
@@ -15,12 +16,11 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
         command.push_str(" --window ");
         command.push_str(&window_value.to_string());
     }
-    if matches.get_one::<String>("spin_time") != None {
-        let spin_time_value = matches.get_one::<String>("spin_time").unwrap();
+    if let Some(spin_time_value) = &common_args.spin_time {
         command.push_str(" --spin-time ");
-        command.push_str(&spin_time_value.to_string());
+        command.push_str(spin_time_value);
     }
-    if matches.get_flag("use_sim_time") {
+    if common_args.use_sim_time {
         command.push_str(" --use-sim-time");
     }
     if matches.get_one::<String>("filter") != None {
@@ -54,7 +54,7 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
+pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs){
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+    let _ = rt.block_on(run_command(matches, common_args));
 }

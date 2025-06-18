@@ -1,4 +1,23 @@
-use clap::{Command, Arg, ArgAction};
+use clap::{Command, Arg, ArgAction, ArgMatches};
+
+/// Common topic arguments that are extracted from the parent topic command
+#[derive(Debug, Clone)]
+pub struct CommonTopicArgs {
+    pub spin_time: Option<String>,
+    pub use_sim_time: bool,
+    pub no_daemon: bool,
+}
+
+impl CommonTopicArgs {
+    /// Extract common topic arguments from the parent topic command matches
+    pub fn from_matches(parent_matches: &ArgMatches) -> Self {
+        Self {
+            spin_time: parent_matches.get_one::<String>("spin_time").cloned(),
+            use_sim_time: parent_matches.get_flag("use_sim_time"),
+            no_daemon: parent_matches.get_flag("no_daemon"),
+        }
+    }
+}
 
 pub fn cmd() -> Command {
     Command::new("topic")
@@ -6,6 +25,34 @@ pub fn cmd() -> Command {
         .aliases(&["t", "top"])
         .subcommand_required(true)
         .arg_required_else_help(true)
+        // Common flags that apply to all topic subcommands
+        .arg(
+            Arg::new("spin_time")
+            .long("spin-time")
+            .aliases(&["spin_time", "spin"])
+            .value_name("SPIN_TIME")
+            .num_args(1)
+            .help("Spin time for discovery (if daemon not in use)")
+            .action(ArgAction::Append)
+            .global(true)
+        )
+        .arg(
+            Arg::new("use_sim_time")
+            .short('s')
+            .long("use-sim-time")
+            .aliases(&["use_sim_time", "use_simtime", "sim"])
+            .help("Enable ROS simulation time")
+            .action(ArgAction::SetTrue)
+            .global(true)
+        )
+        .arg(
+            Arg::new("no_daemon")
+            .long("no-daemon")
+            .aliases(&["no_daemon"])
+            .help("Don't spawn or use a running daemon")
+            .action(ArgAction::SetTrue)
+            .global(true)
+        )
         .subcommand(
             Command::new("echo")
             .about("Print messages from topic to screen")
@@ -16,30 +63,6 @@ pub fn cmd() -> Command {
                 .help("Name of the ROS topic to echo (e.g. '/chatter')")
                 .required(true)
                 .value_name("TOPIC_NAME")
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
             )
             .arg(
                 Arg::new("qos_profile")
@@ -182,23 +205,6 @@ pub fn cmd() -> Command {
                 .default_missing_value("10000")
             )
             .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
                 Arg::new("filter")
                 .long("filter")
                 .aliases(&["regex"])
@@ -224,30 +230,6 @@ pub fn cmd() -> Command {
                 .help("Name of the ROS topic to get info (e.g. '/chatter')")
                 .required(true)
                 .value_name("TOPIC_NAME")
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
             )
             .arg(
                 Arg::new("verbose")
@@ -446,23 +428,6 @@ pub fn cmd() -> Command {
                 .help("QoS durability setting (overrides profile, default: transient_local)")
                 .action(ArgAction::Append)
             )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not used)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
         )
         .subcommand(
             Command::new("kind")
@@ -474,30 +439,6 @@ pub fn cmd() -> Command {
                 .help("Name of the ROS topic to get type (e.g. '/chatter')")
                 .required(true)
                 .value_name("TOPIC_NAME")
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
             )
         )
         .subcommand(
@@ -522,23 +463,6 @@ pub fn cmd() -> Command {
                 .action(ArgAction::Append)
                 .default_missing_value("10000")
             )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not used)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
         )
         .subcommand(
             Command::new("find")
@@ -550,30 +474,6 @@ pub fn cmd() -> Command {
                 .help("Name of the ROS topic type to filter for (e.g. 'std_msg/msg/String')")
                 .required(true)
                 .value_name("TOPIC_TYPE")
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
             )
             .arg(
                 Arg::new("count_topics")
@@ -614,23 +514,6 @@ pub fn cmd() -> Command {
                 .help("Window size for rate calculation (default: 10000)")
                 .action(ArgAction::Append)
                 .default_missing_value("10000")
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not used)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
             )
         )
 }
