@@ -21,8 +21,6 @@ impl RclGraphContext {
                 .ok()
                 .and_then(|s| s.parse::<usize>().ok())
                 .unwrap_or(0);
-            
-            println!("Using ROS_DOMAIN_ID: {}", domain_id);
 
             // Initialize RCL init options
             let mut init_options = rcl_get_zero_initialized_init_options();
