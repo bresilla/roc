@@ -3,7 +3,7 @@ use crate::graph::RclGraphContext;
 use crate::arguments::topic::CommonTopicArgs;
 use anyhow::Result;
 
-fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()> {
+fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
     // Create RCL graph context for direct API access
     let graph_context = RclGraphContext::new()
         .map_err(|e| anyhow::anyhow!("Failed to initialize RCL graph context: {}", e))?;
@@ -68,17 +68,17 @@ fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()>
     }
 
     // Handle other flags (for future implementation)
-    if matches.get_flag("use_sim_time") {
+    if common_args.use_sim_time {
         // TODO: Implement simulation time handling when needed
         eprintln!("Warning: --use-sim-time flag not yet implemented in direct RCL mode");
     }
     
-    if matches.get_flag("no_daemon") {
+    if common_args.no_daemon {
         // TODO: Our implementation already bypasses daemon, so this is effectively handled
         // We could add logic here to ensure no daemon interaction if needed
     }
     
-    if let Some(spin_time_value) = matches.get_one::<String>("spin_time") {
+    if let Some(spin_time_value) = common_args.spin_time {
         // TODO: Implement spin time logic when needed for live topic discovery
         eprintln!("Warning: --spin-time {} flag not yet implemented in direct RCL mode", spin_time_value);
     }

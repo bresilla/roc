@@ -462,8 +462,9 @@ impl RclGraphContext {
                 });
             }
             
-            // We should clean up the array, but RCL doesn't provide a specific cleanup function
-            // The allocator will handle it when the context is destroyed
+            // We should clean up the array
+            let mut allocator = rcutils_get_default_allocator();
+            rmw_topic_endpoint_info_array_fini(&mut publishers_info, &mut allocator);
             
             Ok(result)
         }
@@ -529,6 +530,10 @@ impl RclGraphContext {
                     gid,
                 });
             }
+
+            // Clean up the array
+            let mut allocator = rcutils_get_default_allocator();
+            rmw_topic_endpoint_info_array_fini(&mut subscribers_info, &mut allocator);
             
             Ok(result)
         }
@@ -539,15 +544,20 @@ impl Drop for RclGraphContext {
     fn drop(&mut self) {
         if self.is_initialized {
             unsafe {
-                rcl_node_fini(&mut self.node);
-                rcl_shutdown(&mut self.context);
+                // It's important to shut down the node before the context
+                if rcl_node_is_valid(&self.node) {
+                    rcl_node_fini(&mut self.node);
+                }
+                if rcl_context_is_valid(&self.context) {
+                    rcl_shutdown(&mut self.context);
+                }
             }
             self.is_initialized = false;
         }
     }
 }
 
-/// Topic information including name and types
+/// Information about a topic, including its name and types
 #[derive(Debug, Clone)]
 pub struct TopicInfo {
     pub name: String,

@@ -69,6 +69,7 @@ fn main() {
         .allowlist_function("rcl_count_subscribers")
         .allowlist_function("rcl_get_publishers_info_by_topic")
         .allowlist_function("rcl_get_subscriptions_info_by_topic")
+        .allowlist_function("rmw_topic_endpoint_info_array_fini")
         // String array functions
         .allowlist_function("rcutils_get_zero_initialized_string_array")
         .allowlist_function("rcutils_string_array_fini")
