@@ -12,13 +12,24 @@ impl RclGraphContext {
     /// Create a new RCL context for graph operations
     pub fn new() -> Result<Self> {
         unsafe {
-            // For now, just create a zero-initialized context
-            // We'll expand this step by step as we add more functions to rclrs
-            let context = rcl_get_zero_initialized_context();
+            // Initialize RCL with basic setup
+            let mut init_options = rcl_get_zero_initialized_init_options();
+            let allocator = rcutils_get_default_allocator();
+            
+            let ret = rcl_init_options_init(&mut init_options, allocator);
+            if ret != 0 {
+                return Err(anyhow!("Failed to initialize RCL init options: {}", ret));
+            }
+
+            let mut context = rcl_get_zero_initialized_context();
+            let ret = rcl_init(0, ptr::null_mut(), &init_options, &mut context);
+            if ret != 0 {
+                return Err(anyhow!("Failed to initialize RCL: {}", ret));
+            }
 
             Ok(RclGraphContext {
                 context,
-                is_initialized: false, // Set to false until we can properly initialize
+                is_initialized: true,
             })
         }
     }
@@ -34,6 +45,17 @@ impl RclGraphContext {
     }
 }
 
+impl Drop for RclGraphContext {
+    fn drop(&mut self) {
+        if self.is_initialized {
+            unsafe {
+                rcl_shutdown(&mut self.context);
+            }
+            self.is_initialized = false;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43,7 +65,7 @@ mod tests {
         let context = RclGraphContext::new();
         assert!(context.is_ok());
         
-        // For now, just test that we can create the context
-        // We'll add proper initialization tests as we expand the bindings
+        let context = context.unwrap();
+        assert!(context.is_valid());
     }
 }

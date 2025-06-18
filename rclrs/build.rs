@@ -8,6 +8,7 @@ fn main() {
     // Link to the RCL and RMW libraries
     println!("cargo:rustc-link-lib=rcl");
     println!("cargo:rustc-link-lib=rmw");
+    println!("cargo:rustc-link-lib=rcutils");
     
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=wrapper.h");
