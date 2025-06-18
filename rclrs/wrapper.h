@@ -4,9 +4,9 @@
 // Very minimal wrapper - just include the basic RCL types
 #include "rcl/rcl/allocator.h"
 #include "rcl/rcl/context.h"
+#include "rcl/rcl/graph.h"
 #include "rcl/rcl/init.h"
 #include "rcl/rcl/init_options.h"
-#include "rcl/rcl/graph.h"
 #include "rcl/rcl/node.h"
 
 // Basic RMW headers

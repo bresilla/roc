@@ -55,12 +55,16 @@ fn main() {
         .allowlist_function("rcl_node_init")
         .allowlist_function("rcl_node_fini")
         .allowlist_function("rcl_node_is_valid")
+        .allowlist_function("rcl_node_get_default_options")
         // Graph discovery functions
         .allowlist_function("rcl_get_node_names")
         .allowlist_function("rcl_get_node_names_with_enclaves")
         .allowlist_function("rcl_get_topic_names_and_types")
         .allowlist_function("rcl_get_service_names_and_types")
         .allowlist_function("rcl_names_and_types_fini")
+        // String array functions
+        .allowlist_function("rcutils_get_zero_initialized_string_array")
+        .allowlist_function("rcutils_string_array_fini")
         // Also include the basic types we need
         .allowlist_type("rcl_context_t")
         .allowlist_type("rcl_allocator_t")
