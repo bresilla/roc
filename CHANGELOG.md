@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.2.1] - 2025-06-19
+
+### <!-- 0 -->⛰️  Features
+
+- Add documentation and ROS 2 discovery features
+- Display detailed endpoint info with QoS
+- Ros2topic: Add verbose mode to topic info
+- Add topic info to `rclrs`
+- Implement functionality to list topics with types
+- Implement topic listing with RCL direct API
+- Simplify internal graph API queries
+- Add ROS node and graph introspection bindings
+- Add RCL graph and node interface functions
+- Initialize and shutdown the RCL context
+
+### <!-- 2 -->🚜 Refactor
+
+- Improve topic information and daemon status display
+- Refactor 'topic info' to use internal graph API
+- Refactor argument handling to use global scope
+- Refactor topic commands for shared arguments
+- Refactor context initialization and topic discovery
+
+### <!-- 3 -->📚 Documentation
+
+- Document and extend the graph context
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Improve GitHub Actions reliability
+- Refactor: Remove debug traces
+- Remove unused GitHub Actions workflows and unused print statement
+
 ## [0.2.0] - 2025-05-30
 
 ### <!-- 0 -->⛰️  Features
