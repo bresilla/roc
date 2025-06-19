@@ -76,9 +76,26 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
             println!("  <none>");
         } else {
             for pub_info in publishers_info {
+                let endpoint_type = match pub_info.endpoint_type {
+                    crate::graph::EndpointType::Publisher => "PUBLISHER",
+                    crate::graph::EndpointType::Subscription => "SUBSCRIPTION",
+                    crate::graph::EndpointType::Invalid => "INVALID",
+                };
+                
                 println!("  - Node name: {}", pub_info.node_name);
                 println!("    Node namespace: {}", pub_info.node_namespace);
                 println!("    Topic type: {}", pub_info.topic_type);
+                println!("    Topic type hash: RIHS01_{}", pub_info.topic_type_hash);
+                println!("    Endpoint type: {}", endpoint_type);
+                println!("    GID: {}", format_gid(&pub_info.gid));
+                println!("    QoS profile:");
+                println!("      Reliability: {}", pub_info.qos_profile.reliability.to_string());
+                println!("      History ({}): {}", pub_info.qos_profile.history.to_string(), pub_info.qos_profile.depth);
+                println!("      Durability: {}", pub_info.qos_profile.durability.to_string());
+                println!("      Lifespan: {}", pub_info.qos_profile.format_duration(pub_info.qos_profile.lifespan_sec, pub_info.qos_profile.lifespan_nsec));
+                println!("      Deadline: {}", pub_info.qos_profile.format_duration(pub_info.qos_profile.deadline_sec, pub_info.qos_profile.deadline_nsec));
+                println!("      Liveliness: {}", pub_info.qos_profile.liveliness.to_string());
+                println!("      Liveliness lease duration: {}", pub_info.qos_profile.format_duration(pub_info.qos_profile.liveliness_lease_duration_sec, pub_info.qos_profile.liveliness_lease_duration_nsec));
             }
         }
 
@@ -87,14 +104,36 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
             println!("  <none>");
         } else {
             for sub_info in subscribers_info {
+                let endpoint_type = match sub_info.endpoint_type {
+                    crate::graph::EndpointType::Publisher => "PUBLISHER",
+                    crate::graph::EndpointType::Subscription => "SUBSCRIPTION", 
+                    crate::graph::EndpointType::Invalid => "INVALID",
+                };
+                
                 println!("  - Node name: {}", sub_info.node_name);
                 println!("    Node namespace: {}", sub_info.node_namespace);
                 println!("    Topic type: {}", sub_info.topic_type);
+                println!("    Topic type hash: RIHS01_{}", sub_info.topic_type_hash);
+                println!("    Endpoint type: {}", endpoint_type);
+                println!("    GID: {}", format_gid(&sub_info.gid));
+                println!("    QoS profile:");
+                println!("      Reliability: {}", sub_info.qos_profile.reliability.to_string());
+                println!("      History ({}): {}", sub_info.qos_profile.history.to_string(), sub_info.qos_profile.depth);
+                println!("      Durability: {}", sub_info.qos_profile.durability.to_string());
+                println!("      Lifespan: {}", sub_info.qos_profile.format_duration(sub_info.qos_profile.lifespan_sec, sub_info.qos_profile.lifespan_nsec));
+                println!("      Deadline: {}", sub_info.qos_profile.format_duration(sub_info.qos_profile.deadline_sec, sub_info.qos_profile.deadline_nsec));
+                println!("      Liveliness: {}", sub_info.qos_profile.liveliness.to_string());
+                println!("      Liveliness lease duration: {}", sub_info.qos_profile.format_duration(sub_info.qos_profile.liveliness_lease_duration_sec, sub_info.qos_profile.liveliness_lease_duration_nsec));
             }
         }
     }
     
     Ok(())
+}
+
+// Helper function to format GID
+fn format_gid(gid: &[u8]) -> String {
+    gid.iter().map(|b| format!("{:02x}", b)).collect::<Vec<String>>().join(".")
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {

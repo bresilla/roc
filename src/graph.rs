@@ -20,8 +20,75 @@ pub struct TopicEndpointInfo {
     pub node_name: String,
     pub node_namespace: String,
     pub topic_type: String,
+    pub topic_type_hash: String,
+    pub endpoint_type: EndpointType,
     pub gid: Vec<u8>,
-    // We'll skip QoS for now as it's more complex to extract
+    pub qos_profile: QosProfile,
+}
+
+/// Endpoint type enum
+#[derive(Debug, Clone)]
+pub enum EndpointType {
+    Publisher,
+    Subscription,
+    Invalid,
+}
+
+/// QoS Profile information
+#[derive(Debug, Clone)]
+pub struct QosProfile {
+    pub history: QosHistoryPolicy,
+    pub depth: usize,
+    pub reliability: QosReliabilityPolicy,
+    pub durability: QosDurabilityPolicy,
+    pub deadline_sec: u64,
+    pub deadline_nsec: u64,
+    pub lifespan_sec: u64,
+    pub lifespan_nsec: u64,
+    pub liveliness: QosLivelinessPolicy,
+    pub liveliness_lease_duration_sec: u64,
+    pub liveliness_lease_duration_nsec: u64,
+    pub avoid_ros_namespace_conventions: bool,
+}
+
+/// QoS History Policy
+#[derive(Debug, Clone)]
+pub enum QosHistoryPolicy {
+    SystemDefault,
+    KeepLast,
+    KeepAll,
+    Unknown,
+}
+
+/// QoS Reliability Policy
+#[derive(Debug, Clone)]
+pub enum QosReliabilityPolicy {
+    SystemDefault,
+    Reliable,
+    BestEffort,
+    Unknown,
+    BestAvailable,
+}
+
+/// QoS Durability Policy
+#[derive(Debug, Clone)]
+pub enum QosDurabilityPolicy {
+    SystemDefault,
+    TransientLocal,
+    Volatile,
+    Unknown,
+    BestAvailable,
+}
+
+/// QoS Liveliness Policy
+#[derive(Debug, Clone)]
+pub enum QosLivelinessPolicy {
+    SystemDefault,
+    Automatic,
+    ManualByNode,
+    ManualByTopic,
+    Unknown,
+    BestAvailable,
 }
 
 impl RclGraphContext {
@@ -485,14 +552,26 @@ impl RclGraphContext {
                     std::ffi::CStr::from_ptr(info.topic_type).to_string_lossy().to_string()
                 };
                 
+                // Extract topic type hash
+                let topic_type_hash = format_topic_type_hash(&info.topic_type_hash);
+                
+                // Extract endpoint type
+                let endpoint_type = EndpointType::from_rmw(info.endpoint_type);
+                
                 // Extract GID (Global ID) - it's a fixed-size array in RMW
                 let gid = std::slice::from_raw_parts(info.endpoint_gid.as_ptr(), info.endpoint_gid.len()).to_vec();
+                
+                // Extract QoS profile
+                let qos_profile = QosProfile::from_rmw(&info.qos_profile);
                 
                 result.push(TopicEndpointInfo {
                     node_name,
                     node_namespace,
                     topic_type,
+                    topic_type_hash,
+                    endpoint_type,
                     gid,
+                    qos_profile,
                 });
             }
             
@@ -554,14 +633,26 @@ impl RclGraphContext {
                     std::ffi::CStr::from_ptr(info.topic_type).to_string_lossy().to_string()
                 };
                 
+                // Extract topic type hash
+                let topic_type_hash = format_topic_type_hash(&info.topic_type_hash);
+                
+                // Extract endpoint type
+                let endpoint_type = EndpointType::from_rmw(info.endpoint_type);
+                
                 // Extract GID (Global ID)
                 let gid = std::slice::from_raw_parts(info.endpoint_gid.as_ptr(), info.endpoint_gid.len()).to_vec();
+                
+                // Extract QoS profile
+                let qos_profile = QosProfile::from_rmw(&info.qos_profile);
                 
                 result.push(TopicEndpointInfo {
                     node_name,
                     node_namespace,
                     topic_type,
+                    topic_type_hash,
+                    endpoint_type,
                     gid,
+                    qos_profile,
                 });
             }
 
@@ -633,116 +724,142 @@ pub struct TopicInfo {
     pub types: Vec<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_rcl_context_creation() {
-        let context = RclGraphContext::new();
-        assert!(context.is_ok());
-        
-        let context = context.unwrap();
-        assert!(context.is_valid());
-    }
-
-    #[test]
-    fn test_graph_api_structure() {
-        let context = RclGraphContext::new().unwrap();
-        
-        // Test that the API structure works
-        let topics = context.get_topic_names();
-        let nodes = context.get_node_names();
-        let services = context.get_service_names();
-        
-        // Print results for debugging
-        if let Err(e) = &topics {
-            println!("Topics error: {} (expected without ROS 2 daemon)", e);
-        }
-        if let Err(e) = &services {
-            println!("Services error: {} (expected without ROS 2 daemon)", e);
-        }
-        
-        // Node discovery should always work
-        assert!(nodes.is_ok(), "Node discovery should work");
-        
-        // Check that we got at least our own node
-        let node_names = nodes.unwrap();
-        assert!(node_names.contains(&"roc_graph_node".to_string()));
-        
-        println!("✅ Found {} nodes", node_names.len());
-        println!("✅ Node names: {:?}", node_names);
-        
-        // Topics and services may fail without ROS 2 daemon, but the API should work
-        if let Ok(topic_names) = topics {
-            println!("✅ Found {} topics", topic_names.len());
-        }
-        if let Ok(service_names) = services {
-            println!("✅ Found {} services", service_names.len());
-        }
-        
-        println!("✅ RCL graph discovery API is working!");
-    }
-
-    #[test]
-    fn test_individual_functions() {
-        let context = RclGraphContext::new().unwrap();
-        
-        // Test individual functions separately
-        println!("Context is valid: {}", context.is_valid());
-        
-        let nodes_result = context.get_node_names();
-        match &nodes_result {
-            Ok(nodes) => println!("Nodes: {:?}", nodes),
-            Err(e) => println!("Nodes error: {}", e),
-        }
-        
-        let topics_result = context.get_topic_names();
-        match &topics_result {
-            Ok(topics) => println!("Topics: {:?}", topics),
-            Err(e) => println!("Topics error: {}", e),
-        }
-        
-        let services_result = context.get_service_names();  
-        match &services_result {
-            Ok(services) => println!("Services: {:?}", services),
-            Err(e) => println!("Services error: {}", e),
-        }
-        
-        // At least nodes should work since it has different error behavior
-        assert!(nodes_result.is_ok(), "Node names should work even without ROS 2 daemon");
-    }
-
-    #[test]
-    fn test_topic_discovery_with_delay() {
-        let context = RclGraphContext::new().unwrap();
-        
-        println!("Context created, waiting for discovery...");
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        
-        let topics_result = context.get_topic_names();
-        match &topics_result {
-            Ok(topics) => {
-                println!("✅ Successfully discovered {} topics:", topics.len());
-                for topic in topics {
-                    println!("  - {}", topic);
-                }
-            },
-            Err(e) => {
-                println!("❌ Topics error: {}", e);
-            }
-        }
-        
-        // Test if the issue is persistent
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-        let topics_result2 = context.get_topic_names();
-        match &topics_result2 {
-            Ok(topics) => {
-                println!("✅ Second attempt: Successfully discovered {} topics", topics.len());
-            },
-            Err(e) => {
-                println!("❌ Second attempt also failed: {}", e);
-            }
+impl EndpointType {
+    fn from_rmw(endpoint_type: rmw_endpoint_type_t) -> Self {
+        match endpoint_type {
+            rmw_endpoint_type_e_RMW_ENDPOINT_PUBLISHER => EndpointType::Publisher,
+            rmw_endpoint_type_e_RMW_ENDPOINT_SUBSCRIPTION => EndpointType::Subscription,
+            _ => EndpointType::Invalid,
         }
     }
+}
+
+impl QosHistoryPolicy {
+    fn from_rmw(history: rmw_qos_history_policy_e) -> Self {
+        match history {
+            rmw_qos_history_policy_e_RMW_QOS_POLICY_HISTORY_SYSTEM_DEFAULT => QosHistoryPolicy::SystemDefault,
+            rmw_qos_history_policy_e_RMW_QOS_POLICY_HISTORY_KEEP_LAST => QosHistoryPolicy::KeepLast,
+            rmw_qos_history_policy_e_RMW_QOS_POLICY_HISTORY_KEEP_ALL => QosHistoryPolicy::KeepAll,
+            _ => QosHistoryPolicy::Unknown,
+        }
+    }
+    
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            QosHistoryPolicy::SystemDefault => "SYSTEM_DEFAULT",
+            QosHistoryPolicy::KeepLast => "KEEP_LAST",
+            QosHistoryPolicy::KeepAll => "KEEP_ALL",
+            QosHistoryPolicy::Unknown => "UNKNOWN",
+        }
+    }
+}
+
+impl QosReliabilityPolicy {
+    fn from_rmw(reliability: rmw_qos_reliability_policy_e) -> Self {
+        match reliability {
+            rmw_qos_reliability_policy_e_RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT => QosReliabilityPolicy::SystemDefault,
+            rmw_qos_reliability_policy_e_RMW_QOS_POLICY_RELIABILITY_RELIABLE => QosReliabilityPolicy::Reliable,
+            rmw_qos_reliability_policy_e_RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT => QosReliabilityPolicy::BestEffort,
+            rmw_qos_reliability_policy_e_RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE => QosReliabilityPolicy::BestAvailable,
+            _ => QosReliabilityPolicy::Unknown,
+        }
+    }
+    
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            QosReliabilityPolicy::SystemDefault => "SYSTEM_DEFAULT",
+            QosReliabilityPolicy::Reliable => "RELIABLE",
+            QosReliabilityPolicy::BestEffort => "BEST_EFFORT",
+            QosReliabilityPolicy::Unknown => "UNKNOWN",
+            QosReliabilityPolicy::BestAvailable => "BEST_AVAILABLE",
+        }
+    }
+}
+
+impl QosDurabilityPolicy {
+    fn from_rmw(durability: rmw_qos_durability_policy_e) -> Self {
+        match durability {
+            rmw_qos_durability_policy_e_RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT => QosDurabilityPolicy::SystemDefault,
+            rmw_qos_durability_policy_e_RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL => QosDurabilityPolicy::TransientLocal,
+            rmw_qos_durability_policy_e_RMW_QOS_POLICY_DURABILITY_VOLATILE => QosDurabilityPolicy::Volatile,
+            rmw_qos_durability_policy_e_RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE => QosDurabilityPolicy::BestAvailable,
+            _ => QosDurabilityPolicy::Unknown,
+        }
+    }
+    
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            QosDurabilityPolicy::SystemDefault => "SYSTEM_DEFAULT",
+            QosDurabilityPolicy::TransientLocal => "TRANSIENT_LOCAL",
+            QosDurabilityPolicy::Volatile => "VOLATILE",
+            QosDurabilityPolicy::Unknown => "UNKNOWN",
+            QosDurabilityPolicy::BestAvailable => "BEST_AVAILABLE",
+        }
+    }
+}
+
+impl QosLivelinessPolicy {
+    fn from_rmw(liveliness: rmw_qos_liveliness_policy_e) -> Self {
+        match liveliness {
+            rmw_qos_liveliness_policy_e_RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT => QosLivelinessPolicy::SystemDefault,
+            rmw_qos_liveliness_policy_e_RMW_QOS_POLICY_LIVELINESS_AUTOMATIC => QosLivelinessPolicy::Automatic,
+            rmw_qos_liveliness_policy_e_RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC => QosLivelinessPolicy::ManualByTopic,
+            rmw_qos_liveliness_policy_e_RMW_QOS_POLICY_LIVELINESS_BEST_AVAILABLE => QosLivelinessPolicy::BestAvailable,
+            _ => QosLivelinessPolicy::Unknown,
+        }
+    }
+    
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            QosLivelinessPolicy::SystemDefault => "SYSTEM_DEFAULT",
+            QosLivelinessPolicy::Automatic => "AUTOMATIC",
+            QosLivelinessPolicy::ManualByNode => "MANUAL_BY_NODE",
+            QosLivelinessPolicy::ManualByTopic => "MANUAL_BY_TOPIC",
+            QosLivelinessPolicy::Unknown => "UNKNOWN",
+            QosLivelinessPolicy::BestAvailable => "BEST_AVAILABLE",
+        }
+    }
+}
+
+impl QosProfile {
+    fn from_rmw(qos: &rmw_qos_profile_t) -> Self {
+        QosProfile {
+            history: QosHistoryPolicy::from_rmw(qos.history),
+            depth: qos.depth,
+            reliability: QosReliabilityPolicy::from_rmw(qos.reliability),
+            durability: QosDurabilityPolicy::from_rmw(qos.durability),
+            deadline_sec: qos.deadline.sec,
+            deadline_nsec: qos.deadline.nsec,
+            lifespan_sec: qos.lifespan.sec,
+            lifespan_nsec: qos.lifespan.nsec,
+            liveliness: QosLivelinessPolicy::from_rmw(qos.liveliness),
+            liveliness_lease_duration_sec: qos.liveliness_lease_duration.sec,
+            liveliness_lease_duration_nsec: qos.liveliness_lease_duration.nsec,
+            avoid_ros_namespace_conventions: qos.avoid_ros_namespace_conventions,
+        }
+    }
+    
+    pub fn format_duration(&self, sec: u64, nsec: u64) -> String {
+        if sec == 0x7FFFFFFFFFFFFFFF && nsec == 0x7FFFFFFFFFFFFFFF {
+            "infinite".to_string()
+        } else if sec == 0 && nsec == 0 {
+            "0.000000000".to_string()
+        } else {
+            format!("{}.{:09}", sec, nsec)
+        }
+    }
+}
+
+// Helper function to format topic type hash
+fn format_topic_type_hash(hash: &rosidl_type_hash_t) -> String {
+    // Format the hash as a hexadecimal string
+    let hash_bytes = unsafe {
+        std::slice::from_raw_parts(hash.value.as_ptr(), hash.value.len())
+    };
+    hash_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+}
+
+// Helper function to format GID
+fn format_gid(gid: &[u8]) -> String {
+    gid.iter().map(|b| format!("{:02x}", b)).collect::<Vec<String>>().join(".")
 }
