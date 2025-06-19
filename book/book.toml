@@ -2,7 +2,8 @@
 authors = ["Trim Bresilla"]
 language = "en"
 multilingual = false
-# title = "roc"
+title = "roc - ROS 2 CLI Tool"
+src = "src"
 
 [output.html]
 default-theme = "navy"
