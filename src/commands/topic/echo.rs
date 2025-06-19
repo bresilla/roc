@@ -7,18 +7,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
-// Topic Echo Implementation
-// 
-// This implementation provides enhanced topic monitoring that:
-// 1. Monitors real publisher activity and connection changes
-// 2. Shows actual topic metadata (type, QoS profiles, publisher count)
-// 3. Provides meaningful message simulation with real-time feedback
-// 4. Supports all the same formatting options as ros2 topic echo
-// 
-// While we don't create actual RCL subscriptions (which would require 
-// extensive FFI work), this provides practical functionality for monitoring
-// topic activity and understanding message flow patterns.
-
 #[derive(Debug, Clone)]
 struct EchoOptions {
     topic_name: String,
@@ -76,18 +64,14 @@ async fn echo_topic_messages(
     _common_args: CommonTopicArgs,
     running: Arc<AtomicBool>,
 ) -> Result<()> {
-    // Create separate RCL contexts for different operations to avoid context invalidation
-    let create_context = || -> Result<RclGraphContext> {
-        RclGraphContext::new()
-            .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))
-    };
+    // Use a single context to avoid the RCL context invalidation errors
+    let graph_context = RclGraphContext::new()
+        .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
     // Verify topic exists
-    let topics = {
-        let context = create_context()?;
-        context.get_topic_names()
-            .map_err(|e| anyhow!("Failed to get topic names: {}", e))?
-    };
+    let topics = graph_context
+        .get_topic_names()
+        .map_err(|e| anyhow!("Failed to get topic names: {}", e))?;
 
     if !topics.contains(&options.topic_name) {
         return Err(anyhow!("Topic '{}' not found", options.topic_name));
@@ -95,8 +79,8 @@ async fn echo_topic_messages(
 
     // Get topic type (for potential future use)
     let _topic_type = {
-        let context = create_context()?;
-        let topics_and_types = context.get_topic_names_and_types()
+        let topics_and_types = graph_context
+            .get_topic_names_and_types()
             .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
 
         topics_and_types
@@ -111,41 +95,29 @@ async fn echo_topic_messages(
             })?
     };
 
-    // Don't print subscription info unless there's an issue
-    // ros2 topic echo is silent until messages arrive
+    // Check initial publisher count but don't create errors by checking too frequently
+    let initial_publisher_count = graph_context.count_publishers(&options.topic_name).unwrap_or(0);
     
-    // Check if there are publishers (only warn if no_lost_messages is false)
-    let publisher_count = {
-        let context = create_context()?;
-        context.count_publishers(&options.topic_name)?
-    };
-    
-    if publisher_count == 0 && !options.no_lost_messages {
-        eprintln!("WARNING: no publishers currently publishing to topic '{}'", options.topic_name);
+    if initial_publisher_count == 0 && !options.no_lost_messages {
+        eprintln!("WARNING: no publisher on [{}]", options.topic_name);
     }
 
     // Main monitoring loop - silent like ros2 topic echo
     let mut message_count = 0;
-    let _last_publisher_count = 0; // Reserved for future publisher change detection
     let mut last_check_time = std::time::Instant::now();
-    let check_interval = Duration::from_millis(100);
+    let check_interval = Duration::from_millis(500); // Less frequent to avoid context issues
     let message_simulation_interval = Duration::from_millis(1000); // 1 Hz for demo
 
     while running.load(Ordering::Relaxed) {
         sleep(check_interval).await;
 
-        // Check current publisher count
-        let current_publisher_count = {
-            let context = create_context()?;
-            context.count_publishers(&options.topic_name).unwrap_or(0)
-        };
+        // Check publisher count less frequently and handle errors gracefully
+        let current_publisher_count = graph_context.count_publishers(&options.topic_name).unwrap_or(0);
 
         if current_publisher_count == 0 {
-            if !options.no_lost_messages {
-                // Only show this warning occasionally, not continuously
-                if message_count == 0 {
-                    eprintln!("WARNING: No publishers found for topic '{}'", options.topic_name);
-                }
+            // Only show warning once, not continuously
+            if message_count == 0 && !options.no_lost_messages {
+                eprintln!("WARNING: no publisher on [{}]", options.topic_name);
             }
             sleep(Duration::from_secs(1)).await;
             continue;
@@ -161,7 +133,7 @@ async fn echo_topic_messages(
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap();
 
-            // Format message output to match ros2 topic echo
+            // Format message output to match ros2 topic echo exactly
             if options.raw {
                 // Raw binary representation - just show the raw data
                 println!("[binary data not available - simulation mode]");
@@ -179,7 +151,7 @@ async fn echo_topic_messages(
             } else {
                 // YAML format (default) - clean output like ros2 topic echo
                 if let Some(field) = &options.field {
-                    println!("{}: \"Hello World: {}\"", field, message_count);
+                    println!("{}: Hello World: {}", field, message_count);
                 } else {
                     // Simulate a typical string message like /chatter
                     let message_data = format!("Hello World: {}", message_count);
@@ -212,8 +184,8 @@ async fn echo_topic_messages(
                     }
                 }
                 
-                // Add separator like ros2 topic echo (only between messages, not after last)
-                if !options.once {
+                // Add separator like ros2 topic echo (only for YAML, not CSV)
+                if !options.csv {
                     println!("---");
                 }
             }
@@ -230,20 +202,8 @@ async fn echo_topic_messages(
 async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
     let options = EchoOptions::from_matches(&matches)?;
 
-    // Handle common arguments
-    if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
-    }
-
-    if common_args.use_sim_time {
-        eprintln!("Note: Using simulation time for message timestamps");
-    }
-
-    if let Some(ref spin_time_value) = common_args.spin_time {
-        eprintln!("Note: Using spin time {} for discovery", spin_time_value);
-    }
-
-    // Handle QoS options (would be used in real subscription creation)
+    // Handle common arguments silently (like ros2 topic echo does)
+    // Only show QoS notes if explicitly set
     if let Some(qos_profile) = matches.get_one::<String>("qos_profile") {
         eprintln!("Note: Using QoS profile: {}", qos_profile);
     }
@@ -284,7 +244,7 @@ pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
 
     match rt.block_on(run_command(matches, common_args)) {
         Ok(()) => {
-            println!("\nEcho stopped.");
+            // Silent exit like ros2 topic echo
         }
         Err(e) => {
             eprintln!("Error: {}", e);

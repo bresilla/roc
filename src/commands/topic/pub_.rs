@@ -74,9 +74,11 @@ async fn publish_messages(
     _common_args: CommonTopicArgs,
     running: Arc<AtomicBool>,
 ) -> Result<()> {
-    // Create RCL context for direct API access
-    let graph_context = RclGraphContext::new()
-        .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
+    // Create separate RCL contexts for different operations to avoid context invalidation
+    let create_context = || -> Result<RclGraphContext> {
+        RclGraphContext::new()
+            .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))
+    };
 
     // Check if we need to wait for matching subscriptions
     if options.wait_matching_subscriptions > 0 {
@@ -89,7 +91,10 @@ async fn publish_messages(
         const MAX_RETRIES: usize = 300; // 30 seconds with 100ms intervals
 
         while retries < MAX_RETRIES {
-            let subscriber_count = graph_context.count_subscribers(&options.topic_name)?;
+            let subscriber_count = {
+                let context = create_context()?;
+                context.count_subscribers(&options.topic_name)?
+            };
 
             if subscriber_count >= options.wait_matching_subscriptions {
                 println!("Found {} matching subscription(s)", subscriber_count);
@@ -107,7 +112,10 @@ async fn publish_messages(
             retries += 1;
         }
 
-        let final_count = graph_context.count_subscribers(&options.topic_name)?;
+        let final_count = {
+            let context = create_context()?;
+            context.count_subscribers(&options.topic_name)?
+        };
         if final_count < options.wait_matching_subscriptions {
             return Err(anyhow!(
                 "Timeout waiting for matching subscriptions. Found {}, expected {}",
@@ -147,9 +155,10 @@ async fn publish_messages(
         message_count += 1;
 
         // Check if we have subscribers (optional feedback)
-        let subscriber_count = graph_context
-            .count_subscribers(&options.topic_name)
-            .unwrap_or(0);
+        let subscriber_count = {
+            let context = create_context()?;
+            context.count_subscribers(&options.topic_name).unwrap_or(0)
+        };
 
         if options.print {
             println!("Publishing message #{}", message_count);

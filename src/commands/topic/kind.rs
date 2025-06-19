@@ -1,50 +1,67 @@
-use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
 use crate::arguments::topic::CommonTopicArgs;
+use crate::graph::RclGraphContext;
+use anyhow::{anyhow, Result};
+use clap::ArgMatches;
 
-async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 topic type".to_owned();
+// Topic Type (Kind) Implementation
+// 
+// This implementation shows the message type for a topic using:
+// 1. Direct RCL API calls to get topic types
+// 2. Simple topic name to type lookup
+// 3. Clean output matching ros2 topic type behavior
 
-    let topic_name = matches.get_one::<String>("topic_name").unwrap();
-    command.push_str(" ");
-    command.push_str(&topic_name.to_string());
+fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
+    let topic_name = matches
+        .get_one::<String>("topic_name")
+        .ok_or_else(|| anyhow!("Topic name is required"))?;
 
-    if let Some(spin_time_value) = &common_args.spin_time {
-        command.push_str(" --spin-time ");
-        command.push_str(spin_time_value);
-    }
-    if common_args.use_sim_time {
-        command.push_str(" --use-sim-time");
-    }
+    // Create RCL context for direct API access
+    let create_context = || -> Result<RclGraphContext> {
+        RclGraphContext::new()
+            .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))
+    };
+
+    // Handle common arguments
     if common_args.no_daemon {
-        command.push_str(" --no-daemon");
+        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
 
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
+    if common_args.use_sim_time {
+        eprintln!("Note: Using simulation time for discovery");
     }
+
+    if let Some(ref spin_time_value) = common_args.spin_time {
+        eprintln!("Note: Using spin time {} for discovery", spin_time_value);
+    }
+
+    // Get topic type
+    let topic_type = {
+        let context = create_context()?;
+        let topics_and_types = context.get_topic_names_and_types()
+            .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
+
+        topics_and_types
+            .iter()
+            .find(|(name, _)| name == topic_name)
+            .map(|(_, type_name)| type_name.clone())
+            .ok_or_else(|| {
+                let daemon_status = RclGraphContext::get_daemon_status();
+                anyhow!("Topic '{}' not found. [{}]", topic_name, daemon_status)
+            })?
+    };
+
+    // Simple output - just the type name (like ros2 topic type)
+    println!("{}", topic_type);
+
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches, common_args));
+pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
+    match run_command(matches, common_args) {
+        Ok(()) => {}
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
