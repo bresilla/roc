@@ -50,7 +50,11 @@ roc <COMMAND> [SUBCOMMAND] [OPTIONS] [ARGS]
 ### Workspace Commands
 - `run` `[r]` - Execute ROS2 packages and nodes
 - `launch` `[l]` - Launch file execution
-- `work` `[w]` - Workspace management and build tools
+- `work` `[w]` - **Complete workspace management suite**
+  - `build` - **Colcon replacement build system** with parallel builds, dependency resolution, and environment management
+  - `create` - Package creation wizard for ament_cmake, ament_python, and cmake packages
+  - `list` - Package discovery and listing
+  - `info` - Package metadata and dependency information
 
 ### Utility Commands
 - `bag` `[b]` - ROS bag recording and playback
@@ -97,9 +101,64 @@ cd book
 mdbook serve
 ```
 
-## 🛠️ Development
+## 🛠️ Workspace Management
 
-### Prerequisites
+ROC includes a complete workspace management system that serves as a **drop-in replacement for colcon**:
+
+### Build System (`roc work build`)
+- **Full colcon compatibility**: All major colcon build options supported
+- **Parallel builds**: Multi-threaded compilation with automatic dependency resolution
+- **Package discovery**: Automatic scanning and parsing of package.xml manifests
+- **Environment management**: Automatic setup of build and runtime environments
+- **Isolated/merged installs**: Support for both colcon install modes
+- **Build types supported**: ament_cmake, ament_python, cmake
+
+```bash
+# Build entire workspace (like colcon build)
+roc work build
+
+# Build specific packages
+roc work build --packages-select my_package another_package
+
+# Parallel builds with custom worker count
+roc work build --parallel-workers 8
+
+# Build with merged install space
+roc work build --merge-install
+
+# Continue on errors
+roc work build --continue-on-error
+```
+
+### Package Creation (`roc work create`)
+Intelligent package creation wizard that generates properly structured ROS2 packages:
+
+```bash
+# Create C++ package
+roc work create my_cpp_package --build-type ament_cmake
+
+# Create Python package  
+roc work create my_py_package --build-type ament_python
+
+# Create with dependencies and metadata
+roc work create my_package \
+  --build-type ament_cmake \
+  --dependencies rclcpp std_msgs \
+  --description "My awesome ROS2 package" \
+  --maintainer-name "Your Name" \
+  --maintainer-email "you@domain.com"
+```
+
+### Package Management
+```bash
+# List all packages in workspace
+roc work list
+
+# Get detailed package information
+roc work info my_package --xml
+```
+
+## 🛠️ Development
 - Rust 1.70+ 
 - ROS2 (Humble, Iron, or Rolling)
 - clang/libclang (for bindgen)
@@ -126,10 +185,14 @@ ROC is actively developed and production-ready for most ROS2 workflows. Current 
 - ✅ **Node Operations**: Node discovery and detailed information
 - ✅ **Parameter Operations**: Full parameter management
 - ✅ **Interface Operations**: Message and service type introspection
+- ✅ **Workspace Operations**: **Complete colcon replacement build system**
+  - ✅ Build system with parallel execution and dependency resolution
+  - ✅ Package creation wizard for all major build types
+  - ✅ Environment management and setup script generation
+  - ✅ Package discovery and metadata extraction
 - 🚧 **Action Operations**: Basic functionality (expanding)
-- 🚧 **Bag Operations**: Recording and playback (in progress)
+- 🚧 **Bag Operations**: Recording and playbook (in progress)
 - ⏳ **Launch Operations**: Planning phase
-- ⏳ **Workspace Operations**: Planning phase
 
 ## 🤝 Why ROC?
 
@@ -138,6 +201,7 @@ ROC was created to address limitations in the existing ROS2 toolchain:
 - **Reliability**: Strong typing and memory safety reduce runtime errors  
 - **Completeness**: Direct RCL/RMW access enables features not available in the standard CLI
 - **Developer Experience**: Better error messages, shell completions, and debugging tools
+- **Build System Innovation**: Modern colcon replacement with superior dependency resolution, parallel execution, and cleaner environment management
 
 ## 📄 License
 

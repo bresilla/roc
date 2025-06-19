@@ -17,6 +17,15 @@
 - [Endpoint Discovery](./implementation/endpoint_discovery.md)
 - [Memory Management](./implementation/memory_management.md)
 
+# Workspace Management
+
+- [Workspace Overview](./workspace/overview.md)
+- [Build System Architecture](./workspace/build_system.md)
+- [Package Discovery](./workspace/package_discovery.md)
+- [Dependency Resolution](./workspace/dependency_resolution.md)
+- [Environment Management](./workspace/environment_management.md)
+- [Colcon Compatibility](./workspace/colcon_compatibility.md)
+
 # Examples & Usage
 
 - [Basic Usage](./examples/basic_usage.md)
