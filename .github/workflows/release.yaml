@@ -12,114 +12,45 @@ env:
 
 jobs:
   build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-22.04
-            archive: tar.gz
-            ros_distro: humble
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-22.04
-            archive: tar.gz
-            ros_distro: humble
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04
-            archive: tar.gz
-            ros_distro: humble
-          - target: x86_64-apple-darwin
-            os: macos-12
-            archive: tar.gz
-          - target: aarch64-apple-darwin
-            os: macos-12
-            archive: tar.gz
-          - target: x86_64-pc-windows-msvc
-            os: windows-2022
-            archive: zip
+    name: Build
+    runs-on: ubuntu-24.04
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Set up ROS2 (Linux only)
-        if: runner.os == 'Linux'
+      - name: Set up ROS2
         uses: ros-tooling/setup-ros@v0.7
         with:
-          required-ros-distributions: ${{ matrix.ros_distro }}
+          required-ros-distributions: humble
           install-connext: false
           
-      - name: Install build dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install build dependencies
         run: |
           sudo apt install -y build-essential clang libclang-dev pkg-config
-          if [[ "${{ matrix.target }}" == *"musl"* ]]; then
-            sudo apt install -y musl-tools
-          fi
-          if [[ "${{ matrix.target }}" == "aarch64"* ]]; then
-            sudo apt install -y gcc-aarch64-linux-gnu
-          fi
-          
-      - name: Install build dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install llvm pkg-config
-          echo 'export PATH="/opt/homebrew/opt/llvm/bin:$PATH"' >> ~/.zshrc
-          
-      - name: Install build dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          choco install llvm
           
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-          
-      - name: Configure Cargo
-        run: |
-          mkdir -p ~/.cargo
-          echo '[target.${{ matrix.target }}]' >> ~/.cargo/config.toml
-          if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]]; then
-            echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
-          fi
-        shell: bash
         
       - name: Build binary
         run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            source /opt/ros/${{ matrix.ros_distro }}/setup.bash
-          fi
-          cargo build --release --target ${{ matrix.target }} --locked
+          source /opt/ros/humble/setup.bash
+          cargo build --release
         shell: bash
         
-      - name: Strip binary (Unix)
-        if: runner.os != 'Windows'
+      - name: Strip binary
         run: |
-          if [[ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]]; then
-            aarch64-linux-gnu-strip target/${{ matrix.target }}/release/roc
-          else
-            strip target/${{ matrix.target }}/release/roc
-          fi
+          strip target/release/roc
         shell: bash
         
       - name: Create archive
         id: archive
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          ARCHIVE_NAME="roc-${VERSION}-${{ matrix.target }}"
-          
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            BINARY_PATH="target/${{ matrix.target }}/release/roc.exe"
-            ARCHIVE_FILE="${ARCHIVE_NAME}.${{ matrix.archive }}"
-            7z a "${ARCHIVE_FILE}" "${BINARY_PATH}"
-          else
-            BINARY_PATH="target/${{ matrix.target }}/release/roc"
-            ARCHIVE_FILE="${ARCHIVE_NAME}.${{ matrix.archive }}"
-            tar -czf "${ARCHIVE_FILE}" -C "target/${{ matrix.target }}/release" roc
-          fi
+          ARCHIVE_NAME="roc-${VERSION}-x86_64-unknown-linux-gnu"
+          BINARY_PATH="target/release/roc"
+          ARCHIVE_FILE="${ARCHIVE_NAME}.tar.gz"
+          tar -czf "${ARCHIVE_FILE}" -C "target/release" roc
           
           echo "archive_name=${ARCHIVE_NAME}" >> $GITHUB_OUTPUT
           echo "archive_file=${ARCHIVE_FILE}" >> $GITHUB_OUTPUT
@@ -142,7 +73,7 @@ jobs:
 
   publish-crates:
     name: Publish to crates.io
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
     
