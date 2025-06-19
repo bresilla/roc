@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.2] - 2025-06-19
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Streamline Linux release build process
+
 ## [0.2.1] - 2025-06-19
 
 ### <!-- 0 -->⛰️  Features
