@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - roc - ROS 2 CLI Tool</title>
+        <title>Workspace Overview - roc - ROS 2 CLI Tool</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "";
+            const path_to_root = "../";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc.js"></script>
+        <script src="../toc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -102,7 +102,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
             </noscript>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -137,7 +137,7 @@
                     <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
 
                     <div class="right-buttons">
-                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
 
@@ -166,37 +166,77 @@
 
                 <div id="content" class="content">
                     <main>
-                        <p align="center">
-  <img src="images/logo.png" />
-</p>
-<h2 id="what-is-roc"><a class="header" href="#what-is-roc">What is roc?</a></h2>
-<p>roc is a tool that wants to help you to develop ROS2 applications faster and easier. It is a collection of tools that are used to generate code, build and test your ROS2 applications. It is based on the <a href="https://index.ros.org/doc/ros2/Tutorials/Colcon-Tutorial/">ROS2 CLI</a>.</p>
-<h2 id="why-roc"><a class="header" href="#why-roc">Why roc?</a></h2>
-<p align="center">
-  <img src="images/standards.png" />
-</p>
-<p>roc aims to be a tool that will completely be written in RUST and at some point not relay on the ROS2 CLI anymore. This will allow us to have a tool that is faster and more reliable. It will also allow us to have a tool that can be used on other platforms like Windows.</p>
-<h2 id="features"><a class="header" href="#features">Features</a></h2>
+                        <h1 id="workspace-management-overview"><a class="header" href="#workspace-management-overview">Workspace Management Overview</a></h1>
+<p>ROC includes a comprehensive workspace management system that serves as a modern, high-performance replacement for colcon. The <code>roc work</code> command provides a complete suite of tools for ROS2 workspace management, including package creation, discovery, dependency resolution, and building.</p>
+<h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
+<h3 id="complete-colcon-replacement"><a class="header" href="#complete-colcon-replacement">Complete Colcon Replacement</a></h3>
+<p>ROC's build system (<code>roc work build</code>) is designed as a drop-in replacement for <code>colcon build</code> with the following advantages:</p>
 <ul>
-<li>Generate ROS2 packages with a template system</li>
-<li>Build ROS2 packages (colcon at the moment) but will be replaced by a custom build system</li>
-<li>Adding missing feature that IMO ros2 cli should have like:
+<li><strong>Native Performance</strong>: Written in Rust for superior performance and memory safety</li>
+<li><strong>Parallel Execution</strong>: Multi-threaded builds with intelligent dependency resolution</li>
+<li><strong>Environment Isolation</strong>: Clean environment management preventing build contamination</li>
+<li><strong>Comprehensive Logging</strong>: Detailed build logs and error reporting</li>
+<li><strong>Full Compatibility</strong>: Supports all major colcon command-line options</li>
+</ul>
+<h3 id="package-management"><a class="header" href="#package-management">Package Management</a></h3>
 <ul>
-<li><code>roc frame</code> to work with tf frames, cordination systems and transformations</li>
-<li><code>roc bridge</code> to bridge topics between different ROS2 instances</li>
+<li><strong>Intelligent Discovery</strong>: Automatic workspace scanning and package.xml parsing</li>
+<li><strong>Metadata Extraction</strong>: Complete package information including dependencies, maintainers, and build types</li>
+<li><strong>Build Type Support</strong>: Full support for ament_cmake, ament_python, and cmake packages</li>
+<li><strong>Dependency Validation</strong>: Circular dependency detection and resolution</li>
 </ul>
-</li>
-<li>Adding TUI (Text User Interface) to make it easier to work with ROS2</li>
+<h3 id="development-workflow"><a class="header" href="#development-workflow">Development Workflow</a></h3>
+<ul>
+<li><strong>Package Creation</strong>: Intelligent wizard for creating properly structured ROS2 packages</li>
+<li><strong>Build Optimization</strong>: Incremental builds and parallel execution</li>
+<li><strong>Environment Setup</strong>: Automatic generation of setup scripts for workspace activation</li>
 </ul>
-<h2 id="notice"><a class="header" href="#notice">Notice</a></h2>
-<p>Almost all of this book is generated by LLM, i have just guided it through the code. If you see something not as in code or vice versa, please let knw (open a PR or something). This will help me guide the project further and not have a discrappancy between docs and code.</p>
+<h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
+<p>The workspace management system is built on several core components:</p>
+<ol>
+<li><strong>Package Discovery Engine</strong>: Recursively scans workspace directories for <code>package.xml</code> files</li>
+<li><strong>Dependency Graph Resolver</strong>: Builds and validates package dependency graphs</li>
+<li><strong>Build Executor</strong>: Manages parallel build execution with proper environment isolation</li>
+<li><strong>Environment Manager</strong>: Handles environment variable setup and setup script generation</li>
+</ol>
+<h2 id="command-structure"><a class="header" href="#command-structure">Command Structure</a></h2>
+<pre><code class="language-bash">roc work &lt;subcommand&gt; [options]
+</code></pre>
+<h3 id="available-subcommands"><a class="header" href="#available-subcommands">Available Subcommands</a></h3>
+<ul>
+<li><code>build</code> - Build packages in the workspace (colcon replacement)</li>
+<li><code>create</code> - Create new ROS2 packages with templates</li>
+<li><code>list</code> - List and discover packages in the workspace</li>
+<li><code>info</code> - Display detailed package information</li>
+</ul>
+<h2 id="compatibility"><a class="header" href="#compatibility">Compatibility</a></h2>
+<p>ROC's workspace system is designed to be fully compatible with existing ROS2 workflows:</p>
+<ul>
+<li><strong>Colcon Arguments</strong>: All major colcon build options are supported</li>
+<li><strong>Package Formats</strong>: Supports package.xml formats 2 and 3</li>
+<li><strong>Build Systems</strong>: Works with ament_cmake, ament_python, and plain cmake</li>
+<li><strong>Environment</strong>: Generates standard ROS2 setup scripts compatible with existing tools</li>
+</ul>
+<h2 id="performance-benefits"><a class="header" href="#performance-benefits">Performance Benefits</a></h2>
+<p>Compared to colcon, ROC provides:</p>
+<ul>
+<li><strong>Faster Startup</strong>: Native binary with minimal overhead</li>
+<li><strong>Better Parallelization</strong>: More efficient worker thread management</li>
+<li><strong>Memory Efficiency</strong>: Lower memory usage during builds</li>
+<li><strong>Cleaner Environment</strong>: Better isolation prevents build environment pollution</li>
+<li><strong>Superior Error Handling</strong>: More detailed error messages and recovery options</li>
+</ul>
+<p>The following sections provide detailed information about each component of the workspace management system.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../implementation/memory_management.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
 
-                            <a rel="next prefetch" href="chapter_2.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../workspace/build_system.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -206,8 +246,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../implementation/memory_management.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
 
-                    <a rel="next prefetch" href="chapter_2.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../workspace/build_system.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
@@ -222,13 +265,13 @@
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
 
         <!-- Custom JS scripts -->
 

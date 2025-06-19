@@ -1,0 +1,488 @@
+<!DOCTYPE HTML>
+<html lang="en" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Dependency Resolution - roc - ROS 2 CLI Tool</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="dependency-resolution"><a class="header" href="#dependency-resolution">Dependency Resolution</a></h1>
+<p>ROC's dependency resolution system builds a comprehensive dependency graph from discovered packages and determines the optimal build order. This chapter explains the algorithms and strategies used for dependency management.</p>
+<h2 id="dependency-graph-construction"><a class="header" href="#dependency-graph-construction">Dependency Graph Construction</a></h2>
+<h3 id="graph-representation"><a class="header" href="#graph-representation">Graph Representation</a></h3>
+<p>The dependency system uses a directed graph where:</p>
+<ul>
+<li><strong>Nodes</strong>: Represent packages in the workspace</li>
+<li><strong>Edges</strong>: Represent dependencies (A → B means A depends on B)</li>
+<li><strong>Direction</strong>: Dependencies point from dependent to dependency</li>
+</ul>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn topological_sort(packages: &amp;[PackageMeta]) -&gt; Result&lt;Vec&lt;usize&gt;, Box&lt;dyn std::error::Error&gt;&gt; {
+    let mut name_to_index: HashMap&lt;String, usize&gt; = HashMap::new();
+    let mut graph: Vec&lt;Vec&lt;usize&gt;&gt; = vec![Vec::new(); packages.len()];
+    let mut in_degree: Vec&lt;usize&gt; = vec![0; packages.len()];
+    
+    // Build name to index mapping
+    for (idx, package) in packages.iter().enumerate() {
+        name_to_index.insert(package.name.clone(), idx);
+    }
+    
+    // Build dependency graph
+    for (pkg_idx, package) in packages.iter().enumerate() {
+        for dep_name in &amp;package.build_deps {
+            if let Some(&amp;dep_idx) = name_to_index.get(dep_name) {
+                graph[dep_idx].push(pkg_idx);
+                in_degree[pkg_idx] += 1;
+            }
+            // External dependencies are ignored (assumed available)
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="dependency-types"><a class="header" href="#dependency-types">Dependency Types</a></h3>
+<p>The system considers multiple types of dependencies when building the graph:</p>
+<h4 id="build-dependencies-build_depend"><a class="header" href="#build-dependencies-build_depend">Build Dependencies (<code>build_depend</code>)</a></h4>
+<ul>
+<li>Required for compilation/building</li>
+<li>Must be built before dependent package</li>
+<li>Include headers, libraries, and build tools</li>
+</ul>
+<h4 id="build-tool-dependencies-buildtool_depend"><a class="header" href="#build-tool-dependencies-buildtool_depend">Build Tool Dependencies (<code>buildtool_depend</code>)</a></h4>
+<ul>
+<li>Build system tools (cmake, ament_cmake, etc.)</li>
+<li>Usually external to workspace</li>
+<li>Considered for ordering if present in workspace</li>
+</ul>
+<h4 id="runtime-dependencies-exec_depend"><a class="header" href="#runtime-dependencies-exec_depend">Runtime Dependencies (<code>exec_depend</code>)</a></h4>
+<ul>
+<li>Required at runtime</li>
+<li>Not directly used for build ordering</li>
+<li>Important for environment setup</li>
+</ul>
+<h3 id="external-dependencies"><a class="header" href="#external-dependencies">External Dependencies</a></h3>
+<p>Dependencies not found in the workspace are treated as external:</p>
+<ul>
+<li>Assumed to be available in the environment</li>
+<li>Not included in build ordering</li>
+<li>May trigger warnings if expected but missing</li>
+</ul>
+<h2 id="topological-sorting-algorithm"><a class="header" href="#topological-sorting-algorithm">Topological Sorting Algorithm</a></h2>
+<h3 id="kahns-algorithm-implementation"><a class="header" href="#kahns-algorithm-implementation">Kahn's Algorithm Implementation</a></h3>
+<p>ROC uses Kahn's algorithm for topological sorting, which is efficient and provides clear cycle detection:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Kahn's algorithm for topological sorting
+let mut queue: VecDeque&lt;usize&gt; = VecDeque::new();
+let mut result: Vec&lt;usize&gt; = Vec::new();
+
+// Add all nodes with no incoming edges
+for (idx, &amp;degree) in in_degree.iter().enumerate() {
+    if degree == 0 {
+        queue.push_back(idx);
+    }
+}
+
+while let Some(current) = queue.pop_front() {
+    result.push(current);
+    
+    // Remove this node and update in-degrees
+    for &amp;neighbor in &amp;graph[current] {
+        in_degree[neighbor] -= 1;
+        if in_degree[neighbor] == 0 {
+            queue.push_back(neighbor);
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="algorithm-benefits"><a class="header" href="#algorithm-benefits">Algorithm Benefits</a></h3>
+<p>Kahn's algorithm provides several advantages:</p>
+<ol>
+<li><strong>Cycle Detection</strong>: Incomplete result indicates circular dependencies</li>
+<li><strong>Efficiency</strong>: O(V + E) time complexity</li>
+<li><strong>Stability</strong>: Consistent ordering for the same input</li>
+<li><strong>Parallelization</strong>: Can identify independent packages for parallel builds</li>
+</ol>
+<h2 id="cycle-detection-and-resolution"><a class="header" href="#cycle-detection-and-resolution">Cycle Detection and Resolution</a></h2>
+<h3 id="circular-dependency-detection"><a class="header" href="#circular-dependency-detection">Circular Dependency Detection</a></h3>
+<p>Circular dependencies are detected when the topological sort fails to include all packages:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Check for cycles
+if result.len() != packages.len() {
+    // Find the cycle
+    let remaining: Vec&lt;String&gt; = packages
+        .iter()
+        .enumerate()
+        .filter(|(idx, _)| !result.contains(idx))
+        .map(|(_, pkg)| pkg.name.clone())
+        .collect();
+    
+    return Err(format!("Circular dependency detected among packages: {:?}", remaining).into());
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="common-cycle-scenarios"><a class="header" href="#common-cycle-scenarios">Common Cycle Scenarios</a></h3>
+<p>Typical circular dependency patterns:</p>
+<ol>
+<li><strong>Direct Cycles</strong>: A depends on B, B depends on A</li>
+<li><strong>Indirect Cycles</strong>: A → B → C → A</li>
+<li><strong>Build Tool Cycles</strong>: Package depends on build tool that depends on package</li>
+</ol>
+<h3 id="resolution-strategies"><a class="header" href="#resolution-strategies">Resolution Strategies</a></h3>
+<p>When cycles are detected, users can:</p>
+<ol>
+<li><strong>Review Dependencies</strong>: Examine package.xml files for unnecessary dependencies</li>
+<li><strong>Split Packages</strong>: Break large packages into smaller, independent pieces</li>
+<li><strong>Use Interface Packages</strong>: Create interface-only packages to break cycles</li>
+<li><strong>Dependency Inversion</strong>: Restructure dependencies using abstract interfaces</li>
+</ol>
+<h2 id="package-filtering"><a class="header" href="#package-filtering">Package Filtering</a></h2>
+<h3 id="build-selection-filters"><a class="header" href="#build-selection-filters">Build Selection Filters</a></h3>
+<p>The dependency resolver supports various package selection strategies:</p>
+<h4 id="selective-building---packages-select"><a class="header" href="#selective-building---packages-select">Selective Building (<code>--packages-select</code>)</a></h4>
+<p>Build only specified packages plus their dependencies:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if let Some(ref selected) = self.config.packages_select {
+    self.packages.retain(|pkg| selected.contains(&amp;pkg.name));
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="package-exclusion---packages-ignore"><a class="header" href="#package-exclusion---packages-ignore">Package Exclusion (<code>--packages-ignore</code>)</a></h4>
+<p>Exclude specific packages from builds:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if let Some(ref ignored) = self.config.packages_ignore {
+    self.packages.retain(|pkg| !ignored.contains(&amp;pkg.name));
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="build-up-to---packages-up-to"><a class="header" href="#build-up-to---packages-up-to">Build Up To (<code>--packages-up-to</code>)</a></h4>
+<p>Build dependencies up to specified packages:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if let Some(ref up_to) = self.config.packages_up_to {
+    let mut packages_to_build = std::collections::HashSet::new();
+    
+    // Add target packages
+    for target in up_to {
+        if let Some(pkg) = self.packages.iter().find(|p| &amp;p.name == target) {
+            packages_to_build.insert(pkg.name.clone());
+            // Add all dependencies recursively
+            self.add_dependencies_recursive(&amp;pkg.name, &amp;mut packages_to_build);
+        }
+    }
+    
+    self.packages.retain(|pkg| packages_to_build.contains(&amp;pkg.name));
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="recursive-dependency-collection"><a class="header" href="#recursive-dependency-collection">Recursive Dependency Collection</a></h3>
+<p>For <code>--packages-up-to</code>, dependencies are collected recursively:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn add_dependencies_recursive(&amp;self, pkg_name: &amp;str, packages_to_build: &amp;mut std::collections::HashSet&lt;String&gt;) {
+    if let Some(pkg) = self.packages.iter().find(|p| &amp;p.name == pkg_name) {
+        for dep in &amp;pkg.build_deps {
+            if !packages_to_build.contains(dep) {
+                if self.packages.iter().any(|p| &amp;p.name == dep) {
+                    packages_to_build.insert(dep.clone());
+                    self.add_dependencies_recursive(dep, packages_to_build);
+                }
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="parallel-build-optimization"><a class="header" href="#parallel-build-optimization">Parallel Build Optimization</a></h2>
+<h3 id="independent-package-identification"><a class="header" href="#independent-package-identification">Independent Package Identification</a></h3>
+<p>The topological sort naturally identifies packages that can be built in parallel:</p>
+<ul>
+<li>Packages with no dependencies can start immediately</li>
+<li>Packages with the same dependency level can build concurrently</li>
+<li>Only direct dependencies need to complete before a package starts</li>
+</ul>
+<h3 id="dependency-satisfaction-checking"><a class="header" href="#dependency-satisfaction-checking">Dependency Satisfaction Checking</a></h3>
+<p>During parallel builds, each worker verifies dependencies before starting:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let all_deps_ready = deps.iter().all(|dep| {
+    states.get(dep).map(|s| *s == PackageState::Completed).unwrap_or(true)
+});
+
+if all_deps_ready {
+    states.insert(pkg_name.clone(), PackageState::Building);
+    ready_package = Some(pkg_name);
+    break;
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="load-balancing"><a class="header" href="#load-balancing">Load Balancing</a></h3>
+<p>The work-stealing approach ensures optimal resource utilization:</p>
+<ol>
+<li><strong>Dynamic Work Assignment</strong>: Workers pick up available packages as dependencies complete</li>
+<li><strong>No Static Partitioning</strong>: Avoids idle workers when some builds take longer</li>
+<li><strong>Dependency-Aware</strong>: Respects build order constraints while maximizing parallelism</li>
+</ol>
+<h2 id="advanced-dependency-scenarios"><a class="header" href="#advanced-dependency-scenarios">Advanced Dependency Scenarios</a></h2>
+<h3 id="cross-package-dependencies"><a class="header" href="#cross-package-dependencies">Cross-Package Dependencies</a></h3>
+<p>Handling complex dependency relationships:</p>
+<h4 id="messageservice-dependencies"><a class="header" href="#messageservice-dependencies">Message/Service Dependencies</a></h4>
+<pre><code class="language-xml">&lt;build_depend&gt;my_interfaces&lt;/build_depend&gt;
+&lt;exec_depend&gt;my_interfaces&lt;/exec_depend&gt;
+</code></pre>
+<h4 id="metapackage-dependencies"><a class="header" href="#metapackage-dependencies">Metapackage Dependencies</a></h4>
+<pre><code class="language-xml">&lt;buildtool_depend&gt;ament_cmake&lt;/buildtool_depend&gt;
+&lt;exec_depend&gt;package1&lt;/exec_depend&gt;
+&lt;exec_depend&gt;package2&lt;/exec_depend&gt;
+</code></pre>
+<h4 id="conditional-dependencies-format-3"><a class="header" href="#conditional-dependencies-format-3">Conditional Dependencies (Format 3)</a></h4>
+<pre><code class="language-xml">&lt;depend condition="$ROS_VERSION == 2"&gt;ros2_specific_pkg&lt;/depend&gt;
+</code></pre>
+<h3 id="build-tool-resolution"><a class="header" href="#build-tool-resolution">Build Tool Resolution</a></h3>
+<p>Special handling for build tools:</p>
+<ol>
+<li><strong>External Build Tools</strong>: ament_cmake, cmake, python3-setuptools</li>
+<li><strong>Workspace Build Tools</strong>: Custom ament extensions built from source</li>
+<li><strong>Version Constraints</strong>: Ensuring compatible tool versions</li>
+</ol>
+<h2 id="error-handling-and-diagnostics"><a class="header" href="#error-handling-and-diagnostics">Error Handling and Diagnostics</a></h2>
+<h3 id="dependency-validation"><a class="header" href="#dependency-validation">Dependency Validation</a></h3>
+<p>The system performs comprehensive validation:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Check for missing dependencies
+for package in &amp;packages {
+    for dep in &amp;package.build_deps {
+        if !name_to_index.contains_key(dep) &amp;&amp; !is_external_dependency(dep) {
+            warnings.push(format!("Package {} depends on missing package {}", 
+                                package.name, dep));
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="diagnostic-output"><a class="header" href="#diagnostic-output">Diagnostic Output</a></h3>
+<p>Detailed information for troubleshooting:</p>
+<ul>
+<li><strong>Build Order Visualization</strong>: Show the determined build sequence</li>
+<li><strong>Dependency Tree</strong>: Display complete dependency relationships</li>
+<li><strong>Cycle Analysis</strong>: Identify specific packages involved in cycles</li>
+<li><strong>Missing Dependencies</strong>: List external dependencies that may be missing</li>
+</ul>
+<h3 id="recovery-strategies"><a class="header" href="#recovery-strategies">Recovery Strategies</a></h3>
+<p>When dependency issues are encountered:</p>
+<ol>
+<li><strong>Graceful Degradation</strong>: Continue with buildable packages</li>
+<li><strong>Partial Builds</strong>: Build independent subgraphs</li>
+<li><strong>Dependency Suggestions</strong>: Recommend missing packages to install</li>
+<li><strong>Alternative Orderings</strong>: Provide multiple valid build orders when possible</li>
+</ol>
+<p>The dependency resolution system provides a robust foundation for workspace builds, ensuring correct build order while maximizing parallel execution opportunities and providing clear diagnostics for troubleshooting dependency issues.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../workspace/package_discovery.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../workspace/environment_management.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../workspace/package_discovery.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../workspace/environment_management.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
