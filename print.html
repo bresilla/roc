@@ -1,14 +1,14 @@
 <!DOCTYPE HTML>
-<html lang="en" class="navy" dir="ltr">
+<html lang="en" class="navy sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title></title>
+        <title>roc - ROS 2 CLI Tool</title>
         <meta name="robots" content="noindex">
 
 
         <!-- Custom HTML head -->
-        
+
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
@@ -25,26 +25,40 @@
         <link rel="stylesheet" href="fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="highlight.css">
-        <link rel="stylesheet" href="tomorrow-night.css">
-        <link rel="stylesheet" href="ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
-    </head>
-    <body class="sidebar-visible no-js">
-    <div id="body-container">
-        <!-- Provide site root to javascript -->
-        <script>
-            var path_to_root = "";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "navy";
-        </script>
 
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -58,24 +72,22 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
-            var html = document.querySelector('html');
+            const html = document.documentElement;
             html.classList.remove('navy')
             html.classList.add(theme);
-            var body = document.querySelector('body');
-            body.classList.remove('no-js')
-            body.classList.add('js');
+            html.classList.add("js");
         </script>
 
         <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var body = document.querySelector('body');
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -83,43 +95,25 @@
                 sidebar = 'hidden';
             }
             sidebar_toggle.checked = sidebar === 'visible';
-            body.classList.remove('sidebar-visible');
-            body.classList.add("sidebar-" + sidebar);
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="chapter_1.html"><strong aria-hidden="true">1.</strong> Intro</a></li><li class="chapter-item expanded "><a href="chapter_2.html"><strong aria-hidden="true">2.</strong> Installation</a></li></ol>
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
             </div>
-            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
-
-        <!-- Track and set sidebar scroll position -->
-        <script>
-            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
-            sidebarScrollbox.addEventListener('click', function(e) {
-                if (e.target.tagName === 'A') {
-                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
-                }
-            }, { passive: true });
-            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
-            sessionStorage.removeItem('sidebar-scroll');
-            if (sidebarScrollTop) {
-                // preserve sidebar scroll position when navigating via links within sidebar
-                sidebarScrollbox.scrollTop = sidebarScrollTop;
-            } else {
-                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
-                var activeSection = document.querySelector('#sidebar .active');
-                if (activeSection) {
-                    activeSection.scrollIntoView({ block: 'center' });
-                }
-            }
-        </script>
 
         <div id="page-wrapper" class="page-wrapper">
 
             <div class="page">
-                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
                         <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
@@ -129,18 +123,19 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
                         </ul>
-                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
                     </div>
 
-                    <h1 class="menu-title"></h1>
+                    <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -207,7 +202,7 @@ sudo add-apt-repository universe
 sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
 </code></pre>
 <p>Then add the repository to your sources list.</p>
-<pre><code class="language-bash">echo &quot;deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release &amp;&amp; echo $UBUNTU_CODENAME) main&quot; | sudo tee /etc/apt/sources.list.d/ros2.list &gt; /dev/null
+<pre><code class="language-bash">echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release &amp;&amp; echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list &gt; /dev/null
 </code></pre>
 <h3 id="install-ros-2-packages"><a class="header" href="#install-ros-2-packages">Install ROS 2 packages</a></h3>
 <p>Update your apt repository caches after setting up the repositories.</p>
@@ -245,6 +240,3510 @@ su
 cd rocc
 cargo install --path .
 </code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="ros-2-architecture-overview"><a class="header" href="#ros-2-architecture-overview">ROS 2 Architecture Overview</a></h1>
+<p>ROS 2 (Robot Operating System 2) is a sophisticated middleware framework designed for distributed robotics applications. Understanding its layered architecture is crucial for implementing effective bindings and tools like <code>roc</code>.</p>
+<h2 id="layered-architecture"><a class="header" href="#layered-architecture">Layered Architecture</a></h2>
+<p>ROS 2 follows a layered architecture that separates concerns and provides modularity:</p>
+<pre><code>┌─────────────────────────────────────────┐
+│           User Applications             │
+├─────────────────────────────────────────┤
+│              ROS 2 API                  │
+│         (rclcpp, rclpy, etc.)           │
+├─────────────────────────────────────────┤
+│               RCL Layer                 │
+│        (Robot Control Library)         │
+├─────────────────────────────────────────┤
+│               RMW Layer                 │
+│       (ROS Middleware Interface)        │
+├─────────────────────────────────────────┤
+│          DDS Implementation             │
+│    (Fast-DDS, Cyclone DX, etc.)        │
+└─────────────────────────────────────────┘
+</code></pre>
+<h2 id="key-components"><a class="header" href="#key-components">Key Components</a></h2>
+<h3 id="1-dds-layer-bottom"><a class="header" href="#1-dds-layer-bottom">1. DDS Layer (Bottom)</a></h3>
+<ul>
+<li><strong>Purpose</strong>: Provides the actual networking and discovery mechanisms</li>
+<li><strong>Examples</strong>: Fast-DDS, Cyclone DX, Connext DDS</li>
+<li><strong>Responsibilities</strong>:
+<ul>
+<li>Network communication</li>
+<li>Service discovery</li>
+<li>Quality of Service (QoS) enforcement</li>
+<li>Data serialization/deserialization</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-rmw-layer-ros-middleware-interface"><a class="header" href="#2-rmw-layer-ros-middleware-interface">2. RMW Layer (ROS Middleware Interface)</a></h3>
+<ul>
+<li><strong>Purpose</strong>: Abstract interface that isolates ROS 2 from specific DDS implementations</li>
+<li><strong>Location</strong>: <code>/opt/ros/jazzy/include/rmw/</code></li>
+<li><strong>Key Types</strong>:
+<ul>
+<li><code>rmw_context_t</code> - Middleware context</li>
+<li><code>rmw_node_t</code> - Node representation</li>
+<li><code>rmw_publisher_t</code> / <code>rmw_subscription_t</code> - Topic endpoints</li>
+<li><code>rmw_qos_profile_t</code> - Quality of Service profiles</li>
+<li><code>rmw_topic_endpoint_info_t</code> - Detailed endpoint information</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-rcl-layer-robot-control-library"><a class="header" href="#3-rcl-layer-robot-control-library">3. RCL Layer (Robot Control Library)</a></h3>
+<ul>
+<li><strong>Purpose</strong>: Provides a C API that manages the ROS 2 graph and lifecycle</li>
+<li><strong>Location</strong>: <code>/opt/ros/jazzy/include/rcl/</code></li>
+<li><strong>Key Functions</strong>:
+<ul>
+<li><code>rcl_init()</code> - Initialize RCL context</li>
+<li><code>rcl_node_init()</code> - Create nodes</li>
+<li><code>rcl_get_topic_names_and_types()</code> - Graph introspection</li>
+<li><code>rcl_get_publishers_info_by_topic()</code> - Detailed topic information</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-language-specific-apis"><a class="header" href="#4-language-specific-apis">4. Language-Specific APIs</a></h3>
+<ul>
+<li><strong>rclcpp</strong>: C++ client library</li>
+<li><strong>rclpy</strong>: Python client library</li>
+<li><strong>rclrs</strong>: Rust client library (emerging)</li>
+</ul>
+<h2 id="why-this-architecture-matters-for-roc"><a class="header" href="#why-this-architecture-matters-for-roc">Why This Architecture Matters for <code>roc</code></a></h2>
+<p>The <code>roc</code> tool operates primarily at the <strong>RCL and RMW layers</strong>, bypassing the higher-level language APIs to:</p>
+<ol>
+<li><strong>Direct Access</strong>: Get raw, unfiltered information about the ROS 2 graph</li>
+<li><strong>Performance</strong>: Avoid overhead of higher-level abstractions</li>
+<li><strong>Completeness</strong>: Access all available metadata (QoS, GIDs, type hashes)</li>
+<li><strong>Compatibility</strong>: Work consistently across different ROS 2 distributions</li>
+</ol>
+<h2 id="discovery-and-communication-flow"><a class="header" href="#discovery-and-communication-flow">Discovery and Communication Flow</a></h2>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant App as roc Application
+    participant RCL as RCL Layer
+    participant RMW as RMW Layer
+    participant DDS as DDS Implementation
+    
+    App-&gt;&gt;RCL: rcl_init()
+    RCL-&gt;&gt;RMW: rmw_init()
+    RMW-&gt;&gt;DDS: Initialize DDS participant
+    
+    App-&gt;&gt;RCL: rcl_get_publishers_info_by_topic()
+    RCL-&gt;&gt;RMW: rmw_get_publishers_info_by_topic()
+    RMW-&gt;&gt;DDS: Query DDS discovery database
+    DDS--&gt;&gt;RMW: Publisher endpoint info
+    RMW--&gt;&gt;RCL: rmw_topic_endpoint_info_t[]
+    RCL--&gt;&gt;App: rcl_topic_endpoint_info_array_t
+</code></pre>
+<p>This architecture allows <code>roc</code> to access detailed information that is often abstracted away in higher-level tools, making it particularly powerful for debugging and system introspection.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="rcl-and-rmw-layers"><a class="header" href="#rcl-and-rmw-layers">RCL and RMW Layers</a></h1>
+<p>The RCL (Robot Control Library) and RMW (ROS Middleware) layers form the core of ROS 2's architecture. Understanding these layers is essential for implementing effective bindings and tools.</p>
+<h2 id="rmw-layer-ros-middleware-interface"><a class="header" href="#rmw-layer-ros-middleware-interface">RMW Layer (ROS Middleware Interface)</a></h2>
+<h3 id="purpose-and-design"><a class="header" href="#purpose-and-design">Purpose and Design</a></h3>
+<p>The RMW layer serves as an abstraction barrier between ROS 2 and specific DDS implementations. This design allows ROS 2 to work with different middleware providers without changing upper-layer code.</p>
+<h3 id="key-data-structures"><a class="header" href="#key-data-structures">Key Data Structures</a></h3>
+<h4 id="topic-endpoint-information"><a class="header" href="#topic-endpoint-information">Topic Endpoint Information</a></h4>
+<pre><code class="language-c">typedef struct rmw_topic_endpoint_info_s {
+    const char * node_name;                    // Node that owns this endpoint
+    const char * node_namespace;               // Node's namespace
+    const char * topic_type;                   // Message type name
+    rosidl_type_hash_t topic_type_hash;        // Hash of message definition
+    rmw_endpoint_type_t endpoint_type;         // PUBLISHER or SUBSCRIPTION
+    uint8_t endpoint_gid[RMW_GID_STORAGE_SIZE]; // Global unique identifier
+    rmw_qos_profile_t qos_profile;             // Quality of Service settings
+} rmw_topic_endpoint_info_t;
+</code></pre>
+<p>This structure contains all the detailed information about a topic endpoint that <code>roc</code> displays in verbose mode.</p>
+<h4 id="qos-profile-structure"><a class="header" href="#qos-profile-structure">QoS Profile Structure</a></h4>
+<pre><code class="language-c">typedef struct rmw_qos_profile_s {
+    rmw_qos_history_policy_e history;          // KEEP_LAST, KEEP_ALL
+    size_t depth;                              // Queue depth for KEEP_LAST
+    rmw_qos_reliability_policy_e reliability;  // RELIABLE, BEST_EFFORT
+    rmw_qos_durability_policy_e durability;    // VOLATILE, TRANSIENT_LOCAL
+    rmw_time_s deadline;                       // Maximum time between messages
+    rmw_time_s lifespan;                       // How long messages stay valid
+    rmw_qos_liveliness_policy_e liveliness;    // Liveliness assertion policy
+    rmw_time_s liveliness_lease_duration;      // Liveliness lease time
+    bool avoid_ros_namespace_conventions;      // Bypass ROS naming
+} rmw_qos_profile_t;
+</code></pre>
+<h3 id="rmw-functions-used-by-roc"><a class="header" href="#rmw-functions-used-by-roc">RMW Functions Used by <code>roc</code></a></h3>
+<p>The key RMW functions that our implementation uses:</p>
+<pre><code class="language-c">// Get detailed publisher information
+rmw_ret_t rmw_get_publishers_info_by_topic(
+    const rmw_node_t * node,
+    rcutils_allocator_t * allocator,
+    const char * topic_name,
+    bool no_mangle,
+    rmw_topic_endpoint_info_array_t * publishers_info
+);
+
+// Get detailed subscriber information  
+rmw_ret_t rmw_get_subscriptions_info_by_topic(
+    const rmw_node_t * node,
+    rcutils_allocator_t * allocator,
+    const char * topic_name,
+    bool no_mangle,
+    rmw_topic_endpoint_info_array_t * subscriptions_info
+);
+</code></pre>
+<h2 id="rcl-layer-robot-control-library"><a class="header" href="#rcl-layer-robot-control-library">RCL Layer (Robot Control Library)</a></h2>
+<h3 id="purpose-and-design-1"><a class="header" href="#purpose-and-design-1">Purpose and Design</a></h3>
+<p>The RCL layer provides a C API that manages:</p>
+<ul>
+<li>Context initialization and cleanup</li>
+<li>Node lifecycle management</li>
+<li>Graph introspection</li>
+<li>Resource management</li>
+</ul>
+<h3 id="key-rcl-functions"><a class="header" href="#key-rcl-functions">Key RCL Functions</a></h3>
+<h4 id="context-and-node-management"><a class="header" href="#context-and-node-management">Context and Node Management</a></h4>
+<pre><code class="language-c">// Initialize RCL context
+rcl_ret_t rcl_init(
+    int argc,
+    char const * const * argv,
+    const rcl_init_options_t * options,
+    rcl_context_t * context
+);
+
+// Initialize a node
+rcl_ret_t rcl_node_init(
+    rcl_node_t * node,
+    const char * name,
+    const char * namespace_,
+    rcl_context_t * context,
+    const rcl_node_options_t * options
+);
+</code></pre>
+<h4 id="graph-introspection"><a class="header" href="#graph-introspection">Graph Introspection</a></h4>
+<pre><code class="language-c">// Get all topics and their types
+rcl_ret_t rcl_get_topic_names_and_types(
+    const rcl_node_t * node,
+    rcutils_allocator_t * allocator,
+    bool no_demangle,
+    rcl_names_and_types_t * topic_names_and_types
+);
+
+// Count publishers for a topic
+rcl_ret_t rcl_count_publishers(
+    const rcl_node_t * node,
+    const char * topic_name,
+    size_t * count
+);
+</code></pre>
+<h4 id="detailed-endpoint-information"><a class="header" href="#detailed-endpoint-information">Detailed Endpoint Information</a></h4>
+<pre><code class="language-c">// Get detailed publisher info (wraps RMW function)
+rcl_ret_t rcl_get_publishers_info_by_topic(
+    const rcl_node_t * node,
+    rcutils_allocator_t * allocator,
+    const char * topic_name,
+    bool no_mangle,
+    rcl_topic_endpoint_info_array_t * publishers_info
+);
+</code></pre>
+<h2 id="type-mapping-and-aliases"><a class="header" href="#type-mapping-and-aliases">Type Mapping and Aliases</a></h2>
+<p>RCL often provides type aliases for RMW types:</p>
+<pre><code class="language-c">// RCL aliases for RMW types
+typedef rmw_topic_endpoint_info_t rcl_topic_endpoint_info_t;
+typedef rmw_topic_endpoint_info_array_t rcl_topic_endpoint_info_array_t;
+typedef rmw_names_and_types_t rcl_names_and_types_t;
+</code></pre>
+<p>This design means that RCL functions often directly pass through to RMW implementations.</p>
+<h2 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h2>
+<p>Both RCL and RMW use integer return codes:</p>
+<pre><code class="language-c">#define RCL_RET_OK                    0
+#define RCL_RET_ERROR                 1
+#define RCL_RET_BAD_ALLOC            10
+#define RCL_RET_INVALID_ARGUMENT     11
+#define RCL_RET_NODE_INVALID         200
+</code></pre>
+<p>Our Rust bindings convert these into <code>Result&lt;T, anyhow::Error&gt;</code> types for idiomatic error handling.</p>
+<h2 id="memory-management"><a class="header" href="#memory-management">Memory Management</a></h2>
+<h3 id="key-principles"><a class="header" href="#key-principles">Key Principles</a></h3>
+<ol>
+<li><strong>Caller allocates, caller deallocates</strong>: The caller must provide allocators and clean up resources</li>
+<li><strong>Array finalization</strong>: Arrays returned by RCL/RMW must be finalized with specific functions</li>
+<li><strong>String lifecycle</strong>: Strings in returned structures may have complex ownership</li>
+</ol>
+<h3 id="example-proper-resource-cleanup"><a class="header" href="#example-proper-resource-cleanup">Example: Proper Resource Cleanup</a></h3>
+<pre><code class="language-c">// Initialize array
+rcl_topic_endpoint_info_array_t publishers_info = rmw_get_zero_initialized_topic_endpoint_info_array();
+
+// Get data
+rcl_get_publishers_info_by_topic(node, &amp;allocator, topic_name, false, &amp;publishers_info);
+
+// Use data...
+
+// Clean up (REQUIRED)
+rmw_topic_endpoint_info_array_fini(&amp;publishers_info, &amp;allocator);
+</code></pre>
+<p>This pattern is critical for preventing memory leaks in long-running applications like <code>roc</code>.</p>
+<h2 id="integration-with-dds"><a class="header" href="#integration-with-dds">Integration with DDS</a></h2>
+<p>The RMW layer abstracts DDS-specific details, but understanding the mapping helps:</p>
+<div class="table-wrapper"><table><thead><tr><th>ROS 2 Concept</th><th>DDS Concept</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>Node</td><td>DDS Participant</td><td>Process-level entity</td></tr>
+<tr><td>Publisher</td><td>DDS Publisher + DataWriter</td><td>Sends data</td></tr>
+<tr><td>Subscription</td><td>DDS Subscriber + DataReader</td><td>Receives data</td></tr>
+<tr><td>Topic</td><td>DDS Topic</td><td>Communication channel</td></tr>
+<tr><td>QoS Profile</td><td>DDS QoS Policies</td><td>Communication behavior</td></tr>
+<tr><td>GID</td><td>DDS Instance Handle</td><td>Unique endpoint ID</td></tr>
+</tbody></table>
+</div>
+<p>This layered approach allows <code>roc</code> to access both high-level ROS 2 concepts and low-level DDS details through a unified interface.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="rust-ffi-bindings"><a class="header" href="#rust-ffi-bindings">Rust FFI Bindings</a></h1>
+<p>Creating effective Rust bindings for ROS 2's C libraries requires careful handling of Foreign Function Interface (FFI) concepts, memory management, and type safety.</p>
+<h2 id="overview-of-our-binding-strategy"><a class="header" href="#overview-of-our-binding-strategy">Overview of Our Binding Strategy</a></h2>
+<p>The <code>roc</code> project uses a custom FFI binding approach located in the <code>rclrs/</code> subdirectory. This provides direct access to RCL and RMW functions without the overhead of higher-level abstractions.</p>
+<h2 id="project-structure"><a class="header" href="#project-structure">Project Structure</a></h2>
+<pre><code>rclrs/
+├── build.rs              # Build script for bindgen
+├── Cargo.toml             # Crate configuration
+├── wrapper.h              # C header wrapper
+└── src/
+    └── lib.rs             # Rust bindings and wrappers
+</code></pre>
+<h2 id="build-system-buildrs"><a class="header" href="#build-system-buildrs">Build System (<code>build.rs</code>)</a></h2>
+<p>Our build script uses <code>bindgen</code> to automatically generate Rust bindings from C headers:</p>
+<pre><pre class="playground"><code class="language-rust">use bindgen;
+use std::env;
+use std::path::PathBuf;
+
+fn main() {
+    // Tell cargo to look for ROS 2 installation
+    println!("cargo:rustc-link-search=native=/opt/ros/jazzy/lib");
+    
+    // Link against RCL libraries
+    println!("cargo:rustc-link-lib=rcl");
+    println!("cargo:rustc-link-lib=rmw");
+    println!("cargo:rustc-link-lib=rcutils");
+    
+    // Generate bindings
+    let bindings = bindgen::Builder::default()
+        .header("wrapper.h")
+        .clang_arg("-I/opt/ros/jazzy/include")
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .generate()
+        .expect("Unable to generate bindings");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
+}</code></pre></pre>
+<h2 id="header-wrapper-wrapperh"><a class="header" href="#header-wrapper-wrapperh">Header Wrapper (<code>wrapper.h</code>)</a></h2>
+<p>We create a minimal wrapper that includes only the headers we need:</p>
+<pre><code class="language-c">#ifndef WRAPPER_H
+#define WRAPPER_H
+
+// Core RCL headers
+#include "rcl/rcl/allocator.h"
+#include "rcl/rcl/context.h"
+#include "rcl/rcl/graph.h"
+#include "rcl/rcl/init.h"
+#include "rcl/rcl/init_options.h"
+#include "rcl/rcl/node.h"
+
+// RMW headers for detailed topic information
+#include "rmw/rmw/allocators.h"
+#include "rmw/rmw/init.h"
+#include "rmw/rmw/init_options.h"
+#include "rmw/rmw/ret_types.h"
+#include "rmw/rmw/types.h"
+#include "rmw/rmw/topic_endpoint_info.h"
+
+#endif // WRAPPER_H
+</code></pre>
+<p>This selective inclusion keeps compilation fast and only exposes the APIs we actually use.</p>
+<h2 id="generated-bindings"><a class="header" href="#generated-bindings">Generated Bindings</a></h2>
+<p>The <code>bindgen</code> tool generates Rust equivalents for C types and functions:</p>
+<h3 id="c-structs--rust-structs"><a class="header" href="#c-structs--rust-structs">C Structs → Rust Structs</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// C: rmw_topic_endpoint_info_t
+#[repr(C)]
+pub struct rmw_topic_endpoint_info_s {
+    pub node_name: *const ::std::os::raw::c_char,
+    pub node_namespace: *const ::std::os::raw::c_char,
+    pub topic_type: *const ::std::os::raw::c_char,
+    pub topic_type_hash: rosidl_type_hash_t,
+    pub endpoint_type: rmw_endpoint_type_t,
+    pub endpoint_gid: [u8; 16usize],
+    pub qos_profile: rmw_qos_profile_t,
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="c-enums--rust-constants"><a class="header" href="#c-enums--rust-constants">C Enums → Rust Constants</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// C: rmw_endpoint_type_e
+pub const rmw_endpoint_type_e_RMW_ENDPOINT_INVALID: rmw_endpoint_type_e = 0;
+pub const rmw_endpoint_type_e_RMW_ENDPOINT_PUBLISHER: rmw_endpoint_type_e = 1;
+pub const rmw_endpoint_type_e_RMW_ENDPOINT_SUBSCRIPTION: rmw_endpoint_type_e = 2;
+pub type rmw_endpoint_type_e = ::std::os::raw::c_uint;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="c-functions--rust-extern-functions"><a class="header" href="#c-functions--rust-extern-functions">C Functions → Rust Extern Functions</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>extern "C" {
+    pub fn rcl_get_publishers_info_by_topic(
+        node: *const rcl_node_t,
+        allocator: *mut rcutils_allocator_t,
+        topic_name: *const ::std::os::raw::c_char,
+        no_mangle: bool,
+        publishers_info: *mut rcl_topic_endpoint_info_array_t,
+    ) -&gt; rcl_ret_t;
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="safe-rust-wrappers"><a class="header" href="#safe-rust-wrappers">Safe Rust Wrappers</a></h2>
+<p>Our implementation wraps the raw FFI with safe Rust abstractions:</p>
+<h3 id="string-handling"><a class="header" href="#string-handling">String Handling</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Convert C strings to Rust strings safely
+let node_name = if info.node_name.is_null() {
+    "unknown".to_string()
+} else {
+    std::ffi::CStr::from_ptr(info.node_name)
+        .to_string_lossy()
+        .to_string()
+};
+<span class="boring">}</span></code></pre></pre>
+<h3 id="error-handling-1"><a class="header" href="#error-handling-1">Error Handling</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Convert C return codes to Rust Results
+let ret = rcl_get_publishers_info_by_topic(
+    &amp;self.node,
+    &amp;mut allocator,
+    topic_name_c.as_ptr(),
+    false,
+    &amp;mut publishers_info,
+);
+
+if ret != 0 {
+    return Err(anyhow!("Failed to get publishers info: {}", ret));
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="memory-management-1"><a class="header" href="#memory-management-1">Memory Management</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Ensure proper cleanup with RAII
+unsafe {
+    let mut allocator = rcutils_get_default_allocator();
+    let mut publishers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+    
+    // ... use the data ...
+    
+    // Automatic cleanup when leaving scope
+    rmw_topic_endpoint_info_array_fini(&amp;mut publishers_info, &amp;mut allocator);
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="type-conversions"><a class="header" href="#type-conversions">Type Conversions</a></h2>
+<p>We provide safe conversions between C types and idiomatic Rust types:</p>
+<h3 id="enum-conversions"><a class="header" href="#enum-conversions">Enum Conversions</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl EndpointType {
+    fn from_rmw(endpoint_type: rmw_endpoint_type_t) -&gt; Self {
+        match endpoint_type {
+            rmw_endpoint_type_e_RMW_ENDPOINT_PUBLISHER =&gt; EndpointType::Publisher,
+            rmw_endpoint_type_e_RMW_ENDPOINT_SUBSCRIPTION =&gt; EndpointType::Subscription,
+            _ =&gt; EndpointType::Invalid,
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="complex-structure-conversions"><a class="header" href="#complex-structure-conversions">Complex Structure Conversions</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl QosProfile {
+    fn from_rmw(qos: &amp;rmw_qos_profile_t) -&gt; Self {
+        QosProfile {
+            history: QosHistoryPolicy::from_rmw(qos.history),
+            depth: qos.depth,
+            reliability: QosReliabilityPolicy::from_rmw(qos.reliability),
+            durability: QosDurabilityPolicy::from_rmw(qos.durability),
+            deadline_sec: qos.deadline.sec,
+            deadline_nsec: qos.deadline.nsec,
+            // ... other fields
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="challenges-and-solutions"><a class="header" href="#challenges-and-solutions">Challenges and Solutions</a></h2>
+<h3 id="1-null-pointer-handling"><a class="header" href="#1-null-pointer-handling">1. Null Pointer Handling</a></h3>
+<p><strong>Challenge</strong>: C APIs can return null pointers
+<strong>Solution</strong>: Check for null before dereferencing</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let topic_type = if info.topic_type.is_null() {
+    "unknown".to_string()
+} else {
+    std::ffi::CStr::from_ptr(info.topic_type).to_string_lossy().to_string()
+};
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-memory-ownership"><a class="header" href="#2-memory-ownership">2. Memory Ownership</a></h3>
+<p><strong>Challenge</strong>: Complex ownership semantics between C and Rust
+<strong>Solution</strong>: Clear ownership boundaries and explicit cleanup</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// C owns the memory in the array, we just read it
+let gid = std::slice::from_raw_parts(
+    info.endpoint_gid.as_ptr(), 
+    info.endpoint_gid.len()
+).to_vec(); // Copy to Rust-owned Vec
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-type-size-mismatches"><a class="header" href="#3-type-size-mismatches">3. Type Size Mismatches</a></h3>
+<p><strong>Challenge</strong>: C <code>int</code> vs Rust <code>i32</code> vs <code>c_int</code>
+<strong>Solution</strong>: Use <code>std::os::raw</code> types consistently</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::os::raw::{c_char, c_int, c_uint};
+<span class="boring">}</span></code></pre></pre>
+<h3 id="4-array-handling"><a class="header" href="#4-array-handling">4. Array Handling</a></h3>
+<p><strong>Challenge</strong>: C arrays with separate size fields
+<strong>Solution</strong>: Safe iteration with bounds checking</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for i in 0..publishers_info.size {
+    let info = &amp;*(publishers_info.info_array.add(i));
+    // ... process info safely
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="testing-ffi-code"><a class="header" href="#testing-ffi-code">Testing FFI Code</a></h2>
+<p>FFI code requires careful testing:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_context_creation() {
+        let context = RclGraphContext::new();
+        assert!(context.is_ok());
+    }
+
+    #[test]
+    fn test_topic_discovery() {
+        let context = RclGraphContext::new().unwrap();
+        let topics = context.get_topic_names();
+        assert!(topics.is_ok());
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="performance-considerations"><a class="header" href="#performance-considerations">Performance Considerations</a></h2>
+<ol>
+<li><strong>Minimize FFI Calls</strong>: Batch operations when possible</li>
+<li><strong>Avoid String Conversions</strong>: Cache converted strings</li>
+<li><strong>Memory Locality</strong>: Process data in the order it's laid out in memory</li>
+<li><strong>Error Path Optimization</strong>: Fast paths for common success cases</li>
+</ol>
+<p>This FFI design provides the foundation for <code>roc</code>'s powerful introspection capabilities while maintaining safety and performance.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="graph-context-implementation"><a class="header" href="#graph-context-implementation">Graph Context Implementation</a></h1>
+<p>The <code>RclGraphContext</code> is the core component that manages ROS 2 graph introspection in <code>roc</code>. It provides a safe Rust wrapper around RCL and RMW APIs for discovering and querying the ROS 2 computation graph.</p>
+<h2 id="core-design-principles"><a class="header" href="#core-design-principles">Core Design Principles</a></h2>
+<h3 id="1-raii-resource-acquisition-is-initialization"><a class="header" href="#1-raii-resource-acquisition-is-initialization">1. RAII (Resource Acquisition Is Initialization)</a></h3>
+<p>The context automatically manages RCL resources:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct RclGraphContext {
+    context: rcl_context_t,      // RCL context handle
+    node: rcl_node_t,            // Minimal node for graph queries
+    is_initialized: bool,        // Safety flag
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-direct-dds-discovery"><a class="header" href="#2-direct-dds-discovery">2. Direct DDS Discovery</a></h3>
+<p>Unlike <code>ros2</code> CLI tools that may use the daemon, <code>roc</code> always performs direct DDS discovery:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// Note: This implementation always performs direct DDS discovery 
+/// (equivalent to --no-daemon)
+pub fn new() -&gt; Result&lt;Self&gt; {
+    Self::new_with_discovery(std::time::Duration::from_millis(150))
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-type-safety"><a class="header" href="#3-type-safety">3. Type Safety</a></h3>
+<p>All unsafe C interactions are wrapped in safe Rust APIs that return <code>Result</code> types.</p>
+<h2 id="initialization-process"><a class="header" href="#initialization-process">Initialization Process</a></h2>
+<p>The initialization follows a specific sequence required by RCL:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn new_with_discovery(discovery_time: std::time::Duration) -&gt; Result&lt;Self&gt; {
+    unsafe {
+        // 1. Read ROS_DOMAIN_ID from environment
+        let domain_id = env::var("ROS_DOMAIN_ID")
+            .ok()
+            .and_then(|s| s.parse::&lt;usize&gt;().ok())
+            .unwrap_or(0);
+
+        // 2. Initialize RCL init options
+        let mut init_options = rcl_get_zero_initialized_init_options();
+        let allocator = rcutils_get_default_allocator();
+        
+        let ret = rcl_init_options_init(&amp;mut init_options, allocator);
+        if ret != 0 {
+            return Err(anyhow!("Failed to initialize RCL init options: {}", ret));
+        }
+
+        // 3. Configure RMW init options with domain ID
+        let rmw_init_options = rcl_init_options_get_rmw_init_options(&amp;mut init_options);
+        if rmw_init_options.is_null() {
+            return Err(anyhow!("Failed to get RMW init options"));
+        }
+        (*rmw_init_options).domain_id = domain_id;
+
+        // 4. Initialize RCL context
+        let mut context = rcl_get_zero_initialized_context();
+        let ret = rcl_init(0, ptr::null_mut(), &amp;init_options, &amp;mut context);
+        if ret != 0 {
+            return Err(anyhow!("Failed to initialize RCL: {}", ret));
+        }
+
+        // 5. Create minimal node for graph queries
+        let mut node = rcl_get_zero_initialized_node();
+        let node_name = CString::new("roc_graph_node")?;
+        let namespace = CString::new("/")?;
+        let node_options = rcl_node_get_default_options();
+        
+        let ret = rcl_node_init(
+            &amp;mut node,
+            node_name.as_ptr(),
+            namespace.as_ptr(),
+            &amp;mut context,
+            &amp;node_options,
+        );
+        if ret != 0 {
+            rcl_shutdown(&amp;mut context);
+            return Err(anyhow!("Failed to initialize node: {}", ret));
+        }
+
+        // 6. Wait for DDS discovery
+        let graph_context = RclGraphContext { context, node, is_initialized: true };
+        graph_context.wait_for_graph_discovery(discovery_time)?;
+        
+        Ok(graph_context)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="graph-discovery-operations"><a class="header" href="#graph-discovery-operations">Graph Discovery Operations</a></h2>
+<h3 id="basic-topic-listing"><a class="header" href="#basic-topic-listing">Basic Topic Listing</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn get_topic_names(&amp;self) -&gt; Result&lt;Vec&lt;String&gt;&gt; {
+    if !self.is_valid() {
+        return Err(anyhow!("RCL context is not valid"));
+    }
+    
+    unsafe {
+        let mut allocator = rcutils_get_default_allocator();
+        let mut topic_names_and_types = rcl_names_and_types_t { 
+            names: rcutils_get_zero_initialized_string_array(),
+            types: ptr::null_mut(),
+        };
+        
+        let ret = rcl_get_topic_names_and_types(
+            &amp;self.node,
+            &amp;mut allocator as *mut _,
+            false, // no_demangle: use ROS topic name conventions
+            &amp;mut topic_names_and_types,
+        );
+        
+        if ret != 0 {
+            return Err(anyhow!("Failed to get topic names: {}", ret));
+        }
+        
+        // Convert C string array to Rust Vec&lt;String&gt;
+        let mut result = Vec::new();
+        for i in 0..topic_names_and_types.names.size {
+            if !topic_names_and_types.names.data.add(i).is_null() {
+                let name_ptr = *topic_names_and_types.names.data.add(i);
+                if !name_ptr.is_null() {
+                    let name_cstr = std::ffi::CStr::from_ptr(name_ptr);
+                    if let Ok(name_str) = name_cstr.to_str() {
+                        result.push(name_str.to_string());
+                    }
+                }
+            }
+        }
+        
+        // Critical: clean up allocated memory
+        rcl_names_and_types_fini(&amp;mut topic_names_and_types);
+        
+        Ok(result)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="counting-publisherssubscribers"><a class="header" href="#counting-publisherssubscribers">Counting Publishers/Subscribers</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn count_publishers(&amp;self, topic_name: &amp;str) -&gt; Result&lt;usize&gt; {
+    if !self.is_valid() {
+        return Err(anyhow!("RCL context is not valid"));
+    }
+    
+    let topic_name_c = CString::new(topic_name)?;
+    
+    unsafe {
+        let mut count: usize = 0;
+        let ret = rcl_count_publishers(
+            &amp;self.node, 
+            topic_name_c.as_ptr(), 
+            &amp;mut count
+        );
+        
+        if ret != 0 {
+            return Err(anyhow!("Failed to count publishers: {}", ret));
+        }
+        
+        Ok(count)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="detailed-endpoint-information-1"><a class="header" href="#detailed-endpoint-information-1">Detailed Endpoint Information</a></h2>
+<p>The most complex operation is getting detailed endpoint information with QoS profiles:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn get_publishers_info(&amp;self, topic_name: &amp;str) -&gt; Result&lt;Vec&lt;TopicEndpointInfo&gt;&gt; {
+    if !self.is_valid() {
+        return Err(anyhow!("RCL context is not valid"));
+    }
+    
+    let topic_name_c = CString::new(topic_name)?;
+    
+    unsafe {
+        let mut allocator = rcutils_get_default_allocator();
+        let mut publishers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+        
+        let ret = rcl_get_publishers_info_by_topic(
+            &amp;self.node,
+            &amp;mut allocator,
+            topic_name_c.as_ptr(),
+            false, // no_mangle: follow ROS conventions
+            &amp;mut publishers_info,
+        );
+        
+        if ret != 0 {
+            return Err(anyhow!("Failed to get publishers info: {}", ret));
+        }
+        
+        // Process each endpoint info structure
+        let mut result = Vec::new();
+        for i in 0..publishers_info.size {
+            let info = &amp;*(publishers_info.info_array.add(i));
+            
+            // Extract and convert all fields safely
+            let endpoint_info = TopicEndpointInfo {
+                node_name: self.extract_string(info.node_name)?,
+                node_namespace: self.extract_string(info.node_namespace)?,
+                topic_type: self.extract_string(info.topic_type)?,
+                topic_type_hash: format_topic_type_hash(&amp;info.topic_type_hash),
+                endpoint_type: EndpointType::from_rmw(info.endpoint_type),
+                gid: self.extract_gid(&amp;info.endpoint_gid),
+                qos_profile: QosProfile::from_rmw(&amp;info.qos_profile),
+            };
+            
+            result.push(endpoint_info);
+        }
+        
+        // Critical: cleanup allocated memory
+        rmw_topic_endpoint_info_array_fini(&amp;mut publishers_info, &amp;mut allocator);
+        
+        Ok(result)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="memory-management-strategy"><a class="header" href="#memory-management-strategy">Memory Management Strategy</a></h2>
+<h3 id="allocation-pattern"><a class="header" href="#allocation-pattern">Allocation Pattern</a></h3>
+<ol>
+<li><strong>Zero-initialize</strong> all structures before use</li>
+<li><strong>Pass allocators</strong> to RCL/RMW functions</li>
+<li><strong>Extract/copy</strong> data before cleanup</li>
+<li><strong>Finalize</strong> structures to free memory</li>
+</ol>
+<h3 id="helper-methods-for-safe-extraction"><a class="header" href="#helper-methods-for-safe-extraction">Helper Methods for Safe Extraction</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl RclGraphContext {
+    unsafe fn extract_string(&amp;self, ptr: *const c_char) -&gt; Result&lt;String&gt; {
+        if ptr.is_null() {
+            Ok("unknown".to_string())
+        } else {
+            Ok(std::ffi::CStr::from_ptr(ptr).to_string_lossy().to_string())
+        }
+    }
+    
+    unsafe fn extract_gid(&amp;self, gid_array: &amp;[u8; 16]) -&gt; Vec&lt;u8&gt; {
+        gid_array.to_vec() // Copy the array to owned Vec
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="error-handling-and-validation"><a class="header" href="#error-handling-and-validation">Error Handling and Validation</a></h2>
+<h3 id="context-validation"><a class="header" href="#context-validation">Context Validation</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn is_valid(&amp;self) -&gt; bool {
+    if !self.is_initialized {
+        return false;
+    }
+    unsafe {
+        rcl_context_is_valid(&amp;self.context) &amp;&amp; rcl_node_is_valid(&amp;self.node)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="comprehensive-error-mapping"><a class="header" href="#comprehensive-error-mapping">Comprehensive Error Mapping</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn map_rcl_error(ret: i32, operation: &amp;str) -&gt; anyhow::Error {
+    match ret {
+        0 =&gt; panic!("Success code passed to error mapper"),
+        1 =&gt; anyhow!("{}: Generic error", operation),
+        10 =&gt; anyhow!("{}: Memory allocation failed", operation),
+        11 =&gt; anyhow!("{}: Invalid argument", operation),
+        200 =&gt; anyhow!("{}: Node is invalid", operation),
+        _ =&gt; anyhow!("{}: Unknown error code {}", operation, ret),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="resource-cleanup-drop-implementation"><a class="header" href="#resource-cleanup-drop-implementation">Resource Cleanup (Drop Implementation)</a></h2>
+<p>Proper cleanup is critical for long-running applications:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl Drop for RclGraphContext {
+    fn drop(&amp;mut self) {
+        if self.is_initialized {
+            unsafe {
+                // Order matters: node before context
+                if rcl_node_is_valid(&amp;self.node) {
+                    rcl_node_fini(&amp;mut self.node);
+                }
+                
+                if rcl_context_is_valid(&amp;self.context) {
+                    rcl_shutdown(&amp;mut self.context);
+                }
+                
+                self.is_initialized = false;
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="discovery-timing"><a class="header" href="#discovery-timing">Discovery Timing</a></h2>
+<p>Since we use direct DDS discovery, we must wait for the discovery protocol:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn wait_for_graph_discovery(&amp;self, discovery_time: std::time::Duration) -&gt; Result&lt;()&gt; {
+    if !self.is_valid() {
+        return Err(anyhow!("RCL context is not valid"));
+    }
+
+    // DDS discovery is asynchronous - we need to wait for network convergence
+    std::thread::sleep(discovery_time);
+    
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The default 150ms timeout balances discovery completeness with startup speed.</p>
+<h2 id="thread-safety"><a class="header" href="#thread-safety">Thread Safety</a></h2>
+<p>The <code>RclGraphContext</code> is <strong>not</strong> thread-safe. RCL contexts and nodes are not designed for concurrent access. For multi-threaded applications, create separate contexts per thread or use synchronization primitives.</p>
+<h2 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h2>
+<ul>
+<li><strong>Initialization</strong>: ~150ms (dominated by DDS discovery)</li>
+<li><strong>Topic listing</strong>: ~1-5ms (depends on graph size)</li>
+<li><strong>Detailed queries</strong>: ~5-20ms (depends on topic complexity)</li>
+<li><strong>Memory usage</strong>: ~1MB base + proportional to graph size</li>
+</ul>
+<p>This implementation provides the foundation for all of <code>roc</code>'s graph introspection capabilities while maintaining safety and performance.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="topic-information-system"><a class="header" href="#topic-information-system">Topic Information System</a></h1>
+<p>The topic information system in <code>roc</code> provides comprehensive details about ROS 2 topics, including basic metadata and detailed endpoint information with QoS profiles. This chapter explains how the system works and what information it provides.</p>
+<h2 id="command-structure"><a class="header" href="#command-structure">Command Structure</a></h2>
+<p>The topic info command follows this pattern:</p>
+<pre><code class="language-bash">roc topic info &lt;topic_name&gt; [--verbose]
+</code></pre>
+<ul>
+<li><strong>Basic mode</strong>: Shows topic type, publisher count, and subscriber count</li>
+<li><strong>Verbose mode</strong>: Adds detailed endpoint information including QoS profiles, GIDs, and type hashes</li>
+</ul>
+<h2 id="information-hierarchy"><a class="header" href="#information-hierarchy">Information Hierarchy</a></h2>
+<h3 id="basic-information"><a class="header" href="#basic-information">Basic Information</a></h3>
+<pre><code>Type: std_msgs/msg/String
+Publisher count: 1  
+Subscription count: 1
+</code></pre>
+<p>This basic information comes from:</p>
+<ol>
+<li><code>rcl_get_topic_names_and_types()</code> - for the topic type</li>
+<li><code>rcl_count_publishers()</code> - for publisher count</li>
+<li><code>rcl_count_subscribers()</code> - for subscriber count</li>
+</ol>
+<h3 id="detailed-information-verbose-mode"><a class="header" href="#detailed-information-verbose-mode">Detailed Information (Verbose Mode)</a></h3>
+<pre><code>Publishers:
+  Node name: talker
+  Node namespace: /
+  Topic type: std_msgs/msg/String
+  Topic type hash: RIHS01_df668c740482bbd48fb39d76a70dfd4bd59db1288021743503259e948f6b1a18
+  Endpoint type: PUBLISHER
+  GID: 01.0f.ba.ec.43.55.39.96.00.00.00.00.00.00.14.03
+  QoS profile:
+    Reliability: RELIABLE
+    History (KEEP_LAST): 10
+    Durability: VOLATILE
+    Lifespan: Infinite
+    Deadline: Infinite
+    Liveliness: AUTOMATIC
+    Liveliness lease duration: Infinite
+</code></pre>
+<h2 id="data-flow-architecture"><a class="header" href="#data-flow-architecture">Data Flow Architecture</a></h2>
+<pre><code class="language-mermaid">graph TD
+    A[User Command] --&gt; B[Command Parser]
+    B --&gt; C[RclGraphContext::new]
+    C --&gt; D[RCL Initialization]
+    D --&gt; E[DDS Discovery Wait]
+    E --&gt; F{Verbose Mode?}
+    F --&gt;|No| G[Basic Info Queries]
+    F --&gt;|Yes| H[Detailed Info Queries]
+    G --&gt; I[Display Basic Results]
+    H --&gt; J[Extract &amp; Convert Data]
+    J --&gt; K[Display Detailed Results]
+</code></pre>
+<h2 id="implementation-details"><a class="header" href="#implementation-details">Implementation Details</a></h2>
+<h3 id="basic-information-collection"><a class="header" href="#basic-information-collection">Basic Information Collection</a></h3>
+<p>The basic mode uses simple counting operations:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -&gt; Result&lt;()&gt; {
+    let topic_name = matches.get_one::&lt;String&gt;("topic_name")?;
+    let verbose = matches.get_flag("verbose");
+    
+    let create_context = || -&gt; Result&lt;RclGraphContext&gt; {
+        RclGraphContext::new()
+            .map_err(|e| anyhow!("Failed to initialize RCL context: {}", e))
+    };
+    
+    // Get topic type
+    let topic_type = {
+        let context = create_context()?;
+        let topics_and_types = context.get_topic_names_and_types()?;
+        topics_and_types.iter()
+            .find(|(name, _)| name == topic_name)
+            .map(|(_, type_name)| type_name.clone())
+            .ok_or_else(|| anyhow!("Topic '{}' not found", topic_name))?
+    };
+    
+    // Get counts
+    let publisher_count = create_context()?.count_publishers(topic_name)?;
+    let subscriber_count = create_context()?.count_subscribers(topic_name)?;
+    
+    println!("Type: {}", topic_type);
+    println!("Publisher count: {}", publisher_count);
+    println!("Subscription count: {}", subscriber_count);
+    
+    // ... verbose mode handling
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="detailed-information-collection"><a class="header" href="#detailed-information-collection">Detailed Information Collection</a></h3>
+<p>For verbose mode, we query detailed endpoint information:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if verbose {
+    let publishers_info = create_context()?.get_publishers_info(topic_name)?;
+    let subscribers_info = create_context()?.get_subscribers_info(topic_name)?;
+    
+    println!("\nPublishers:");
+    for pub_info in publishers_info {
+        display_endpoint_info(&amp;pub_info);
+    }
+    
+    println!("\nSubscribers:");
+    for sub_info in subscribers_info {
+        display_endpoint_info(&amp;sub_info);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="data-structures"><a class="header" href="#data-structures">Data Structures</a></h2>
+<h3 id="topicendpointinfo-structure"><a class="header" href="#topicendpointinfo-structure">TopicEndpointInfo Structure</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct TopicEndpointInfo {
+    pub node_name: String,              // Node that owns this endpoint
+    pub node_namespace: String,         // Node's namespace  
+    pub topic_type: String,             // Message type name
+    pub topic_type_hash: String,        // Hash of message definition
+    pub endpoint_type: EndpointType,    // PUBLISHER or SUBSCRIPTION
+    pub gid: Vec&lt;u8&gt;,                   // Global unique identifier
+    pub qos_profile: QosProfile,        // Quality of Service settings
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="qosprofile-structure"><a class="header" href="#qosprofile-structure">QosProfile Structure</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct QosProfile {
+    pub history: QosHistoryPolicy,           // KEEP_LAST, KEEP_ALL
+    pub depth: usize,                        // Queue depth for KEEP_LAST
+    pub reliability: QosReliabilityPolicy,   // RELIABLE, BEST_EFFORT
+    pub durability: QosDurabilityPolicy,     // VOLATILE, TRANSIENT_LOCAL
+    pub deadline_sec: u64,                   // Deadline seconds
+    pub deadline_nsec: u64,                  // Deadline nanoseconds
+    pub lifespan_sec: u64,                   // Lifespan seconds
+    pub lifespan_nsec: u64,                  // Lifespan nanoseconds
+    pub liveliness: QosLivelinessPolicy,     // Liveliness policy
+    pub liveliness_lease_duration_sec: u64,  // Lease duration seconds
+    pub liveliness_lease_duration_nsec: u64, // Lease duration nanoseconds
+    pub avoid_ros_namespace_conventions: bool, // Bypass ROS naming
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="information-sources-and-mapping"><a class="header" href="#information-sources-and-mapping">Information Sources and Mapping</a></h2>
+<h3 id="rclrmw-source-mapping"><a class="header" href="#rclrmw-source-mapping">RCL/RMW Source Mapping</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Display Field</th><th>RCL/RMW Source</th><th>Notes</th></tr></thead><tbody>
+<tr><td>Type</td><td><code>rcl_get_topic_names_and_types()</code></td><td>Basic topic type</td></tr>
+<tr><td>Publisher count</td><td><code>rcl_count_publishers()</code></td><td>Simple count</td></tr>
+<tr><td>Subscription count</td><td><code>rcl_count_subscribers()</code></td><td>Simple count</td></tr>
+<tr><td>Node name</td><td><code>rmw_topic_endpoint_info_t.node_name</code></td><td>From detailed query</td></tr>
+<tr><td>Node namespace</td><td><code>rmw_topic_endpoint_info_t.node_namespace</code></td><td>From detailed query</td></tr>
+<tr><td>Topic type hash</td><td><code>rmw_topic_endpoint_info_t.topic_type_hash</code></td><td>Message definition hash</td></tr>
+<tr><td>Endpoint type</td><td><code>rmw_topic_endpoint_info_t.endpoint_type</code></td><td>PUBLISHER/SUBSCRIPTION</td></tr>
+<tr><td>GID</td><td><code>rmw_topic_endpoint_info_t.endpoint_gid</code></td><td>DDS global identifier</td></tr>
+<tr><td>QoS profile</td><td><code>rmw_topic_endpoint_info_t.qos_profile</code></td><td>Complete QoS settings</td></tr>
+</tbody></table>
+</div>
+<h3 id="topic-type-hash-format"><a class="header" href="#topic-type-hash-format">Topic Type Hash Format</a></h3>
+<p>The topic type hash uses the RIHS (ROS Interface Hash Standard) format:</p>
+<pre><code>RIHS01_&lt;hex_hash&gt;
+</code></pre>
+<p>Where:</p>
+<ul>
+<li><code>RIHS01</code> indicates version 1 of the ROS Interface Hash Standard</li>
+<li><code>&lt;hex_hash&gt;</code> is the SHA-256 hash of the message definition</li>
+</ul>
+<h3 id="gid-format"><a class="header" href="#gid-format">GID Format</a></h3>
+<p>Global Identifiers (GIDs) are displayed as dot-separated hexadecimal:</p>
+<pre><code>01.0f.ba.ec.43.55.39.96.00.00.00.00.00.00.14.03
+</code></pre>
+<p>This 16-byte identifier uniquely identifies the DDS endpoint.</p>
+<h2 id="qos-policy-interpretation"><a class="header" href="#qos-policy-interpretation">QoS Policy Interpretation</a></h2>
+<h3 id="reliability"><a class="header" href="#reliability">Reliability</a></h3>
+<ul>
+<li><strong>RELIABLE</strong>: Guarantees delivery, may retry</li>
+<li><strong>BEST_EFFORT</strong>: Attempts delivery, may lose messages</li>
+<li><strong>SYSTEM_DEFAULT</strong>: Uses DDS implementation default</li>
+</ul>
+<h3 id="history"><a class="header" href="#history">History</a></h3>
+<ul>
+<li><strong>KEEP_LAST</strong>: Keep only the last N messages (N = depth)</li>
+<li><strong>KEEP_ALL</strong>: Keep all messages subject to resource limits</li>
+<li><strong>SYSTEM_DEFAULT</strong>: Uses DDS implementation default</li>
+</ul>
+<h3 id="durability"><a class="header" href="#durability">Durability</a></h3>
+<ul>
+<li><strong>VOLATILE</strong>: Messages not persisted</li>
+<li><strong>TRANSIENT_LOCAL</strong>: Messages persisted for late-joining subscribers</li>
+<li><strong>SYSTEM_DEFAULT</strong>: Uses DDS implementation default</li>
+</ul>
+<h3 id="liveliness"><a class="header" href="#liveliness">Liveliness</a></h3>
+<ul>
+<li><strong>AUTOMATIC</strong>: DDS automatically asserts liveliness</li>
+<li><strong>MANUAL_BY_TOPIC</strong>: Application must assert liveliness per topic</li>
+<li><strong>SYSTEM_DEFAULT</strong>: Uses DDS implementation default</li>
+</ul>
+<h3 id="duration-values"><a class="header" href="#duration-values">Duration Values</a></h3>
+<p>Duration values are displayed in nanoseconds:</p>
+<ul>
+<li><strong>Infinite</strong>: <code>9223372036854775807</code> nanoseconds (effectively infinite)</li>
+<li><strong>Zero</strong>: <code>0</code> nanoseconds (immediate)</li>
+<li><strong>Finite</strong>: Actual nanosecond values</li>
+</ul>
+<h2 id="error-handling-2"><a class="header" href="#error-handling-2">Error Handling</a></h2>
+<h3 id="topic-not-found"><a class="header" href="#topic-not-found">Topic Not Found</a></h3>
+<p>When a topic doesn't exist:</p>
+<pre><code>Error: Topic '/nonexistent' not found. [No daemon running]
+</code></pre>
+<p>The error message includes daemon status for compatibility with <code>ros2</code> CLI.</p>
+<h3 id="context-initialization-failures"><a class="header" href="#context-initialization-failures">Context Initialization Failures</a></h3>
+<p>If RCL initialization fails:</p>
+<pre><code>Error: Failed to initialize RCL context: &lt;error_code&gt;
+</code></pre>
+<h3 id="discovery-timeouts"><a class="header" href="#discovery-timeouts">Discovery Timeouts</a></h3>
+<p>If no endpoints are found but the topic exists, this typically indicates:</p>
+<ol>
+<li>Publishers/subscribers haven't started discovery yet</li>
+<li>Network connectivity issues</li>
+<li>Domain ID mismatches</li>
+</ol>
+<h2 id="performance-considerations-1"><a class="header" href="#performance-considerations-1">Performance Considerations</a></h2>
+<h3 id="context-reuse-strategy"><a class="header" href="#context-reuse-strategy">Context Reuse Strategy</a></h3>
+<p>The current implementation creates a new context for each query operation. This trade-off:</p>
+<ul>
+<li><strong>Pros</strong>: Ensures fresh discovery information, prevents stale state</li>
+<li><strong>Cons</strong>: ~150ms overhead per context creation</li>
+</ul>
+<p>Future optimizations could cache contexts with invalidation strategies.</p>
+<h3 id="memory-usage"><a class="header" href="#memory-usage">Memory Usage</a></h3>
+<ul>
+<li>Basic queries: ~1MB (RCL/DDS overhead)</li>
+<li>Detailed queries: +~10KB per endpoint (QoS and string data)</li>
+<li>Peak usage during array processing before conversion to Rust types</li>
+</ul>
+<h3 id="discovery-timing-1"><a class="header" href="#discovery-timing-1">Discovery Timing</a></h3>
+<p>The 150ms discovery timeout balances:</p>
+<ul>
+<li><strong>Completeness</strong>: Enough time for DDS discovery protocol</li>
+<li><strong>Responsiveness</strong>: Fast enough for interactive use</li>
+<li><strong>Reliability</strong>: Consistent results across different DDS implementations</li>
+</ul>
+<p>This information system provides the foundation for understanding ROS 2 system behavior and debugging communication issues.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="qos-profile-handling"><a class="header" href="#qos-profile-handling">QoS Profile Handling</a></h1>
+<p>Quality of Service (QoS) profiles are critical for ROS 2 communication behavior. The <code>roc</code> tool provides detailed QoS information that helps developers understand and debug communication patterns, compatibility issues, and performance characteristics.</p>
+<h2 id="qos-overview"><a class="header" href="#qos-overview">QoS Overview</a></h2>
+<p>QoS profiles define the communication behavior between publishers and subscribers. They consist of several policies that must be compatible between endpoints for successful communication.</p>
+<h3 id="qos-policies-in-roc"><a class="header" href="#qos-policies-in-roc">QoS Policies in <code>roc</code></a></h3>
+<p><code>roc</code> displays the following QoS policies:</p>
+<ol>
+<li><strong>Reliability</strong> - Message delivery guarantees</li>
+<li><strong>History</strong> - Message queue behavior</li>
+<li><strong>Durability</strong> - Message persistence</li>
+<li><strong>Deadline</strong> - Maximum time between messages</li>
+<li><strong>Lifespan</strong> - How long messages remain valid</li>
+<li><strong>Liveliness</strong> - Endpoint aliveness checking</li>
+</ol>
+<h2 id="data-structure-implementation"><a class="header" href="#data-structure-implementation">Data Structure Implementation</a></h2>
+<h3 id="rust-qos-representation"><a class="header" href="#rust-qos-representation">Rust QoS Representation</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct QosProfile {
+    pub history: QosHistoryPolicy,
+    pub depth: usize,
+    pub reliability: QosReliabilityPolicy,
+    pub durability: QosDurabilityPolicy,
+    pub deadline_sec: u64,
+    pub deadline_nsec: u64,
+    pub lifespan_sec: u64,
+    pub lifespan_nsec: u64,
+    pub liveliness: QosLivelinessPolicy,
+    pub liveliness_lease_duration_sec: u64,
+    pub liveliness_lease_duration_nsec: u64,
+    pub avoid_ros_namespace_conventions: bool,
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="policy-enumerations"><a class="header" href="#policy-enumerations">Policy Enumerations</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub enum QosReliabilityPolicy {
+    SystemDefault,    // Use DDS implementation default
+    Reliable,         // Guarantee delivery
+    BestEffort,       // Best effort delivery
+    Unknown,          // Unrecognized value
+    BestAvailable,    // Match majority of endpoints
+}
+
+#[derive(Debug, Clone)]
+pub enum QosHistoryPolicy {
+    SystemDefault,    // Use DDS implementation default
+    KeepLast,         // Keep last N messages
+    KeepAll,          // Keep all messages
+    Unknown,          // Unrecognized value
+}
+
+#[derive(Debug, Clone)]
+pub enum QosDurabilityPolicy {
+    SystemDefault,    // Use DDS implementation default
+    TransientLocal,   // Persist for late joiners
+    Volatile,         // Don't persist
+    Unknown,          // Unrecognized value
+    BestAvailable,    // Match majority of endpoints
+}
+
+#[derive(Debug, Clone)]
+pub enum QosLivelinessPolicy {
+    SystemDefault,    // Use DDS implementation default
+    Automatic,        // DDS manages liveliness
+    ManualByNode,     // Application asserts per node (deprecated)
+    ManualByTopic,    // Application asserts per topic
+    Unknown,          // Unrecognized value
+    BestAvailable,    // Match majority of endpoints
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="conversion-from-rmw-types"><a class="header" href="#conversion-from-rmw-types">Conversion from RMW Types</a></h2>
+<h3 id="from-c-enums-to-rust-enums"><a class="header" href="#from-c-enums-to-rust-enums">From C Enums to Rust Enums</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl QosReliabilityPolicy {
+    fn from_rmw(reliability: rmw_qos_reliability_policy_e) -&gt; Self {
+        match reliability {
+            rmw_qos_reliability_policy_e_RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT 
+                =&gt; QosReliabilityPolicy::SystemDefault,
+            rmw_qos_reliability_policy_e_RMW_QOS_POLICY_RELIABILITY_RELIABLE 
+                =&gt; QosReliabilityPolicy::Reliable,
+            rmw_qos_reliability_policy_e_RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT 
+                =&gt; QosReliabilityPolicy::BestEffort,
+            rmw_qos_reliability_policy_e_RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE 
+                =&gt; QosReliabilityPolicy::BestAvailable,
+            _ =&gt; QosReliabilityPolicy::Unknown,
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="complete-qos-profile-conversion"><a class="header" href="#complete-qos-profile-conversion">Complete QoS Profile Conversion</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl QosProfile {
+    fn from_rmw(qos: &amp;rmw_qos_profile_t) -&gt; Self {
+        QosProfile {
+            history: QosHistoryPolicy::from_rmw(qos.history),
+            depth: qos.depth,
+            reliability: QosReliabilityPolicy::from_rmw(qos.reliability),
+            durability: QosDurabilityPolicy::from_rmw(qos.durability),
+            deadline_sec: qos.deadline.sec,
+            deadline_nsec: qos.deadline.nsec,
+            lifespan_sec: qos.lifespan.sec,
+            lifespan_nsec: qos.lifespan.nsec,
+            liveliness: QosLivelinessPolicy::from_rmw(qos.liveliness),
+            liveliness_lease_duration_sec: qos.liveliness_lease_duration.sec,
+            liveliness_lease_duration_nsec: qos.liveliness_lease_duration.nsec,
+            avoid_ros_namespace_conventions: qos.avoid_ros_namespace_conventions,
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="display-formatting"><a class="header" href="#display-formatting">Display Formatting</a></h2>
+<h3 id="duration-formatting"><a class="header" href="#duration-formatting">Duration Formatting</a></h3>
+<p>Duration values require special formatting because they can represent:</p>
+<ul>
+<li><strong>Infinite duration</strong>: <code>0x7FFFFFFFFFFFFFFF</code> seconds and nanoseconds</li>
+<li><strong>Unspecified duration</strong>: <code>0</code> seconds and nanoseconds</li>
+<li><strong>Specific duration</strong>: Actual time values</li>
+</ul>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl QosProfile {
+    pub fn format_duration(&amp;self, sec: u64, nsec: u64) -&gt; String {
+        if sec == 0x7FFFFFFFFFFFFFFF &amp;&amp; nsec == 0x7FFFFFFFFFFFFFFF {
+            "Infinite".to_string()
+        } else if sec == 0 &amp;&amp; nsec == 0 {
+            "0 nanoseconds".to_string()
+        } else {
+            format!("{} nanoseconds", sec * 1_000_000_000 + nsec)
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="policy-display"><a class="header" href="#policy-display">Policy Display</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl QosReliabilityPolicy {
+    pub fn to_string(&amp;self) -&gt; &amp;'static str {
+        match self {
+            QosReliabilityPolicy::SystemDefault =&gt; "SYSTEM_DEFAULT",
+            QosReliabilityPolicy::Reliable =&gt; "RELIABLE",
+            QosReliabilityPolicy::BestEffort =&gt; "BEST_EFFORT",
+            QosReliabilityPolicy::Unknown =&gt; "UNKNOWN",
+            QosReliabilityPolicy::BestAvailable =&gt; "BEST_AVAILABLE",
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="qos-policy-details"><a class="header" href="#qos-policy-details">QoS Policy Details</a></h2>
+<h3 id="reliability-policy"><a class="header" href="#reliability-policy">Reliability Policy</a></h3>
+<p><strong>RELIABLE</strong></p>
+<ul>
+<li>Guarantees message delivery</li>
+<li>Uses acknowledgments and retransmissions</li>
+<li>Higher bandwidth and latency overhead</li>
+<li>Suitable for critical data</li>
+</ul>
+<p><strong>BEST_EFFORT</strong></p>
+<ul>
+<li>Attempts delivery without guarantees</li>
+<li>No acknowledgments or retransmissions</li>
+<li>Lower bandwidth and latency</li>
+<li>Suitable for high-frequency sensor data</li>
+</ul>
+<p>Example output:</p>
+<pre><code>Reliability: RELIABLE
+</code></pre>
+<h3 id="history-policy"><a class="header" href="#history-policy">History Policy</a></h3>
+<p><strong>KEEP_LAST</strong></p>
+<ul>
+<li>Maintains a queue of the last N messages</li>
+<li>Depth field indicates queue size</li>
+<li>Older messages are discarded when queue is full</li>
+<li>Most common for real-time systems</li>
+</ul>
+<p><strong>KEEP_ALL</strong></p>
+<ul>
+<li>Attempts to deliver all messages</li>
+<li>Subject to resource limits</li>
+<li>Can cause memory growth under high load</li>
+<li>Suitable when no data loss is acceptable</li>
+</ul>
+<p>Example output:</p>
+<pre><code>History (KEEP_LAST): 10
+</code></pre>
+<h3 id="durability-policy"><a class="header" href="#durability-policy">Durability Policy</a></h3>
+<p><strong>VOLATILE</strong></p>
+<ul>
+<li>Messages exist only while publisher is active</li>
+<li>Late-joining subscribers miss earlier messages</li>
+<li>Default for most applications</li>
+</ul>
+<p><strong>TRANSIENT_LOCAL</strong></p>
+<ul>
+<li>Messages are stored for late-joining subscribers</li>
+<li>Publisher maintains message history</li>
+<li>Useful for configuration or status topics</li>
+</ul>
+<p>Example output:</p>
+<pre><code>Durability: TRANSIENT_LOCAL
+</code></pre>
+<h3 id="deadline-policy"><a class="header" href="#deadline-policy">Deadline Policy</a></h3>
+<p>Specifies the maximum expected time between consecutive messages.</p>
+<p><strong>Infinite</strong> (default)</p>
+<ul>
+<li>No deadline constraint</li>
+<li>Publisher can send at any rate</li>
+</ul>
+<p><strong>Finite deadline</strong></p>
+<ul>
+<li>Publisher commits to sending within deadline</li>
+<li>Subscriber can detect missed deadlines</li>
+<li>Useful for real-time systems</li>
+</ul>
+<p>Example output:</p>
+<pre><code>Deadline: Infinite
+Deadline: 100000000 nanoseconds  # 100ms
+</code></pre>
+<h3 id="lifespan-policy"><a class="header" href="#lifespan-policy">Lifespan Policy</a></h3>
+<p>Defines how long messages remain valid after publication.</p>
+<p><strong>Infinite</strong> (default)</p>
+<ul>
+<li>Messages never expire</li>
+<li>Suitable for persistent data</li>
+</ul>
+<p><strong>Finite lifespan</strong></p>
+<ul>
+<li>Messages expire after specified time</li>
+<li>Useful for time-sensitive data</li>
+</ul>
+<p>Example output:</p>
+<pre><code>Lifespan: 5000000000 nanoseconds  # 5 seconds
+</code></pre>
+<h3 id="liveliness-policy"><a class="header" href="#liveliness-policy">Liveliness Policy</a></h3>
+<p>Determines how endpoint "aliveness" is maintained and monitored.</p>
+<p><strong>AUTOMATIC</strong></p>
+<ul>
+<li>DDS automatically maintains liveliness</li>
+<li>Most common and recommended setting</li>
+</ul>
+<p><strong>MANUAL_BY_TOPIC</strong></p>
+<ul>
+<li>Application must explicitly assert liveliness</li>
+<li>Provides fine-grained control</li>
+<li>Used in safety-critical systems</li>
+</ul>
+<p>Example output:</p>
+<pre><code>Liveliness: AUTOMATIC
+Liveliness lease duration: Infinite
+</code></pre>
+<h2 id="qos-compatibility"><a class="header" href="#qos-compatibility">QoS Compatibility</a></h2>
+<h3 id="compatibility-rules"><a class="header" href="#compatibility-rules">Compatibility Rules</a></h3>
+<p>For successful communication, QoS policies must be compatible:</p>
+<div class="table-wrapper"><table><thead><tr><th>Policy</th><th>Publisher</th><th>Subscriber</th><th>Compatible?</th></tr></thead><tbody>
+<tr><td>Reliability</td><td>RELIABLE</td><td>RELIABLE</td><td>✅</td></tr>
+<tr><td>Reliability</td><td>RELIABLE</td><td>BEST_EFFORT</td><td>✅</td></tr>
+<tr><td>Reliability</td><td>BEST_EFFORT</td><td>RELIABLE</td><td>❌</td></tr>
+<tr><td>Reliability</td><td>BEST_EFFORT</td><td>BEST_EFFORT</td><td>✅</td></tr>
+</tbody></table>
+</div><div class="table-wrapper"><table><thead><tr><th>Policy</th><th>Publisher</th><th>Subscriber</th><th>Compatible?</th></tr></thead><tbody>
+<tr><td>Durability</td><td>TRANSIENT_LOCAL</td><td>TRANSIENT_LOCAL</td><td>✅</td></tr>
+<tr><td>Durability</td><td>TRANSIENT_LOCAL</td><td>VOLATILE</td><td>✅</td></tr>
+<tr><td>Durability</td><td>VOLATILE</td><td>TRANSIENT_LOCAL</td><td>❌</td></tr>
+<tr><td>Durability</td><td>VOLATILE</td><td>VOLATILE</td><td>✅</td></tr>
+</tbody></table>
+</div>
+<h3 id="common-qos-profiles"><a class="header" href="#common-qos-profiles">Common QoS Profiles</a></h3>
+<p><strong>Sensor Data Profile</strong></p>
+<pre><code>Reliability: BEST_EFFORT
+History (KEEP_LAST): 5
+Durability: VOLATILE
+Deadline: Infinite
+Lifespan: Infinite
+Liveliness: AUTOMATIC
+</code></pre>
+<p><strong>Parameter Profile</strong></p>
+<pre><code>Reliability: RELIABLE
+History (KEEP_LAST): 1000
+Durability: VOLATILE
+Deadline: Infinite
+Lifespan: Infinite
+Liveliness: AUTOMATIC
+</code></pre>
+<p><strong>Services Profile</strong></p>
+<pre><code>Reliability: RELIABLE
+History (KEEP_LAST): 10
+Durability: VOLATILE
+Deadline: Infinite
+Lifespan: Infinite
+Liveliness: AUTOMATIC
+</code></pre>
+<h2 id="debugging-qos-issues"><a class="header" href="#debugging-qos-issues">Debugging QoS Issues</a></h2>
+<h3 id="common-problems"><a class="header" href="#common-problems">Common Problems</a></h3>
+<p><strong>No Communication</strong></p>
+<ul>
+<li>Check reliability compatibility</li>
+<li>Verify durability compatibility</li>
+<li>Ensure deadline constraints are met</li>
+</ul>
+<p><strong>High Latency</strong></p>
+<ul>
+<li>RELIABLE policy adds overhead</li>
+<li>Large history depth increases processing</li>
+<li>Network congestion from retransmissions</li>
+</ul>
+<p><strong>Memory Usage</strong></p>
+<ul>
+<li>KEEP_ALL history can grow unbounded</li>
+<li>TRANSIENT_LOCAL stores message history</li>
+<li>Large depth values consume memory</li>
+</ul>
+<h3 id="using-roc-for-qos-debugging"><a class="header" href="#using-roc-for-qos-debugging">Using <code>roc</code> for QoS Debugging</a></h3>
+<ol>
+<li>
+<p><strong>Check endpoint QoS</strong>:</p>
+<pre><code class="language-bash">roc topic info /my_topic --verbose
+</code></pre>
+</li>
+<li>
+<p><strong>Compare publisher and subscriber QoS</strong>:
+Look for compatibility issues in the output</p>
+</li>
+<li>
+<p><strong>Monitor over time</strong>:
+Run repeatedly to see if QoS settings change</p>
+</li>
+<li>
+<p><strong>Verify against expectations</strong>:
+Compare displayed QoS with application configuration</p>
+</li>
+</ol>
+<h2 id="performance-impact"><a class="header" href="#performance-impact">Performance Impact</a></h2>
+<h3 id="policy-performance-characteristics"><a class="header" href="#policy-performance-characteristics">Policy Performance Characteristics</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Policy</th><th>Bandwidth</th><th>Latency</th><th>Memory</th><th>CPU</th></tr></thead><tbody>
+<tr><td>RELIABLE</td><td>High</td><td>Higher</td><td>Medium</td><td>Higher</td></tr>
+<tr><td>BEST_EFFORT</td><td>Low</td><td>Lower</td><td>Low</td><td>Lower</td></tr>
+<tr><td>KEEP_ALL</td><td>-</td><td>-</td><td>High</td><td>Medium</td></tr>
+<tr><td>KEEP_LAST</td><td>-</td><td>-</td><td>Low</td><td>Low</td></tr>
+<tr><td>TRANSIENT_LOCAL</td><td>Medium</td><td>-</td><td>High</td><td>Medium</td></tr>
+</tbody></table>
+</div>
+<h3 id="optimization-guidelines"><a class="header" href="#optimization-guidelines">Optimization Guidelines</a></h3>
+<ol>
+<li><strong>Use BEST_EFFORT</strong> for high-frequency sensor data</li>
+<li><strong>Use RELIABLE</strong> for commands and critical data</li>
+<li><strong>Keep history depth small</strong> for real-time performance</li>
+<li><strong>Use VOLATILE durability</strong> unless persistence is needed</li>
+<li><strong>Set realistic deadlines</strong> to detect communication issues</li>
+</ol>
+<p>The QoS system in <code>roc</code> provides essential visibility into ROS 2 communication behavior, enabling developers to optimize performance and debug connectivity issues.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="endpoint-discovery"><a class="header" href="#endpoint-discovery">Endpoint Discovery</a></h1>
+<p>Endpoint discovery is the process by which <code>roc</code> finds and identifies publishers and subscribers in the ROS 2 system. This chapter explains how the discovery mechanism works, the information it provides, and how it differs from daemon-based approaches.</p>
+<h2 id="discovery-architecture"><a class="header" href="#discovery-architecture">Discovery Architecture</a></h2>
+<h3 id="direct-dds-discovery-vs-daemon"><a class="header" href="#direct-dds-discovery-vs-daemon">Direct DDS Discovery vs Daemon</a></h3>
+<p><code>roc</code> uses <strong>direct DDS discovery</strong>, which differs from the <code>ros2</code> CLI daemon approach:</p>
+<div class="table-wrapper"><table><thead><tr><th>Approach</th><th>Mechanism</th><th>Pros</th><th>Cons</th></tr></thead><tbody>
+<tr><td><strong>Direct DDS</strong> (roc)</td><td>Directly queries DDS discovery database</td><td>Always current, no daemon dependency</td><td>Slower startup, repeated discovery overhead</td></tr>
+<tr><td><strong>Daemon</strong> (ros2 cli)</td><td>Queries centralized daemon cache</td><td>Fast queries, shared discovery</td><td>Stale data possible, daemon dependency</td></tr>
+</tbody></table>
+</div>
+<h3 id="discovery-flow"><a class="header" href="#discovery-flow">Discovery Flow</a></h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant roc as roc Command
+    participant RCL as RCL Layer
+    participant DDS as DDS Discovery
+    participant Net as Network
+    
+    roc-&gt;&gt;RCL: rcl_init()
+    RCL-&gt;&gt;DDS: Initialize participant
+    DDS-&gt;&gt;Net: Send participant announcement
+    Net-&gt;&gt;DDS: Receive peer announcements
+    DDS-&gt;&gt;DDS: Build discovery database
+    
+    Note over DDS: Discovery timeout (150ms)
+    
+    roc-&gt;&gt;RCL: rcl_get_publishers_info_by_topic()
+    RCL-&gt;&gt;DDS: Query discovery database
+    DDS--&gt;&gt;RCL: Endpoint information
+    RCL--&gt;&gt;roc: Topic endpoint details
+</code></pre>
+<h2 id="discovery-timing-2"><a class="header" href="#discovery-timing-2">Discovery Timing</a></h2>
+<h3 id="initialization-sequence"><a class="header" href="#initialization-sequence">Initialization Sequence</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn new_with_discovery(discovery_time: std::time::Duration) -&gt; Result&lt;Self&gt; {
+    // 1. Initialize RCL context and node
+    let graph_context = RclGraphContext { context, node, is_initialized: true };
+    
+    // 2. Wait for DDS discovery to converge
+    graph_context.wait_for_graph_discovery(discovery_time)?;
+    
+    Ok(graph_context)
+}
+
+fn wait_for_graph_discovery(&amp;self, discovery_time: std::time::Duration) -&gt; Result&lt;()&gt; {
+    // DDS discovery is asynchronous - wait for network convergence
+    std::thread::sleep(discovery_time);
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="discovery-timeout-selection"><a class="header" href="#discovery-timeout-selection">Discovery Timeout Selection</a></h3>
+<p>The default 150ms timeout balances several factors:</p>
+<p><strong>Too Short (&lt; 50ms)</strong></p>
+<ul>
+<li>May miss endpoints that haven't completed discovery</li>
+<li>Inconsistent results across runs</li>
+<li>Network-dependent behavior</li>
+</ul>
+<p><strong>Optimal (100-200ms)</strong></p>
+<ul>
+<li>Allows most DDS implementations to converge</li>
+<li>Reasonable for interactive use</li>
+<li>Reliable across different networks</li>
+</ul>
+<p><strong>Too Long (&gt; 500ms)</strong></p>
+<ul>
+<li>Slow interactive response</li>
+<li>Diminishing returns for completeness</li>
+<li>User experience degradation</li>
+</ul>
+<h2 id="endpoint-information-structure"><a class="header" href="#endpoint-information-structure">Endpoint Information Structure</a></h2>
+<h3 id="complete-endpoint-data"><a class="header" href="#complete-endpoint-data">Complete Endpoint Data</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct TopicEndpointInfo {
+    pub node_name: String,              // ROS node name
+    pub node_namespace: String,         // ROS namespace
+    pub topic_type: String,             // Message type
+    pub topic_type_hash: String,        // Message definition hash  
+    pub endpoint_type: EndpointType,    // PUBLISHER/SUBSCRIPTION
+    pub gid: Vec&lt;u8&gt;,                   // DDS Global ID
+    pub qos_profile: QosProfile,        // Complete QoS settings
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="endpoint-type-classification"><a class="header" href="#endpoint-type-classification">Endpoint Type Classification</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub enum EndpointType {
+    Publisher,     // Sends messages
+    Subscription,  // Receives messages  
+    Invalid,       // Error state
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="discovery-data-sources"><a class="header" href="#discovery-data-sources">Discovery Data Sources</a></h2>
+<h3 id="rcl-discovery-functions"><a class="header" href="#rcl-discovery-functions">RCL Discovery Functions</a></h3>
+<p><strong>Basic Topology</strong></p>
+<pre><code class="language-c">// Get all topics and types
+rcl_ret_t rcl_get_topic_names_and_types(
+    const rcl_node_t * node,
+    rcutils_allocator_t * allocator,
+    bool no_demangle,
+    rcl_names_and_types_t * topic_names_and_types
+);
+
+// Count endpoints
+rcl_ret_t rcl_count_publishers(const rcl_node_t * node, const char * topic_name, size_t * count);
+rcl_ret_t rcl_count_subscribers(const rcl_node_t * node, const char * topic_name, size_t * count);
+</code></pre>
+<p><strong>Detailed Endpoint Information</strong></p>
+<pre><code class="language-c">// Get detailed publisher info
+rcl_ret_t rcl_get_publishers_info_by_topic(
+    const rcl_node_t * node,
+    rcutils_allocator_t * allocator,
+    const char * topic_name,
+    bool no_mangle,
+    rcl_topic_endpoint_info_array_t * publishers_info
+);
+
+// Get detailed subscriber info  
+rcl_ret_t rcl_get_subscriptions_info_by_topic(
+    const rcl_node_t * node,
+    rcutils_allocator_t * allocator,
+    const char * topic_name,
+    bool no_mangle,
+    rcl_topic_endpoint_info_array_t * subscriptions_info
+);
+</code></pre>
+<h3 id="information-extraction-process"><a class="header" href="#information-extraction-process">Information Extraction Process</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn get_publishers_info(&amp;self, topic_name: &amp;str) -&gt; Result&lt;Vec&lt;TopicEndpointInfo&gt;&gt; {
+    let topic_name_c = CString::new(topic_name)?;
+    
+    unsafe {
+        let mut allocator = rcutils_get_default_allocator();
+        let mut publishers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+        
+        // Query DDS discovery database
+        let ret = rcl_get_publishers_info_by_topic(
+            &amp;self.node,
+            &amp;mut allocator,
+            topic_name_c.as_ptr(),
+            false, // no_mangle: follow ROS naming conventions
+            &amp;mut publishers_info,
+        );
+        
+        if ret != 0 {
+            return Err(anyhow!("Failed to get publishers info: {}", ret));
+        }
+        
+        // Extract information from each endpoint
+        let mut result = Vec::new();
+        for i in 0..publishers_info.size {
+            let info = &amp;*(publishers_info.info_array.add(i));
+            
+            result.push(TopicEndpointInfo {
+                node_name: extract_string(info.node_name),
+                node_namespace: extract_string(info.node_namespace),
+                topic_type: extract_string(info.topic_type),
+                topic_type_hash: format_topic_type_hash(&amp;info.topic_type_hash),
+                endpoint_type: EndpointType::from_rmw(info.endpoint_type),
+                gid: extract_gid(&amp;info.endpoint_gid),
+                qos_profile: QosProfile::from_rmw(&amp;info.qos_profile),
+            });
+        }
+        
+        // Clean up allocated memory
+        rmw_topic_endpoint_info_array_fini(&amp;mut publishers_info, &amp;mut allocator);
+        
+        Ok(result)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="global-identifiers-gids"><a class="header" href="#global-identifiers-gids">Global Identifiers (GIDs)</a></h2>
+<h3 id="gid-structure-and-format"><a class="header" href="#gid-structure-and-format">GID Structure and Format</a></h3>
+<p>GIDs are 16-byte unique identifiers assigned by the DDS implementation:</p>
+<pre><code>Byte Layout: [01][0f][ba][ec][43][55][39][96][00][00][00][00][00][00][14][03]
+Display:     01.0f.ba.ec.43.55.39.96.00.00.00.00.00.00.14.03
+</code></pre>
+<p><strong>GID Components</strong> (implementation-specific):</p>
+<ul>
+<li><strong>Bytes 0-3</strong>: Often participant identifier</li>
+<li><strong>Bytes 4-7</strong>: Usually timestamp or sequence</li>
+<li><strong>Bytes 8-11</strong>: Typically zero padding</li>
+<li><strong>Bytes 12-15</strong>: Entity identifier within participant</li>
+</ul>
+<h3 id="gid-extraction-and-formatting"><a class="header" href="#gid-extraction-and-formatting">GID Extraction and Formatting</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Extract GID from C array
+let gid = std::slice::from_raw_parts(
+    info.endpoint_gid.as_ptr(), 
+    info.endpoint_gid.len()
+).to_vec();
+
+// Format for display
+fn format_gid(gid: &amp;[u8]) -&gt; String {
+    gid.iter()
+       .map(|b| format!("{:02x}", b))
+       .collect::&lt;Vec&lt;String&gt;&gt;()
+       .join(".")
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="gid-uniqueness-properties"><a class="header" href="#gid-uniqueness-properties">GID Uniqueness Properties</a></h3>
+<ul>
+<li><strong>Global</strong>: Unique across entire DDS domain</li>
+<li><strong>Persistent</strong>: Remains same for endpoint lifetime</li>
+<li><strong>Deterministic</strong>: Recreated consistently by DDS</li>
+<li><strong>Opaque</strong>: Implementation-specific internal structure</li>
+</ul>
+<h2 id="topic-type-hashes"><a class="header" href="#topic-type-hashes">Topic Type Hashes</a></h2>
+<h3 id="rihs-format-ros-interface-hash-standard"><a class="header" href="#rihs-format-ros-interface-hash-standard">RIHS Format (ROS Interface Hash Standard)</a></h3>
+<p>Topic type hashes follow the RIHS format:</p>
+<pre><code>RIHS01_&lt;hex_hash&gt;
+</code></pre>
+<p><strong>Components</strong>:</p>
+<ul>
+<li><code>RIHS</code>: ROS Interface Hash Standard identifier</li>
+<li><code>01</code>: Version number (currently 1)</li>
+<li><code>&lt;hex_hash&gt;</code>: SHA-256 hash of message definition</li>
+</ul>
+<h3 id="hash-generation-process"><a class="header" href="#hash-generation-process">Hash Generation Process</a></h3>
+<ol>
+<li><strong>Canonical representation</strong>: Message definition in canonical form</li>
+<li><strong>Hash calculation</strong>: SHA-256 of canonical representation</li>
+<li><strong>Encoding</strong>: Hexadecimal encoding of hash bytes</li>
+<li><strong>Formatting</strong>: Prepend RIHS version identifier</li>
+</ol>
+<h3 id="example-hash"><a class="header" href="#example-hash">Example Hash</a></h3>
+<pre><code>RIHS01_df668c740482bbd48fb39d76a70dfd4bd59db1288021743503259e948f6b1a18
+</code></pre>
+<p>This represents the hash for <code>std_msgs/msg/String</code>.</p>
+<h3 id="hash-extraction"><a class="header" href="#hash-extraction">Hash Extraction</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn format_topic_type_hash(hash: &amp;rosidl_type_hash_t) -&gt; String {
+    let hash_bytes = unsafe {
+        std::slice::from_raw_parts(hash.value.as_ptr(), hash.value.len())
+    };
+    let hex_hash = hash_bytes.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::&lt;String&gt;();
+    format!("RIHS01_{}", hex_hash)
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="discovery-scope-and-filtering"><a class="header" href="#discovery-scope-and-filtering">Discovery Scope and Filtering</a></h2>
+<h3 id="domain-isolation"><a class="header" href="#domain-isolation">Domain Isolation</a></h3>
+<p>Discovery is limited by ROS domain:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Read ROS_DOMAIN_ID from environment (default: 0)
+let domain_id = env::var("ROS_DOMAIN_ID")
+    .ok()
+    .and_then(|s| s.parse::&lt;usize&gt;().ok())
+    .unwrap_or(0);
+
+// Configure RMW with domain ID
+(*rmw_init_options).domain_id = domain_id;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="topic-name-filtering"><a class="header" href="#topic-name-filtering">Topic Name Filtering</a></h3>
+<p>The discovery system can filter by:</p>
+<ul>
+<li><strong>Exact topic name</strong>: <code>rcl_get_publishers_info_by_topic("/chatter", ...)</code></li>
+<li><strong>Name mangling</strong>: <code>no_mangle</code> parameter controls ROS naming conventions</li>
+</ul>
+<h3 id="endpoint-filtering"><a class="header" href="#endpoint-filtering">Endpoint Filtering</a></h3>
+<p>Results can be filtered by:</p>
+<ul>
+<li><strong>Endpoint type</strong>: Publishers vs subscribers</li>
+<li><strong>Node name/namespace</strong>: Filter by owning node</li>
+<li><strong>QoS compatibility</strong>: Only compatible endpoints</li>
+</ul>
+<h2 id="discovery-performance"><a class="header" href="#discovery-performance">Discovery Performance</a></h2>
+<h3 id="timing-characteristics"><a class="header" href="#timing-characteristics">Timing Characteristics</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Operation</th><th>Typical Time</th><th>Factors</th></tr></thead><tbody>
+<tr><td>Context initialization</td><td>150ms</td><td>DDS discovery timeout</td></tr>
+<tr><td>Topic list query</td><td>1-5ms</td><td>Number of topics</td></tr>
+<tr><td>Endpoint count</td><td>1-3ms</td><td>Number of endpoints</td></tr>
+<tr><td>Detailed endpoint info</td><td>5-20ms</td><td>QoS complexity, endpoint count</td></tr>
+</tbody></table>
+</div>
+<h3 id="memory-usage-1"><a class="header" href="#memory-usage-1">Memory Usage</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Component</th><th>Memory Usage</th><th>Notes</th></tr></thead><tbody>
+<tr><td>RCL context</td><td>~1MB</td><td>DDS participant overhead</td></tr>
+<tr><td>Topic list</td><td>~1KB per topic</td><td>Name and type strings</td></tr>
+<tr><td>Endpoint info</td><td>~500B per endpoint</td><td>QoS and metadata</td></tr>
+<tr><td>Peak processing</td><td>+50%</td><td>During C to Rust conversion</td></tr>
+</tbody></table>
+</div>
+<h3 id="optimization-strategies"><a class="header" href="#optimization-strategies">Optimization Strategies</a></h3>
+<p><strong>Context Reuse</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Current: Create new context per operation
+let context = RclGraphContext::new()?;
+let info = context.get_publishers_info(topic)?;
+
+// Potential: Reuse context across operations
+let context = RclGraphContext::new()?;
+let info1 = context.get_publishers_info(topic1)?;
+let info2 = context.get_publishers_info(topic2)?;
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Batch Operations</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Current: Separate calls for publishers and subscribers
+let pubs = context.get_publishers_info(topic)?;
+let subs = context.get_subscribers_info(topic)?;
+
+// Potential: Combined endpoint query
+let endpoints = context.get_all_endpoints_info(topic)?;
+<span class="boring">}</span></code></pre></pre>
+<h2 id="error-handling-and-edge-cases"><a class="header" href="#error-handling-and-edge-cases">Error Handling and Edge Cases</a></h2>
+<h3 id="discovery-failures"><a class="header" href="#discovery-failures">Discovery Failures</a></h3>
+<p><strong>No Endpoints Found</strong></p>
+<ul>
+<li>Topic exists but no active endpoints</li>
+<li>Discovery timing issues</li>
+<li>Network connectivity problems</li>
+</ul>
+<p><strong>Partial Discovery</strong></p>
+<ul>
+<li>Some endpoints discovered, others missed</li>
+<li>Network partitions or high latency</li>
+<li>DDS implementation differences</li>
+</ul>
+<p><strong>Invalid Data</strong></p>
+<ul>
+<li>Corrupted endpoint information</li>
+<li>Unsupported QoS policies</li>
+<li>Protocol version mismatches</li>
+</ul>
+<h3 id="error-recovery-strategies"><a class="header" href="#error-recovery-strategies">Error Recovery Strategies</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Retry with longer discovery timeout
+if endpoints.is_empty() {
+    let context = RclGraphContext::new_with_discovery(Duration::from_millis(500))?;
+    endpoints = context.get_publishers_info(topic)?;
+}
+
+// Validate endpoint data
+for endpoint in &amp;endpoints {
+    if endpoint.node_name.is_empty() {
+        warn!("Endpoint with empty node name: {:?}", endpoint.gid);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The endpoint discovery system provides comprehensive visibility into the ROS 2 computation graph, enabling effective debugging and system understanding.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="memory-management-2"><a class="header" href="#memory-management-2">Memory Management</a></h1>
+<p>This chapter covers how the <code>roc</code> tool manages memory when interfacing with ROS 2's C libraries through FFI (Foreign Function Interface).</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Memory management in FFI bindings is critical for safety and performance. The <code>roc</code> tool must carefully handle:</p>
+<ol>
+<li><strong>Allocation and deallocation</strong> of C structures</li>
+<li><strong>Ownership transfer</strong> between Rust and C code</li>
+<li><strong>String handling</strong> across language boundaries</li>
+<li><strong>Resource cleanup</strong> to prevent memory leaks</li>
+</ol>
+<h2 id="memory-safety-principles"><a class="header" href="#memory-safety-principles">Memory Safety Principles</a></h2>
+<h3 id="raii-resource-acquisition-is-initialization"><a class="header" href="#raii-resource-acquisition-is-initialization">RAII (Resource Acquisition Is Initialization)</a></h3>
+<p>The <code>roc</code> tool follows Rust's RAII principles by wrapping C resources in Rust structs that implement <code>Drop</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct RclGraphContext {
+    context: *mut rcl_context_t,
+    node: *mut rcl_node_t,
+    // Other fields...
+}
+
+impl Drop for RclGraphContext {
+    fn drop(&amp;mut self) {
+        unsafe {
+            if !self.node.is_null() {
+                rcl_node_fini(self.node);
+                libc::free(self.node as *mut c_void);
+            }
+            if !self.context.is_null() {
+                rcl_context_fini(self.context);
+                libc::free(self.context as *mut c_void);
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="safe-wrappers"><a class="header" href="#safe-wrappers">Safe Wrappers</a></h3>
+<p>All C FFI calls are wrapped in safe Rust functions that handle error checking and memory management:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl RclGraphContext {
+    pub fn new() -&gt; Result&lt;Self, String&gt; {
+        unsafe {
+            // Allocate C structures
+            let context = libc::malloc(size_of::&lt;rcl_context_t&gt;()) as *mut rcl_context_t;
+            if context.is_null() {
+                return Err("Failed to allocate context".to_string());
+            }
+
+            // Initialize with proper error handling
+            let ret = rcl_init(0, ptr::null(), ptr::null(), context);
+            if ret != RCL_RET_OK as i32 {
+                libc::free(context as *mut c_void);
+                return Err(format!("Failed to initialize context: {}", ret));
+            }
+
+            // Continue with node allocation and initialization...
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="string-handling-1"><a class="header" href="#string-handling-1">String Handling</a></h2>
+<h3 id="c-string-conversion"><a class="header" href="#c-string-conversion">C String Conversion</a></h3>
+<p>Converting between Rust strings and C strings requires careful memory management:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn rust_string_to_c_string(s: &amp;str) -&gt; Result&lt;*mut c_char, String&gt; {
+    let c_string = CString::new(s).map_err(|e| format!("Invalid string: {}", e))?;
+    let ptr = unsafe { libc::malloc(c_string.len() + 1) as *mut c_char };
+    if ptr.is_null() {
+        return Err("Failed to allocate memory for C string".to_string());
+    }
+    unsafe {
+        libc::strcpy(ptr, c_string.as_ptr());
+    }
+    Ok(ptr)
+}
+
+fn c_string_to_rust_string(ptr: *const c_char) -&gt; Option&lt;String&gt; {
+    if ptr.is_null() {
+        return None;
+    }
+    unsafe {
+        CStr::from_ptr(ptr).to_string_lossy().into_owned().into()
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="owned-vs-borrowed-strings"><a class="header" href="#owned-vs-borrowed-strings">Owned vs Borrowed Strings</a></h3>
+<p>The code distinguishes between owned and borrowed string data:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Borrowed - ROS 2 owns the memory
+let topic_name = c_string_to_rust_string(topic_info.topic_name);
+
+// Owned - we must free the memory
+unsafe {
+    if !owned_string_ptr.is_null() {
+        libc::free(owned_string_ptr as *mut c_void);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="array-and-structure-management"><a class="header" href="#array-and-structure-management">Array and Structure Management</a></h2>
+<h3 id="dynamic-arrays"><a class="header" href="#dynamic-arrays">Dynamic Arrays</a></h3>
+<p>When ROS 2 returns arrays of structures, we must carefully manage the memory:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn get_topic_names_and_types(&amp;self) -&gt; Result&lt;Vec&lt;(String, Vec&lt;String&gt;)&gt;, String&gt; {
+    let mut names_and_types = rcl_names_and_types_t {
+        names: rcl_string_array_t {
+            data: ptr::null_mut(),
+            size: 0,
+            allocator: rcl_get_default_allocator(),
+        },
+        types: rcl_string_array_t {
+            data: ptr::null_mut(),
+            size: 0,
+            allocator: rcl_get_default_allocator(),
+        },
+    };
+
+    unsafe {
+        let ret = rcl_get_topic_names_and_types(
+            self.node,
+            &amp;mut names_and_types.names,
+            &amp;mut names_and_types.types,
+        );
+
+        if ret != RCL_RET_OK as i32 {
+            return Err(format!("Failed to get topic names and types: {}", ret));
+        }
+
+        // Convert to Rust types
+        let result = self.convert_names_and_types(&amp;names_and_types)?;
+
+        // Clean up ROS 2 allocated memory
+        rcl_names_and_types_fini(&amp;mut names_and_types);
+
+        Ok(result)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="structure-initialization"><a class="header" href="#structure-initialization">Structure Initialization</a></h3>
+<p>C structures must be properly initialized to avoid undefined behavior:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn create_topic_endpoint_info() -&gt; rcl_topic_endpoint_info_t {
+    rcl_topic_endpoint_info_t {
+        node_name: ptr::null(),
+        node_namespace: ptr::null(),
+        topic_type: ptr::null(),
+        endpoint_type: RCL_PUBLISHER_ENDPOINT,
+        endpoint_gid: [0; 24], // GID is a fixed-size array
+        qos_profile: rcl_qos_profile_t {
+            history: RCL_QOS_POLICY_HISTORY_KEEP_LAST,
+            depth: 10,
+            reliability: RCL_QOS_POLICY_RELIABILITY_RELIABLE,
+            durability: RCL_QOS_POLICY_DURABILITY_VOLATILE,
+            deadline: rcl_duration_t { nanoseconds: 0 },
+            lifespan: rcl_duration_t { nanoseconds: 0 },
+            liveliness: RCL_QOS_POLICY_LIVELINESS_AUTOMATIC,
+            liveliness_lease_duration: rcl_duration_t { nanoseconds: 0 },
+            avoid_ros_namespace_conventions: false,
+        },
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="error-handling-and-cleanup"><a class="header" href="#error-handling-and-cleanup">Error Handling and Cleanup</a></h2>
+<h3 id="consistent-error-handling"><a class="header" href="#consistent-error-handling">Consistent Error Handling</a></h3>
+<p>All FFI operations follow a consistent pattern for error handling:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>macro_rules! check_rcl_ret {
+    ($ret:expr, $msg:expr) =&gt; {
+        if $ret != RCL_RET_OK as i32 {
+            return Err(format!("{}: error code {}", $msg, $ret));
+        }
+    };
+}
+
+// Usage
+let ret = unsafe { rcl_some_function(params) };
+check_rcl_ret!(ret, "Failed to call rcl_some_function");
+<span class="boring">}</span></code></pre></pre>
+<h3 id="resource-cleanup-on-error"><a class="header" href="#resource-cleanup-on-error">Resource Cleanup on Error</a></h3>
+<p>When operations fail, we must ensure proper cleanup:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn initialize_node(name: &amp;str) -&gt; Result&lt;*mut rcl_node_t, String&gt; {
+    unsafe {
+        let node = libc::malloc(size_of::&lt;rcl_node_t&gt;()) as *mut rcl_node_t;
+        if node.is_null() {
+            return Err("Failed to allocate node".to_string());
+        }
+
+        let c_name = rust_string_to_c_string(name)?;
+        let ret = rcl_node_init(node, c_name, self.context);
+        
+        // Clean up the C string regardless of success/failure
+        libc::free(c_name as *mut c_void);
+
+        if ret != RCL_RET_OK as i32 {
+            libc::free(node as *mut c_void);
+            return Err(format!("Failed to initialize node: {}", ret));
+        }
+
+        Ok(node)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="performance-considerations-2"><a class="header" href="#performance-considerations-2">Performance Considerations</a></h2>
+<h3 id="memory-pool-reuse"><a class="header" href="#memory-pool-reuse">Memory Pool Reuse</a></h3>
+<p>For frequently allocated structures, consider using memory pools:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct EndpointInfoPool {
+    pool: Vec&lt;rcl_topic_endpoint_info_t&gt;,
+    next_available: usize,
+}
+
+impl EndpointInfoPool {
+    pub fn get_endpoint_info(&amp;mut self) -&gt; &amp;mut rcl_topic_endpoint_info_t {
+        if self.next_available &gt;= self.pool.len() {
+            self.pool.push(create_topic_endpoint_info());
+        }
+        let info = &amp;mut self.pool[self.next_available];
+        self.next_available += 1;
+        info
+    }
+
+    pub fn reset(&amp;mut self) {
+        self.next_available = 0;
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="minimize-allocations"><a class="header" href="#minimize-allocations">Minimize Allocations</a></h3>
+<p>Reuse string buffers and structures when possible:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct StringBuffer {
+    buffer: Vec&lt;u8&gt;,
+}
+
+impl StringBuffer {
+    pub fn as_c_string(&amp;mut self, s: &amp;str) -&gt; *const c_char {
+        self.buffer.clear();
+        self.buffer.extend_from_slice(s.as_bytes());
+        self.buffer.push(0); // null terminator
+        self.buffer.as_ptr() as *const c_char
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="common-pitfalls"><a class="header" href="#common-pitfalls">Common Pitfalls</a></h2>
+<h3 id="double-free"><a class="header" href="#double-free">Double Free</a></h3>
+<p>Never free memory that ROS 2 still owns:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// BAD - ROS 2 owns this memory
+unsafe {
+    libc::free(topic_info.topic_name as *mut c_void); // Don't do this!
+}
+
+// GOOD - Let ROS 2 clean up its own memory
+unsafe {
+    rcl_topic_endpoint_info_fini(&amp;mut topic_info);
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="use-after-free"><a class="header" href="#use-after-free">Use After Free</a></h3>
+<p>Always set pointers to null after freeing:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>unsafe {
+    if !ptr.is_null() {
+        libc::free(ptr as *mut c_void);
+        ptr = ptr::null_mut(); // Prevent use-after-free
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="memory-leaks"><a class="header" href="#memory-leaks">Memory Leaks</a></h3>
+<p>Use tools like Valgrind to detect memory leaks:</p>
+<pre><code class="language-bash">valgrind --leak-check=full --show-leak-kinds=all ./target/debug/roc topic list
+</code></pre>
+<h2 id="testing-memory-management"><a class="header" href="#testing-memory-management">Testing Memory Management</a></h2>
+<h3 id="unit-tests"><a class="header" href="#unit-tests">Unit Tests</a></h3>
+<p>Test memory management in isolation:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_context_creation_and_cleanup() {
+        let context = RclGraphContext::new().expect("Failed to create context");
+        // Context should be properly cleaned up when dropped
+    }
+
+    #[test]
+    fn test_string_conversion() {
+        let test_str = "test_topic";
+        let c_str = rust_string_to_c_string(test_str).expect("Failed to convert");
+        let rust_str = c_string_to_rust_string(c_str).expect("Failed to convert back");
+        assert_eq!(test_str, rust_str);
+        unsafe {
+            libc::free(c_str as *mut c_void);
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="integration-tests"><a class="header" href="#integration-tests">Integration Tests</a></h3>
+<p>Test memory management with real ROS 2 operations:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_topic_info_memory_management() {
+    let context = RclGraphContext::new().expect("Failed to create context");
+    
+    // This should not leak memory
+    for _ in 0..1000 {
+        let topics = context.get_topic_names_and_types()
+            .expect("Failed to get topics");
+        assert!(!topics.is_empty());
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This comprehensive memory management ensures that the <code>roc</code> tool is both safe and efficient when interfacing with ROS 2's C libraries.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="basic-usage-examples"><a class="header" href="#basic-usage-examples">Basic Usage Examples</a></h1>
+<p>This chapter provides practical examples of using the <code>roc</code> tool for common ROS 2 introspection tasks.</p>
+<h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
+<p>Before running these examples, ensure:</p>
+<ul>
+<li>ROS 2 is installed and sourced</li>
+<li>At least one ROS 2 node is running (e.g., <code>ros2 run demo_nodes_cpp talker</code>)</li>
+<li>The <code>roc</code> tool is built and available in your PATH</li>
+</ul>
+<h2 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h2>
+<h3 id="1-list-all-topics"><a class="header" href="#1-list-all-topics">1. List All Topics</a></h3>
+<p>The most basic operation is listing all available topics in the ROS 2 graph:</p>
+<pre><code class="language-bash">roc topic list
+</code></pre>
+<p>Expected output:</p>
+<pre><code>/chatter
+/parameter_events
+/rosout
+</code></pre>
+<h3 id="2-get-basic-topic-information"><a class="header" href="#2-get-basic-topic-information">2. Get Basic Topic Information</a></h3>
+<p>To get basic information about a specific topic:</p>
+<pre><code class="language-bash">roc topic info /chatter
+</code></pre>
+<p>Output:</p>
+<pre><code>Topic: /chatter
+Type: std_msgs/msg/String
+Publishers: 1
+Subscribers: 0
+</code></pre>
+<h3 id="3-get-detailed-topic-information"><a class="header" href="#3-get-detailed-topic-information">3. Get Detailed Topic Information</a></h3>
+<p>For comprehensive topic details including QoS profiles and endpoint information:</p>
+<pre><code class="language-bash">roc topic info /chatter --verbose
+</code></pre>
+<p>Expected verbose output:</p>
+<pre><code>Topic: /chatter
+Type: std_msgs/msg/String
+Publishers: 1
+  Node: /talker
+  Endpoint type: Publisher
+  GID: 01.0f.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx
+  QoS Profile:
+    Reliability: Reliable
+    Durability: Volatile
+    History: Keep last
+    Depth: 10
+    Deadline: Default
+    Lifespan: Default
+    Liveliness: Automatic
+    Liveliness lease duration: Default
+  Type hash: RIHS01_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Subscribers: 0
+</code></pre>
+<h2 id="common-use-cases"><a class="header" href="#common-use-cases">Common Use Cases</a></h2>
+<h3 id="debugging-communication-issues"><a class="header" href="#debugging-communication-issues">Debugging Communication Issues</a></h3>
+<p>When nodes aren't communicating properly, use verbose topic info to check QoS compatibility:</p>
+<pre><code class="language-bash"># Check publisher QoS
+roc topic info /my_topic --verbose
+
+# Compare with subscriber expectations
+# Look for QoS mismatches in reliability, durability, etc.
+</code></pre>
+<h3 id="monitoring-system-health"><a class="header" href="#monitoring-system-health">Monitoring System Health</a></h3>
+<p>Check critical system topics:</p>
+<pre><code class="language-bash"># Monitor rosout for system messages
+roc topic info /rosout --verbose
+
+# Check parameter events
+roc topic info /parameter_events --verbose
+</code></pre>
+<h3 id="network-diagnostics"><a class="header" href="#network-diagnostics">Network Diagnostics</a></h3>
+<p>Use GID information to identify nodes across the network:</p>
+<pre><code class="language-bash"># Get detailed endpoint information
+roc topic info /my_topic --verbose | grep "GID"
+</code></pre>
+<h2 id="working-with-multiple-topics"><a class="header" href="#working-with-multiple-topics">Working with Multiple Topics</a></h2>
+<h3 id="batch-information-gathering"><a class="header" href="#batch-information-gathering">Batch Information Gathering</a></h3>
+<pre><code class="language-bash"># Get info for all topics
+for topic in $(roc topic list); do
+    echo "=== $topic ==="
+    roc topic info "$topic"
+    echo
+done
+</code></pre>
+<h3 id="filtering-by-node"><a class="header" href="#filtering-by-node">Filtering by Node</a></h3>
+<pre><code class="language-bash"># Find topics published by a specific node
+roc topic info /chatter --verbose | grep "Node:"
+</code></pre>
+<h2 id="integration-with-ros-2-tools"><a class="header" href="#integration-with-ros-2-tools">Integration with ROS 2 Tools</a></h2>
+<p>The <code>roc</code> tool complements existing ROS 2 CLI tools:</p>
+<pre><code class="language-bash"># Compare outputs
+ros2 topic info /chatter --verbose
+roc topic info /chatter --verbose
+
+# Use roc for faster queries
+time roc topic list
+time ros2 topic list
+</code></pre>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="no-topics-found"><a class="header" href="#no-topics-found">No Topics Found</a></h3>
+<p>If <code>roc topic list</code> returns empty:</p>
+<ol>
+<li>
+<p>Check if ROS 2 nodes are running:</p>
+<pre><code class="language-bash">ros2 node list
+</code></pre>
+</li>
+<li>
+<p>Verify ROS 2 environment:</p>
+<pre><code class="language-bash">echo $ROS_DOMAIN_ID
+printenv | grep ROS
+</code></pre>
+</li>
+<li>
+<p>Test with a simple publisher:</p>
+<pre><code class="language-bash">ros2 run demo_nodes_cpp talker
+</code></pre>
+</li>
+</ol>
+<h3 id="permission-issues"><a class="header" href="#permission-issues">Permission Issues</a></h3>
+<p>If you encounter permission errors:</p>
+<pre><code class="language-bash"># Check RMW implementation
+echo $RMW_IMPLEMENTATION
+
+# Try with different RMW
+export RMW_IMPLEMENTATION=rmw_cyclone_cpp
+roc topic list
+</code></pre>
+<h3 id="performance-considerations-3"><a class="header" href="#performance-considerations-3">Performance Considerations</a></h3>
+<p>For systems with many topics:</p>
+<pre><code class="language-bash"># Use targeted queries instead of listing all topics
+roc topic info /specific_topic --verbose
+</code></pre>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>See <a href="examples/advanced_usage.html">Advanced Usage</a> for complex scenarios</li>
+<li>Check <a href="examples/command_reference.html">Command Reference</a> for all available options</li>
+<li>Read <a href="examples/integration_examples.html">Integration Examples</a> for using roc in scripts and automation</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="advanced-usage-examples"><a class="header" href="#advanced-usage-examples">Advanced Usage Examples</a></h1>
+<p>This chapter covers advanced usage patterns and complex scenarios for the <code>roc</code> tool.</p>
+<h2 id="advanced-topic-analysis"><a class="header" href="#advanced-topic-analysis">Advanced Topic Analysis</a></h2>
+<h3 id="qos-profile-comparison"><a class="header" href="#qos-profile-comparison">QoS Profile Comparison</a></h3>
+<p>When debugging communication issues, compare QoS profiles between publishers and subscribers:</p>
+<pre><code class="language-bash">#!/bin/bash
+# qos_compare.sh - Compare QoS profiles for a topic
+
+TOPIC="$1"
+if [ -z "$TOPIC" ]; then
+    echo "Usage: $0 &lt;topic_name&gt;"
+    exit 1
+fi
+
+echo "=== QoS Analysis for $TOPIC ==="
+roc topic info "$TOPIC" --verbose | grep -A 10 "QoS Profile:"
+</code></pre>
+<h3 id="multi-domain-discovery"><a class="header" href="#multi-domain-discovery">Multi-Domain Discovery</a></h3>
+<p>Working across multiple ROS domains:</p>
+<pre><code class="language-bash">#!/bin/bash
+# multi_domain_scan.sh - Scan topics across multiple domains
+
+for domain in {0..10}; do
+    export ROS_DOMAIN_ID=$domain
+    echo "=== Domain $domain ==="
+    topics=$(roc topic list 2&gt;/dev/null)
+    if [ -n "$topics" ]; then
+        echo "$topics"
+        echo "Topic count: $(echo "$topics" | wc -l)"
+    else
+        echo "No topics found"
+    fi
+    echo
+done
+</code></pre>
+<h2 id="performance-monitoring"><a class="header" href="#performance-monitoring">Performance Monitoring</a></h2>
+<h3 id="topic-discovery-timing"><a class="header" href="#topic-discovery-timing">Topic Discovery Timing</a></h3>
+<p>Measure topic discovery performance:</p>
+<pre><code class="language-bash">#!/bin/bash
+# discovery_benchmark.sh - Benchmark topic discovery
+
+echo "Benchmarking topic discovery..."
+
+echo "roc topic list:"
+time roc topic list &gt; /dev/null
+
+echo "ros2 topic list:"
+time ros2 topic list &gt; /dev/null
+
+echo "roc topic info (verbose):"
+TOPIC=$(roc topic list | head -1)
+if [ -n "$TOPIC" ]; then
+    time roc topic info "$TOPIC" --verbose &gt; /dev/null
+fi
+</code></pre>
+<h3 id="memory-usage-analysis"><a class="header" href="#memory-usage-analysis">Memory Usage Analysis</a></h3>
+<p>Monitor memory usage during large-scale discovery:</p>
+<pre><code class="language-bash">#!/bin/bash
+# memory_profile.sh - Profile memory usage
+
+echo "Memory usage during topic discovery:"
+
+# Get baseline memory
+baseline=$(ps -o rss= -p $$)
+echo "Baseline memory: ${baseline}KB"
+
+# Run topic discovery and monitor memory
+(
+    while true; do
+        ps -o rss= -p $$ 2&gt;/dev/null || break
+        sleep 0.1
+    done
+) &amp;
+monitor_pid=$!
+
+# Perform discovery operations
+roc topic list &gt; /dev/null
+roc topic info /chatter --verbose &gt; /dev/null 2&gt;&amp;1
+
+kill $monitor_pid 2&gt;/dev/null
+</code></pre>
+<h2 id="integration-patterns"><a class="header" href="#integration-patterns">Integration Patterns</a></h2>
+<h3 id="continuous-monitoring"><a class="header" href="#continuous-monitoring">Continuous Monitoring</a></h3>
+<p>Monitor topic health continuously:</p>
+<pre><code class="language-bash">#!/bin/bash
+# topic_monitor.sh - Continuous topic monitoring
+
+TOPIC="$1"
+INTERVAL="${2:-5}"
+
+if [ -z "$TOPIC" ]; then
+    echo "Usage: $0 &lt;topic_name&gt; [interval_seconds]"
+    exit 1
+fi
+
+echo "Monitoring $TOPIC every ${INTERVAL}s (Ctrl+C to stop)"
+
+while true; do
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "=== $timestamp ==="
+    
+    # Get current topic info
+    info=$(roc topic info "$TOPIC" 2&gt;/dev/null)
+    if [ $? -eq 0 ]; then
+        echo "$info"
+        
+        # Extract publisher/subscriber counts
+        pub_count=$(echo "$info" | grep "Publishers:" | awk '{print $2}')
+        sub_count=$(echo "$info" | grep "Subscribers:" | awk '{print $2}')
+        
+        echo "Status: $pub_count publishers, $sub_count subscribers"
+    else
+        echo "Topic not found or error occurred"
+    fi
+    
+    echo
+    sleep "$INTERVAL"
+done
+</code></pre>
+<h3 id="automated-health-checks"><a class="header" href="#automated-health-checks">Automated Health Checks</a></h3>
+<p>Create health check scripts for ROS 2 systems:</p>
+<pre><code class="language-bash">#!/bin/bash
+# ros2_health_check.sh - Comprehensive ROS 2 system health check
+
+echo "=== ROS 2 System Health Check ==="
+echo "Timestamp: $(date)"
+echo
+
+# Check critical topics
+critical_topics=("/rosout" "/parameter_events")
+for topic in "${critical_topics[@]}"; do
+    echo "Checking $topic..."
+    info=$(roc topic info "$topic" 2&gt;/dev/null)
+    if [ $? -eq 0 ]; then
+        echo "✓ $topic: OK"
+        echo "$info" | grep -E "(Publishers|Subscribers):"
+    else
+        echo "✗ $topic: MISSING"
+    fi
+    echo
+done
+
+# Check for common issues
+echo "=== Potential Issues ==="
+
+# Find topics with no publishers or subscribers
+all_topics=$(roc topic list 2&gt;/dev/null)
+if [ -n "$all_topics" ]; then
+    while IFS= read -r topic; do
+        info=$(roc topic info "$topic" 2&gt;/dev/null)
+        if echo "$info" | grep -q "Publishers: 0"; then
+            echo "⚠ $topic: No publishers"
+        fi
+        if echo "$info" | grep -q "Subscribers: 0"; then
+            echo "⚠ $topic: No subscribers"
+        fi
+    done &lt;&lt;&lt; "$all_topics"
+else
+    echo "✗ No topics found - ROS 2 system may be down"
+fi
+</code></pre>
+<h2 id="data-export-and-analysis"><a class="header" href="#data-export-and-analysis">Data Export and Analysis</a></h2>
+<h3 id="json-export"><a class="header" href="#json-export">JSON Export</a></h3>
+<p>Export topic information in structured format:</p>
+<pre><code class="language-bash">#!/bin/bash
+# export_topics.sh - Export topic information to JSON
+
+output_file="topics_$(date +%Y%m%d_%H%M%S).json"
+
+echo "Exporting topic information to $output_file..."
+
+echo "{" &gt; "$output_file"
+echo '  "timestamp": "'$(date -Iseconds)'",' &gt;&gt; "$output_file"
+echo '  "topics": [' &gt;&gt; "$output_file"
+
+topics=$(roc topic list 2&gt;/dev/null)
+if [ -n "$topics" ]; then
+    first=true
+    while IFS= read -r topic; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            echo "    ," &gt;&gt; "$output_file"
+        fi
+        
+        echo "    {" &gt;&gt; "$output_file"
+        echo '      "name": "'$topic'",' &gt;&gt; "$output_file"
+        
+        # Get topic info and parse it
+        info=$(roc topic info "$topic" --verbose 2&gt;/dev/null)
+        if [ $? -eq 0 ]; then
+            type=$(echo "$info" | grep "Type:" | cut -d' ' -f2-)
+            pub_count=$(echo "$info" | grep "Publishers:" | awk '{print $2}')
+            sub_count=$(echo "$info" | grep "Subscribers:" | awk '{print $2}')
+            
+            echo '      "type": "'$type'",' &gt;&gt; "$output_file"
+            echo '      "publishers": '$pub_count',' &gt;&gt; "$output_file"
+            echo '      "subscribers": '$sub_count &gt;&gt; "$output_file"
+        else
+            echo '      "error": "Failed to get topic info"' &gt;&gt; "$output_file"
+        fi
+        
+        echo -n "    }" &gt;&gt; "$output_file"
+    done &lt;&lt;&lt; "$topics"
+    echo &gt;&gt; "$output_file"
+fi
+
+echo "  ]" &gt;&gt; "$output_file"
+echo "}" &gt;&gt; "$output_file"
+
+echo "Export complete: $output_file"
+</code></pre>
+<h3 id="csv-export-for-analysis"><a class="header" href="#csv-export-for-analysis">CSV Export for Analysis</a></h3>
+<pre><code class="language-bash">#!/bin/bash
+# export_csv.sh - Export topic data to CSV for analysis
+
+output_file="topics_$(date +%Y%m%d_%H%M%S).csv"
+
+echo "Exporting topic information to $output_file..."
+
+# CSV header
+echo "Timestamp,Topic,Type,Publishers,Subscribers" &gt; "$output_file"
+
+topics=$(roc topic list 2&gt;/dev/null)
+if [ -n "$topics" ]; then
+    while IFS= read -r topic; do
+        timestamp=$(date -Iseconds)
+        info=$(roc topic info "$topic" 2&gt;/dev/null)
+        
+        if [ $? -eq 0 ]; then
+            type=$(echo "$info" | grep "Type:" | cut -d' ' -f2- | tr ',' '_')
+            pub_count=$(echo "$info" | grep "Publishers:" | awk '{print $2}')
+            sub_count=$(echo "$info" | grep "Subscribers:" | awk '{print $2}')
+            
+            echo "$timestamp,$topic,$type,$pub_count,$sub_count" &gt;&gt; "$output_file"
+        else
+            echo "$timestamp,$topic,ERROR,0,0" &gt;&gt; "$output_file"
+        fi
+    done &lt;&lt;&lt; "$topics"
+fi
+
+echo "Export complete: $output_file"
+echo "Analyze with: python3 -c \"import pandas as pd; df=pd.read_csv('$output_file'); print(df.describe())\""
+</code></pre>
+<h2 id="custom-rmw-configuration"><a class="header" href="#custom-rmw-configuration">Custom RMW Configuration</a></h2>
+<h3 id="testing-different-rmw-implementations"><a class="header" href="#testing-different-rmw-implementations">Testing Different RMW Implementations</a></h3>
+<pre><code class="language-bash">#!/bin/bash
+# rmw_comparison.sh - Compare performance across RMW implementations
+
+rmw_implementations=(
+    "rmw_cyclone_cpp"
+    "rmw_fastrtps_cpp"
+    "rmw_connext_cpp"
+)
+
+for rmw in "${rmw_implementations[@]}"; do
+    echo "=== Testing with $rmw ==="
+    export RMW_IMPLEMENTATION="$rmw"
+    
+    # Test basic discovery
+    echo "Topic discovery test:"
+    time roc topic list &gt; /dev/null 2&gt;&amp;1
+    
+    if [ $? -eq 0 ]; then
+        topic_count=$(roc topic list 2&gt;/dev/null | wc -l)
+        echo "Success: Found $topic_count topics"
+        
+        # Test detailed info
+        first_topic=$(roc topic list 2&gt;/dev/null | head -1)
+        if [ -n "$first_topic" ]; then
+            echo "Detailed info test:"
+            time roc topic info "$first_topic" --verbose &gt; /dev/null 2&gt;&amp;1
+        fi
+    else
+        echo "Failed: $rmw not available or error occurred"
+    fi
+    echo
+done
+</code></pre>
+<h2 id="error-handling-and-debugging"><a class="header" href="#error-handling-and-debugging">Error Handling and Debugging</a></h2>
+<h3 id="verbose-debugging"><a class="header" href="#verbose-debugging">Verbose Debugging</a></h3>
+<p>Enable detailed debugging for troubleshooting:</p>
+<pre><code class="language-bash">#!/bin/bash
+# debug_roc.sh - Debug roc tool issues
+
+echo "=== ROS 2 Environment ==="
+printenv | grep ROS | sort
+
+echo -e "\n=== RMW Implementation ==="
+echo "RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-default}"
+
+echo -e "\n=== System Info ==="
+echo "OS: $(uname -a)"
+echo "User: $(whoami)"
+echo "Groups: $(groups)"
+
+echo -e "\n=== ROS 2 Process Check ==="
+ps aux | grep -E "(ros|dds)" | grep -v grep
+
+echo -e "\n=== Network Interfaces ==="
+ip addr show | grep -E "(inet|UP|DOWN)"
+
+echo -e "\n=== ROC Tool Test ==="
+echo "Testing roc topic list..."
+if roc topic list; then
+    echo "✓ Basic functionality works"
+    
+    echo -e "\nTesting verbose info..."
+    first_topic=$(roc topic list | head -1)
+    if [ -n "$first_topic" ]; then
+        echo "Testing with topic: $first_topic"
+        roc topic info "$first_topic" --verbose
+    fi
+else
+    echo "✗ Basic functionality failed"
+    echo "Exit code: $?"
+fi
+</code></pre>
+<h2 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h2>
+<h3 id="batch-operations"><a class="header" href="#batch-operations">Batch Operations</a></h3>
+<p>Optimize for scenarios with many topics:</p>
+<pre><code class="language-bash">#!/bin/bash
+# batch_optimize.sh - Optimized batch topic analysis
+
+# Get all topics once
+topics=($(roc topic list 2&gt;/dev/null))
+topic_count=${#topics[@]}
+
+echo "Found $topic_count topics"
+
+if [ $topic_count -eq 0 ]; then
+    echo "No topics found"
+    exit 1
+fi
+
+# Process in batches to avoid overwhelming the system
+batch_size=10
+batch_count=$(( (topic_count + batch_size - 1) / batch_size ))
+
+echo "Processing in $batch_count batches of $batch_size..."
+
+for ((batch=0; batch&lt;batch_count; batch++)); do
+    start=$((batch * batch_size))
+    end=$((start + batch_size))
+    
+    echo "Batch $((batch+1))/$batch_count (topics $start-$((end-1)))"
+    
+    for ((i=start; i&lt;end &amp;&amp; i&lt;topic_count; i++)); do
+        topic="${topics[i]}"
+        echo "  Processing: $topic"
+        roc topic info "$topic" &gt; /dev/null 2&gt;&amp;1
+    done
+    
+    # Small delay between batches
+    sleep 0.1
+done
+
+echo "Batch processing complete"
+</code></pre>
+<p>This completes the advanced usage examples. Next, let me create a command reference guide.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="integration-examples"><a class="header" href="#integration-examples">Integration Examples</a></h1>
+<p>This chapter demonstrates how to integrate the <code>roc</code> tool into larger systems, automation workflows, and monitoring solutions.</p>
+<h2 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h2>
+<h3 id="github-actions-workflow"><a class="header" href="#github-actions-workflow">GitHub Actions Workflow</a></h3>
+<pre><code class="language-yaml"># .github/workflows/ros2-integration-test.yml
+name: ROS 2 Integration Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ros2-integration:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup ROS 2
+      uses: ros-tooling/setup-ros@v0.6
+      with:
+        required-ros-distributions: jazzy
+    
+    - name: Build roc tool
+      run: |
+        source /opt/ros/jazzy/setup.bash
+        cargo build --release
+    
+    - name: Start test nodes
+      run: |
+        source /opt/ros/jazzy/setup.bash
+        ros2 run demo_nodes_cpp talker &amp;
+        ros2 run demo_nodes_cpp listener &amp;
+        sleep 5  # Allow nodes to start
+      
+    - name: Run integration tests
+      run: |
+        source /opt/ros/jazzy/setup.bash
+        ./target/release/roc topic list
+        ./target/release/roc topic info /chatter --verbose
+        
+        # Verify expected topics exist
+        topics=$(./target/release/roc topic list)
+        echo "$topics" | grep -q "/chatter" || exit 1
+        echo "$topics" | grep -q "/rosout" || exit 1
+        
+        # Verify topic has publishers
+        info=$(./target/release/roc topic info /chatter)
+        echo "$info" | grep -q "Publishers: [1-9]" || exit 1
+</code></pre>
+<h3 id="gitlab-ci-pipeline"><a class="header" href="#gitlab-ci-pipeline">GitLab CI Pipeline</a></h3>
+<pre><code class="language-yaml"># .gitlab-ci.yml
+stages:
+  - build
+  - test
+  - integration
+
+variables:
+  ROS_DISTRO: jazzy
+
+build:
+  stage: build
+  image: ros:jazzy
+  script:
+    - apt-get update &amp;&amp; apt-get install -y cargo
+    - cargo build --release
+  artifacts:
+    paths:
+      - target/release/roc
+    expire_in: 1 hour
+
+integration_test:
+  stage: integration
+  image: ros:jazzy
+  needs: ["build"]
+  script:
+    - source /opt/ros/jazzy/setup.bash
+    - ./scripts/integration_test.sh
+  artifacts:
+    reports:
+      junit: test_results.xml
+</code></pre>
+<h2 id="docker-integration"><a class="header" href="#docker-integration">Docker Integration</a></h2>
+<h3 id="ros-2-development-container"><a class="header" href="#ros-2-development-container">ROS 2 Development Container</a></h3>
+<pre><code class="language-dockerfile"># Dockerfile.ros2-dev
+FROM ros:jazzy
+
+# Install Rust and build tools
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install dependencies
+RUN apt-get update &amp;&amp; apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    &amp;&amp; rm -rf /var/lib/apt/lists/*
+
+# Copy and build roc
+COPY . /workspace/roc
+WORKDIR /workspace/roc
+RUN cargo build --release
+
+# Install roc tool
+RUN cp target/release/roc /usr/local/bin/
+
+# Setup entrypoint
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["bash"]
+</code></pre>
+<pre><code class="language-bash">#!/bin/bash
+# docker/entrypoint.sh
+source /opt/ros/jazzy/setup.bash
+exec "$@"
+</code></pre>
+<h3 id="docker-compose-for-testing"><a class="header" href="#docker-compose-for-testing">Docker Compose for Testing</a></h3>
+<pre><code class="language-yaml"># docker-compose.yml
+version: '3.8'
+
+services:
+  ros2-master:
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2-dev
+    command: ros2 run demo_nodes_cpp talker
+    environment:
+      - ROS_DOMAIN_ID=0
+    networks:
+      - ros2-net
+
+  ros2-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2-dev
+    command: |
+      bash -c "
+        sleep 5
+        while true; do
+          echo '=== Topic Monitor ==='
+          roc topic list
+          roc topic info /chatter --verbose
+          sleep 30
+        done
+      "
+    environment:
+      - ROS_DOMAIN_ID=0
+    networks:
+      - ros2-net
+    depends_on:
+      - ros2-master
+
+networks:
+  ros2-net:
+    driver: bridge
+</code></pre>
+<h2 id="monitoring-and-alerting"><a class="header" href="#monitoring-and-alerting">Monitoring and Alerting</a></h2>
+<h3 id="prometheus-integration"><a class="header" href="#prometheus-integration">Prometheus Integration</a></h3>
+<pre><code class="language-python">#!/usr/bin/env python3
+# prometheus_exporter.py - Export roc metrics to Prometheus
+
+import subprocess
+import time
+import re
+from prometheus_client import start_http_server, Gauge, Info
+import json
+
+# Prometheus metrics
+topic_count = Gauge('ros2_topic_count', 'Number of ROS 2 topics')
+topic_publishers = Gauge('ros2_topic_publishers', 'Number of publishers per topic', ['topic_name'])
+topic_subscribers = Gauge('ros2_topic_subscribers', 'Number of subscribers per topic', ['topic_name'])
+topic_info = Info('ros2_topic_info', 'Topic information', ['topic_name'])
+
+def get_topic_list():
+    """Get list of topics using roc tool."""
+    try:
+        result = subprocess.run(['roc', 'topic', 'list'], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            return [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+        return []
+    except Exception as e:
+        print(f"Error getting topic list: {e}")
+        return []
+
+def get_topic_info(topic_name):
+    """Get detailed topic information."""
+    try:
+        result = subprocess.run(['roc', 'topic', 'info', topic_name, '--verbose'], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            return parse_topic_info(result.stdout)
+        return None
+    except Exception as e:
+        print(f"Error getting info for {topic_name}: {e}")
+        return None
+
+def parse_topic_info(info_text):
+    """Parse topic info output."""
+    info = {}
+    
+    # Extract basic info
+    type_match = re.search(r'Type: (.+)', info_text)
+    if type_match:
+        info['type'] = type_match.group(1)
+    
+    pub_match = re.search(r'Publishers: (\d+)', info_text)
+    if pub_match:
+        info['publishers'] = int(pub_match.group(1))
+    
+    sub_match = re.search(r'Subscribers: (\d+)', info_text)
+    if sub_match:
+        info['subscribers'] = int(sub_match.group(1))
+    
+    return info
+
+def update_metrics():
+    """Update Prometheus metrics."""
+    topics = get_topic_list()
+    topic_count.set(len(topics))
+    
+    for topic in topics:
+        info = get_topic_info(topic)
+        if info:
+            topic_publishers.labels(topic_name=topic).set(info.get('publishers', 0))
+            topic_subscribers.labels(topic_name=topic).set(info.get('subscribers', 0))
+            topic_info.labels(topic_name=topic).info({
+                'type': info.get('type', 'unknown'),
+                'publishers': str(info.get('publishers', 0)),
+                'subscribers': str(info.get('subscribers', 0))
+            })
+
+def main():
+    # Start Prometheus metrics server
+    start_http_server(8000)
+    print("Prometheus exporter started on port 8000")
+    
+    while True:
+        try:
+            update_metrics()
+            time.sleep(30)  # Update every 30 seconds
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            print(f"Error updating metrics: {e}")
+            time.sleep(5)
+
+if __name__ == '__main__':
+    main()
+</code></pre>
+<h3 id="grafana-dashboard-configuration"><a class="header" href="#grafana-dashboard-configuration">Grafana Dashboard Configuration</a></h3>
+<pre><code class="language-json">{
+  "dashboard": {
+    "title": "ROS 2 Topic Monitor",
+    "panels": [
+      {
+        "title": "Topic Count",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "ros2_topic_count",
+            "legendFormat": "Topics"
+          }
+        ]
+      },
+      {
+        "title": "Publishers per Topic",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "ros2_topic_publishers",
+            "legendFormat": "{{topic_name}}"
+          }
+        ]
+      },
+      {
+        "title": "Subscribers per Topic",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "ros2_topic_subscribers",
+            "legendFormat": "{{topic_name}}"
+          }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+<h3 id="alerting-rules"><a class="header" href="#alerting-rules">Alerting Rules</a></h3>
+<pre><code class="language-yaml"># alerting_rules.yml
+groups:
+  - name: ros2_alerts
+    rules:
+      - alert: NoTopicsFound
+        expr: ros2_topic_count == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No ROS 2 topics found"
+          description: "The ROS 2 system appears to be down - no topics detected"
+
+      - alert: TopicNoPublishers
+        expr: ros2_topic_publishers{topic_name!="/parameter_events"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Topic {{ $labels.topic_name }} has no publishers"
+          description: "Topic {{ $labels.topic_name }} has no active publishers"
+
+      - alert: CriticalTopicMissing
+        expr: absent(ros2_topic_publishers{topic_name="/rosout"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical topic /rosout is missing"
+          description: "The /rosout topic is not available"
+</code></pre>
+<h2 id="python-integration"><a class="header" href="#python-integration">Python Integration</a></h2>
+<h3 id="ros-2-node-integration"><a class="header" href="#ros-2-node-integration">ROS 2 Node Integration</a></h3>
+<pre><code class="language-python">#!/usr/bin/env python3
+# ros2_monitor_node.py - ROS 2 node that uses roc for monitoring
+
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+import subprocess
+import json
+import threading
+import time
+
+class TopicMonitorNode(Node):
+    def __init__(self):
+        super().__init__('topic_monitor')
+        
+        # Publisher for monitoring results
+        self.publisher = self.create_publisher(String, '/topic_monitor/status', 10)
+        
+        # Timer for periodic monitoring
+        self.timer = self.create_timer(10.0, self.monitor_callback)
+        
+        self.get_logger().info('Topic monitor node started')
+    
+    def get_topic_stats(self):
+        """Get topic statistics using roc tool."""
+        try:
+            # Get topic list
+            result = subprocess.run(['roc', 'topic', 'list'], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode != 0:
+                return None
+            
+            topics = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+            
+            stats = {
+                'timestamp': time.time(),
+                'topic_count': len(topics),
+                'topics': {}
+            }
+            
+            # Get info for each topic
+            for topic in topics[:10]:  # Limit to first 10 topics
+                info_result = subprocess.run(['roc', 'topic', 'info', topic], 
+                                           capture_output=True, text=True, timeout=5)
+                if info_result.returncode == 0:
+                    # Parse the output
+                    lines = info_result.stdout.strip().split('\n')
+                    topic_info = {}
+                    for line in lines:
+                        if line.startswith('Type:'):
+                            topic_info['type'] = line.split(':', 1)[1].strip()
+                        elif line.startswith('Publishers:'):
+                            topic_info['publishers'] = int(line.split(':', 1)[1].strip())
+                        elif line.startswith('Subscribers:'):
+                            topic_info['subscribers'] = int(line.split(':', 1)[1].strip())
+                    
+                    stats['topics'][topic] = topic_info
+            
+            return stats
+            
+        except Exception as e:
+            self.get_logger().error(f'Error getting topic stats: {e}')
+            return None
+    
+    def monitor_callback(self):
+        """Periodic monitoring callback."""
+        stats = self.get_topic_stats()
+        if stats:
+            # Publish stats as JSON
+            msg = String()
+            msg.data = json.dumps(stats)
+            self.publisher.publish(msg)
+            
+            # Log summary
+            self.get_logger().info(f'Monitoring: {stats["topic_count"]} topics found')
+        else:
+            self.get_logger().warn('Failed to get topic statistics')
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = TopicMonitorNode()
+    
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+</code></pre>
+<h2 id="shell-integration"><a class="header" href="#shell-integration">Shell Integration</a></h2>
+<h3 id="bash-completion"><a class="header" href="#bash-completion">Bash Completion</a></h3>
+<pre><code class="language-bash"># roc_completion.bash - Bash completion for roc tool
+
+_roc_completion() {
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    
+    # Top-level commands
+    local commands="topic help"
+    
+    # Topic subcommands
+    local topic_commands="list info"
+    
+    case ${COMP_CWORD} in
+        1)
+            COMPREPLY=($(compgen -W "${commands}" -- ${cur}))
+            return 0
+            ;;
+        2)
+            case ${prev} in
+                topic)
+                    COMPREPLY=($(compgen -W "${topic_commands}" -- ${cur}))
+                    return 0
+                    ;;
+            esac
+            ;;
+        3)
+            case ${COMP_WORDS[1]} in
+                topic)
+                    case ${prev} in
+                        info)
+                            # Complete with available topics
+                            local topics=$(roc topic list 2&gt;/dev/null)
+                            COMPREPLY=($(compgen -W "${topics}" -- ${cur}))
+                            return 0
+                            ;;
+                    esac
+                    ;;
+            esac
+            ;;
+        4)
+            case ${COMP_WORDS[1]} in
+                topic)
+                    case ${COMP_WORDS[2]} in
+                        info)
+                            COMPREPLY=($(compgen -W "--verbose" -- ${cur}))
+                            return 0
+                            ;;
+                    esac
+                    ;;
+            esac
+            ;;
+    esac
+    
+    return 0
+}
+
+complete -F _roc_completion roc
+</code></pre>
+<h3 id="zsh-integration"><a class="header" href="#zsh-integration">Zsh Integration</a></h3>
+<pre><code class="language-zsh"># roc_completion.zsh - Zsh completion for roc tool
+
+#compdef roc
+
+_roc() {
+    local context state line
+    
+    _arguments \
+        '1: :-&gt;command' \
+        '*: :-&gt;args'
+    
+    case $state in
+        command)
+            _values 'commands' \
+                'topic[Topic operations]' \
+                'help[Show help]'
+            ;;
+        args)
+            case $line[1] in
+                topic)
+                    _roc_topic
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_roc_topic() {
+    local context state line
+    
+    _arguments \
+        '1: :-&gt;subcommand' \
+        '*: :-&gt;args'
+    
+    case $state in
+        subcommand)
+            _values 'topic subcommands' \
+                'list[List all topics]' \
+                'info[Show topic information]'
+            ;;
+        args)
+            case $line[1] in
+                info)
+                    _roc_topic_info
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_roc_topic_info() {
+    local context state line
+    
+    _arguments \
+        '1: :-&gt;topic_name' \
+        '2: :-&gt;options'
+    
+    case $state in
+        topic_name)
+            # Get available topics
+            local topics
+            topics=(${(f)"$(roc topic list 2&gt;/dev/null)"})
+            _describe 'topics' topics
+            ;;
+        options)
+            _values 'options' \
+                '--verbose[Show detailed information]'
+            ;;
+    esac
+}
+
+_roc "$@"
+</code></pre>
+<h2 id="systemd-service-integration"><a class="header" href="#systemd-service-integration">Systemd Service Integration</a></h2>
+<h3 id="service-configuration"><a class="header" href="#service-configuration">Service Configuration</a></h3>
+<pre><code class="language-ini"># /etc/systemd/system/ros2-monitor.service
+[Unit]
+Description=ROS 2 Topic Monitor
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=ros
+Group=ros
+WorkingDirectory=/home/ros
+Environment=ROS_DOMAIN_ID=0
+Environment=RMW_IMPLEMENTATION=rmw_cyclone_cpp
+ExecStart=/home/ros/monitoring/monitor_service.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+<pre><code class="language-bash">#!/bin/bash
+# /home/ros/monitoring/monitor_service.sh
+
+source /opt/ros/jazzy/setup.bash
+
+while true; do
+    echo "$(date): Starting monitoring cycle"
+    
+    # Check if ROS 2 system is healthy
+    if roc topic list &gt; /dev/null 2&gt;&amp;1; then
+        echo "$(date): ROS 2 system healthy"
+        
+        # Generate monitoring report
+        {
+            echo "=== ROS 2 System Status ==="
+            echo "Timestamp: $(date)"
+            echo "Topics found: $(roc topic list | wc -l)"
+            echo
+            
+            # Check critical topics
+            for topic in "/rosout" "/parameter_events"; do
+                if roc topic info "$topic" &gt; /dev/null 2&gt;&amp;1; then
+                    echo "✓ $topic: OK"
+                else
+                    echo "✗ $topic: MISSING"
+                fi
+            done
+        } &gt; /var/log/ros2-monitor.log
+        
+    else
+        echo "$(date): ROS 2 system appears down"
+        echo "$(date): ROS 2 system down" &gt;&gt; /var/log/ros2-monitor.log
+    fi
+    
+    sleep 60
+done
+</code></pre>
+<p>This completes the integration examples. Let me now create a comprehensive command reference guide.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="command-reference"><a class="header" href="#command-reference">Command Reference</a></h1>
+<p>This chapter provides a comprehensive reference for all <code>roc</code> tool commands, options, and usage patterns.</p>
+<h2 id="global-options"><a class="header" href="#global-options">Global Options</a></h2>
+<p>All <code>roc</code> commands support these global options:</p>
+<div class="table-wrapper"><table><thead><tr><th>Option</th><th>Description</th><th>Default</th></tr></thead><tbody>
+<tr><td><code>-h, --help</code></td><td>Show help information</td><td>N/A</td></tr>
+<tr><td><code>-V, --version</code></td><td>Show version information</td><td>N/A</td></tr>
+</tbody></table>
+</div>
+<h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
+<p>The <code>roc</code> tool respects standard ROS 2 environment variables:</p>
+<div class="table-wrapper"><table><thead><tr><th>Variable</th><th>Description</th><th>Example</th></tr></thead><tbody>
+<tr><td><code>ROS_DOMAIN_ID</code></td><td>ROS 2 domain ID</td><td><code>export ROS_DOMAIN_ID=0</code></td></tr>
+<tr><td><code>RMW_IMPLEMENTATION</code></td><td>RMW middleware implementation</td><td><code>export RMW_IMPLEMENTATION=rmw_cyclone_cpp</code></td></tr>
+<tr><td><code>ROS_LOCALHOST_ONLY</code></td><td>Limit communication to localhost</td><td><code>export ROS_LOCALHOST_ONLY=1</code></td></tr>
+</tbody></table>
+</div>
+<h2 id="command-structure-1"><a class="header" href="#command-structure-1">Command Structure</a></h2>
+<pre><code>roc &lt;COMMAND&gt; [SUBCOMMAND] [OPTIONS] [ARGS]
+</code></pre>
+<h2 id="topic-commands"><a class="header" href="#topic-commands">Topic Commands</a></h2>
+<h3 id="roc-topic-list"><a class="header" href="#roc-topic-list"><code>roc topic list</code></a></h3>
+<p>List all available topics in the ROS 2 graph.</p>
+<p><strong>Syntax:</strong></p>
+<pre><code class="language-bash">roc topic list
+</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code>/chatter
+/parameter_events
+/rosout
+</code></pre>
+<p><strong>Exit Codes:</strong></p>
+<ul>
+<li><code>0</code>: Success</li>
+<li><code>1</code>: Error (no ROS 2 system found, permission issues, etc.)</li>
+</ul>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-bash"># Basic usage
+roc topic list
+
+# Count topics
+roc topic list | wc -l
+
+# Filter topics
+roc topic list | grep "chatter"
+
+# Store topics in variable
+topics=$(roc topic list)
+</code></pre>
+<h3 id="roc-topic-info"><a class="header" href="#roc-topic-info"><code>roc topic info</code></a></h3>
+<p>Display detailed information about a specific topic.</p>
+<p><strong>Syntax:</strong></p>
+<pre><code class="language-bash">roc topic info &lt;TOPIC_NAME&gt; [OPTIONS]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>&lt;TOPIC_NAME&gt;</code>: The name of the topic to inspect (required)</li>
+</ul>
+<p><strong>Options:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Option</th><th>Short</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>--verbose</code></td><td><code>-v</code></td><td>Show detailed information including QoS profiles and endpoint data</td></tr>
+</tbody></table>
+</div>
+<p><strong>Basic Output:</strong></p>
+<pre><code>Topic: /chatter
+Type: std_msgs/msg/String
+Publishers: 1
+Subscribers: 0
+</code></pre>
+<p><strong>Verbose Output:</strong></p>
+<pre><code>Topic: /chatter
+Type: std_msgs/msg/String
+Publishers: 1
+  Node: /talker
+  Endpoint type: Publisher
+  GID: 01.0f.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx
+  QoS Profile:
+    Reliability: Reliable
+    Durability: Volatile
+    History: Keep last
+    Depth: 10
+    Deadline: Default
+    Lifespan: Default
+    Liveliness: Automatic
+    Liveliness lease duration: Default
+  Type hash: RIHS01_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Subscribers: 0
+</code></pre>
+<p><strong>Exit Codes:</strong></p>
+<ul>
+<li><code>0</code>: Success</li>
+<li><code>1</code>: Topic not found or error accessing topic information</li>
+<li><code>2</code>: Invalid arguments</li>
+</ul>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-bash"># Basic topic information
+roc topic info /chatter
+
+# Detailed information with QoS profiles
+roc topic info /chatter --verbose
+roc topic info /chatter -v
+
+# Check if topic exists (using exit code)
+if roc topic info /my_topic &gt; /dev/null 2&gt;&amp;1; then
+    echo "Topic exists"
+else
+    echo "Topic not found"
+fi
+
+# Get only publisher count
+roc topic info /chatter | grep "Publishers:" | awk '{print $2}'
+</code></pre>
+<h2 id="output-format-details"><a class="header" href="#output-format-details">Output Format Details</a></h2>
+<h3 id="topic-information-fields"><a class="header" href="#topic-information-fields">Topic Information Fields</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Field</th><th>Description</th><th>Example</th></tr></thead><tbody>
+<tr><td><strong>Topic</strong></td><td>Full topic name</td><td><code>/chatter</code></td></tr>
+<tr><td><strong>Type</strong></td><td>Message type</td><td><code>std_msgs/msg/String</code></td></tr>
+<tr><td><strong>Publishers</strong></td><td>Number of active publishers</td><td><code>1</code></td></tr>
+<tr><td><strong>Subscribers</strong></td><td>Number of active subscribers</td><td><code>0</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="verbose-information-fields"><a class="header" href="#verbose-information-fields">Verbose Information Fields</a></h3>
+<h4 id="publishersubscriber-details"><a class="header" href="#publishersubscriber-details">Publisher/Subscriber Details</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>Field</th><th>Description</th><th>Example</th></tr></thead><tbody>
+<tr><td><strong>Node</strong></td><td>Node name</td><td><code>/talker</code></td></tr>
+<tr><td><strong>Endpoint type</strong></td><td>Publisher or Subscriber</td><td><code>Publisher</code></td></tr>
+<tr><td><strong>GID</strong></td><td>Global identifier (16 bytes, hex)</td><td><code>01.0f.xx.xx...</code></td></tr>
+<tr><td><strong>Type hash</strong></td><td>Message type hash</td><td><code>RIHS01_xxx...</code></td></tr>
+</tbody></table>
+</div>
+<h4 id="qos-profile-fields"><a class="header" href="#qos-profile-fields">QoS Profile Fields</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>Field</th><th>Description</th><th>Possible Values</th></tr></thead><tbody>
+<tr><td><strong>Reliability</strong></td><td>Message delivery guarantee</td><td><code>Reliable</code>, <code>Best effort</code></td></tr>
+<tr><td><strong>Durability</strong></td><td>Message persistence</td><td><code>Volatile</code>, <code>Transient local</code>, <code>Transient</code>, <code>Persistent</code></td></tr>
+<tr><td><strong>History</strong></td><td>History policy</td><td><code>Keep last</code>, <code>Keep all</code></td></tr>
+<tr><td><strong>Depth</strong></td><td>History depth (for Keep last)</td><td><code>1</code>, <code>10</code>, <code>100</code>, etc.</td></tr>
+<tr><td><strong>Deadline</strong></td><td>Message deadline</td><td><code>Default</code>, time duration</td></tr>
+<tr><td><strong>Lifespan</strong></td><td>Message lifespan</td><td><code>Default</code>, time duration</td></tr>
+<tr><td><strong>Liveliness</strong></td><td>Liveliness policy</td><td><code>Automatic</code>, <code>Manual by node</code>, <code>Manual by topic</code></td></tr>
+<tr><td><strong>Liveliness lease duration</strong></td><td>Lease duration</td><td><code>Default</code>, time duration</td></tr>
+</tbody></table>
+</div>
+<h2 id="error-handling-3"><a class="header" href="#error-handling-3">Error Handling</a></h2>
+<h3 id="common-error-messages"><a class="header" href="#common-error-messages">Common Error Messages</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Error</th><th>Cause</th><th>Solution</th></tr></thead><tbody>
+<tr><td><code>No topics found</code></td><td>No ROS 2 nodes running</td><td>Start ROS 2 nodes or check <code>ROS_DOMAIN_ID</code></td></tr>
+<tr><td><code>Topic not found: /topic_name</code></td><td>Specified topic doesn't exist</td><td>Verify topic name with <code>roc topic list</code></td></tr>
+<tr><td><code>Permission denied</code></td><td>Insufficient permissions</td><td>Check user permissions and ROS 2 setup</td></tr>
+<tr><td><code>Failed to create context</code></td><td>ROS 2 not properly initialized</td><td>Source ROS 2 setup and check environment</td></tr>
+<tr><td><code>Timeout waiting for topic info</code></td><td>Network or discovery issues</td><td>Check network connectivity and RMW configuration</td></tr>
+</tbody></table>
+</div>
+<h3 id="debugging-commands"><a class="header" href="#debugging-commands">Debugging Commands</a></h3>
+<pre><code class="language-bash"># Check ROS 2 environment
+printenv | grep ROS
+
+# Verify RMW implementation
+echo $RMW_IMPLEMENTATION
+
+# Test basic connectivity
+roc topic list
+
+# Verbose debugging (if available)
+RUST_LOG=debug roc topic info /chatter --verbose
+</code></pre>
+<h2 id="return-codes"><a class="header" href="#return-codes">Return Codes</a></h2>
+<p>All <code>roc</code> commands follow standard Unix conventions:</p>
+<div class="table-wrapper"><table><thead><tr><th>Code</th><th>Meaning</th><th>When Used</th></tr></thead><tbody>
+<tr><td><code>0</code></td><td>Success</td><td>Command completed successfully</td></tr>
+<tr><td><code>1</code></td><td>General error</td><td>Topic not found, ROS 2 system unavailable</td></tr>
+<tr><td><code>2</code></td><td>Invalid arguments</td><td>Wrong number of arguments, invalid options</td></tr>
+<tr><td><code>130</code></td><td>Interrupted</td><td>Command interrupted by user (Ctrl+C)</td></tr>
+</tbody></table>
+</div>
+<h2 id="performance-considerations-4"><a class="header" href="#performance-considerations-4">Performance Considerations</a></h2>
+<h3 id="command-performance"><a class="header" href="#command-performance">Command Performance</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Command</th><th>Typical Time</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>roc topic list</code></td><td>&lt; 100ms</td><td>Fast, caches discovery data</td></tr>
+<tr><td><code>roc topic info</code></td><td>&lt; 200ms</td><td>May be slower for first query</td></tr>
+<tr><td><code>roc topic info --verbose</code></td><td>&lt; 500ms</td><td>Additional QoS/endpoint queries</td></tr>
+</tbody></table>
+</div>
+<h3 id="optimization-tips"><a class="header" href="#optimization-tips">Optimization Tips</a></h3>
+<ol>
+<li><strong>Batch Operations</strong>: Use <code>roc topic list</code> once, then query specific topics</li>
+<li><strong>Caching</strong>: Results are cached briefly to improve repeated queries</li>
+<li><strong>Network</strong>: Use <code>ROS_LOCALHOST_ONLY=1</code> for local-only discovery</li>
+<li><strong>RMW Selection</strong>: Different RMW implementations have different performance characteristics</li>
+</ol>
+<h2 id="comparison-with-ros-2-cli"><a class="header" href="#comparison-with-ros-2-cli">Comparison with ROS 2 CLI</a></h2>
+<h3 id="feature-parity"><a class="header" href="#feature-parity">Feature Parity</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Feature</th><th><code>ros2 topic</code></th><th><code>roc topic</code></th><th>Notes</th></tr></thead><tbody>
+<tr><td>List topics</td><td>✅</td><td>✅</td><td>Full parity</td></tr>
+<tr><td>Basic info</td><td>✅</td><td>✅</td><td>Full parity</td></tr>
+<tr><td>Verbose info</td><td>✅</td><td>✅</td><td>Full parity with QoS details</td></tr>
+<tr><td>Publisher count</td><td>✅</td><td>✅</td><td>Exact match</td></tr>
+<tr><td>Subscriber count</td><td>✅</td><td>✅</td><td>Exact match</td></tr>
+<tr><td>GID information</td><td>✅</td><td>✅</td><td>Formatted identically</td></tr>
+<tr><td>Type hash</td><td>✅</td><td>✅</td><td>Complete hash information</td></tr>
+</tbody></table>
+</div>
+<h3 id="performance-comparison"><a class="header" href="#performance-comparison">Performance Comparison</a></h3>
+<pre><code class="language-bash"># Benchmark both tools
+time ros2 topic list
+time roc topic list
+
+time ros2 topic info /chatter --verbose
+time roc topic info /chatter --verbose
+</code></pre>
+<p>Typical results show <code>roc</code> is 2-3x faster for most operations.</p>
+<h2 id="scripting-and-automation"><a class="header" href="#scripting-and-automation">Scripting and Automation</a></h2>
+<h3 id="common-patterns"><a class="header" href="#common-patterns">Common Patterns</a></h3>
+<pre><code class="language-bash"># Check if specific topics exist
+check_topics() {
+    local required_topics=("$@")
+    local missing_topics=()
+    
+    for topic in "${required_topics[@]}"; do
+        if ! roc topic info "$topic" &gt; /dev/null 2&gt;&amp;1; then
+            missing_topics+=("$topic")
+        fi
+    done
+    
+    if [ ${#missing_topics[@]} -eq 0 ]; then
+        echo "All required topics found"
+        return 0
+    else
+        echo "Missing topics: ${missing_topics[*]}"
+        return 1
+    fi
+}
+
+# Usage
+check_topics "/chatter" "/rosout" "/parameter_events"
+</code></pre>
+<pre><code class="language-bash"># Get topic statistics
+get_topic_stats() {
+    local topics=($(roc topic list))
+    local total_pubs=0
+    local total_subs=0
+    
+    for topic in "${topics[@]}"; do
+        local info=$(roc topic info "$topic")
+        local pubs=$(echo "$info" | grep "Publishers:" | awk '{print $2}')
+        local subs=$(echo "$info" | grep "Subscribers:" | awk '{print $2}')
+        
+        total_pubs=$((total_pubs + pubs))
+        total_subs=$((total_subs + subs))
+    done
+    
+    echo "Topics: ${#topics[@]}"
+    echo "Total publishers: $total_pubs"
+    echo "Total subscribers: $total_subs"
+}
+</code></pre>
+<h3 id="json-output-future-enhancement"><a class="header" href="#json-output-future-enhancement">JSON Output (Future Enhancement)</a></h3>
+<p>While not currently supported, JSON output could be added:</p>
+<pre><code class="language-bash"># Proposed syntax (not yet implemented)
+roc topic list --format json
+roc topic info /chatter --format json --verbose
+</code></pre>
+<h2 id="troubleshooting-1"><a class="header" href="#troubleshooting-1">Troubleshooting</a></h2>
+<h3 id="common-issues"><a class="header" href="#common-issues">Common Issues</a></h3>
+<ol>
+<li>
+<p><strong>No output from <code>roc topic list</code></strong></p>
+<ul>
+<li>Check if ROS 2 nodes are running: <code>ros2 node list</code></li>
+<li>Verify ROS 2 environment: <code>echo $ROS_DOMAIN_ID</code></li>
+<li>Try different RMW: <code>export RMW_IMPLEMENTATION=rmw_cyclone_cpp</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Permission errors</strong></p>
+<ul>
+<li>Check user groups: <code>groups</code></li>
+<li>Verify ROS 2 installation permissions</li>
+<li>Try running with different user</li>
+</ul>
+</li>
+<li>
+<p><strong>Slow performance</strong></p>
+<ul>
+<li>Check network configuration</li>
+<li>Use <code>ROS_LOCALHOST_ONLY=1</code> for local testing</li>
+<li>Consider different RMW implementation</li>
+</ul>
+</li>
+<li>
+<p><strong>Inconsistent results</strong></p>
+<ul>
+<li>Allow time for discovery: <code>sleep 2 &amp;&amp; roc topic list</code></li>
+<li>Check for multiple ROS 2 domains</li>
+<li>Verify system clock synchronization</li>
+</ul>
+</li>
+</ol>
+<h3 id="debug-information"><a class="header" href="#debug-information">Debug Information</a></h3>
+<pre><code class="language-bash"># Enable detailed logging (if built with debug support)
+RUST_LOG=debug roc topic list
+
+# Check system resources
+free -h
+df -h
+
+# Network diagnostics
+netstat -tuln | grep -E "(7400|7401|7411)"
+</code></pre>
+<p>This completes the comprehensive command reference for the <code>roc</code> tool.</p>
 
                     </main>
 

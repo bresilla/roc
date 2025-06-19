@@ -1,0 +1,570 @@
+<!DOCTYPE HTML>
+<html lang="en" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Endpoint Discovery - roc - ROS 2 CLI Tool</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="endpoint-discovery"><a class="header" href="#endpoint-discovery">Endpoint Discovery</a></h1>
+<p>Endpoint discovery is the process by which <code>roc</code> finds and identifies publishers and subscribers in the ROS 2 system. This chapter explains how the discovery mechanism works, the information it provides, and how it differs from daemon-based approaches.</p>
+<h2 id="discovery-architecture"><a class="header" href="#discovery-architecture">Discovery Architecture</a></h2>
+<h3 id="direct-dds-discovery-vs-daemon"><a class="header" href="#direct-dds-discovery-vs-daemon">Direct DDS Discovery vs Daemon</a></h3>
+<p><code>roc</code> uses <strong>direct DDS discovery</strong>, which differs from the <code>ros2</code> CLI daemon approach:</p>
+<div class="table-wrapper"><table><thead><tr><th>Approach</th><th>Mechanism</th><th>Pros</th><th>Cons</th></tr></thead><tbody>
+<tr><td><strong>Direct DDS</strong> (roc)</td><td>Directly queries DDS discovery database</td><td>Always current, no daemon dependency</td><td>Slower startup, repeated discovery overhead</td></tr>
+<tr><td><strong>Daemon</strong> (ros2 cli)</td><td>Queries centralized daemon cache</td><td>Fast queries, shared discovery</td><td>Stale data possible, daemon dependency</td></tr>
+</tbody></table>
+</div>
+<h3 id="discovery-flow"><a class="header" href="#discovery-flow">Discovery Flow</a></h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant roc as roc Command
+    participant RCL as RCL Layer
+    participant DDS as DDS Discovery
+    participant Net as Network
+    
+    roc-&gt;&gt;RCL: rcl_init()
+    RCL-&gt;&gt;DDS: Initialize participant
+    DDS-&gt;&gt;Net: Send participant announcement
+    Net-&gt;&gt;DDS: Receive peer announcements
+    DDS-&gt;&gt;DDS: Build discovery database
+    
+    Note over DDS: Discovery timeout (150ms)
+    
+    roc-&gt;&gt;RCL: rcl_get_publishers_info_by_topic()
+    RCL-&gt;&gt;DDS: Query discovery database
+    DDS--&gt;&gt;RCL: Endpoint information
+    RCL--&gt;&gt;roc: Topic endpoint details
+</code></pre>
+<h2 id="discovery-timing"><a class="header" href="#discovery-timing">Discovery Timing</a></h2>
+<h3 id="initialization-sequence"><a class="header" href="#initialization-sequence">Initialization Sequence</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn new_with_discovery(discovery_time: std::time::Duration) -&gt; Result&lt;Self&gt; {
+    // 1. Initialize RCL context and node
+    let graph_context = RclGraphContext { context, node, is_initialized: true };
+    
+    // 2. Wait for DDS discovery to converge
+    graph_context.wait_for_graph_discovery(discovery_time)?;
+    
+    Ok(graph_context)
+}
+
+fn wait_for_graph_discovery(&amp;self, discovery_time: std::time::Duration) -&gt; Result&lt;()&gt; {
+    // DDS discovery is asynchronous - wait for network convergence
+    std::thread::sleep(discovery_time);
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="discovery-timeout-selection"><a class="header" href="#discovery-timeout-selection">Discovery Timeout Selection</a></h3>
+<p>The default 150ms timeout balances several factors:</p>
+<p><strong>Too Short (&lt; 50ms)</strong></p>
+<ul>
+<li>May miss endpoints that haven't completed discovery</li>
+<li>Inconsistent results across runs</li>
+<li>Network-dependent behavior</li>
+</ul>
+<p><strong>Optimal (100-200ms)</strong></p>
+<ul>
+<li>Allows most DDS implementations to converge</li>
+<li>Reasonable for interactive use</li>
+<li>Reliable across different networks</li>
+</ul>
+<p><strong>Too Long (&gt; 500ms)</strong></p>
+<ul>
+<li>Slow interactive response</li>
+<li>Diminishing returns for completeness</li>
+<li>User experience degradation</li>
+</ul>
+<h2 id="endpoint-information-structure"><a class="header" href="#endpoint-information-structure">Endpoint Information Structure</a></h2>
+<h3 id="complete-endpoint-data"><a class="header" href="#complete-endpoint-data">Complete Endpoint Data</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct TopicEndpointInfo {
+    pub node_name: String,              // ROS node name
+    pub node_namespace: String,         // ROS namespace
+    pub topic_type: String,             // Message type
+    pub topic_type_hash: String,        // Message definition hash  
+    pub endpoint_type: EndpointType,    // PUBLISHER/SUBSCRIPTION
+    pub gid: Vec&lt;u8&gt;,                   // DDS Global ID
+    pub qos_profile: QosProfile,        // Complete QoS settings
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="endpoint-type-classification"><a class="header" href="#endpoint-type-classification">Endpoint Type Classification</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub enum EndpointType {
+    Publisher,     // Sends messages
+    Subscription,  // Receives messages  
+    Invalid,       // Error state
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="discovery-data-sources"><a class="header" href="#discovery-data-sources">Discovery Data Sources</a></h2>
+<h3 id="rcl-discovery-functions"><a class="header" href="#rcl-discovery-functions">RCL Discovery Functions</a></h3>
+<p><strong>Basic Topology</strong></p>
+<pre><code class="language-c">// Get all topics and types
+rcl_ret_t rcl_get_topic_names_and_types(
+    const rcl_node_t * node,
+    rcutils_allocator_t * allocator,
+    bool no_demangle,
+    rcl_names_and_types_t * topic_names_and_types
+);
+
+// Count endpoints
+rcl_ret_t rcl_count_publishers(const rcl_node_t * node, const char * topic_name, size_t * count);
+rcl_ret_t rcl_count_subscribers(const rcl_node_t * node, const char * topic_name, size_t * count);
+</code></pre>
+<p><strong>Detailed Endpoint Information</strong></p>
+<pre><code class="language-c">// Get detailed publisher info
+rcl_ret_t rcl_get_publishers_info_by_topic(
+    const rcl_node_t * node,
+    rcutils_allocator_t * allocator,
+    const char * topic_name,
+    bool no_mangle,
+    rcl_topic_endpoint_info_array_t * publishers_info
+);
+
+// Get detailed subscriber info  
+rcl_ret_t rcl_get_subscriptions_info_by_topic(
+    const rcl_node_t * node,
+    rcutils_allocator_t * allocator,
+    const char * topic_name,
+    bool no_mangle,
+    rcl_topic_endpoint_info_array_t * subscriptions_info
+);
+</code></pre>
+<h3 id="information-extraction-process"><a class="header" href="#information-extraction-process">Information Extraction Process</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn get_publishers_info(&amp;self, topic_name: &amp;str) -&gt; Result&lt;Vec&lt;TopicEndpointInfo&gt;&gt; {
+    let topic_name_c = CString::new(topic_name)?;
+    
+    unsafe {
+        let mut allocator = rcutils_get_default_allocator();
+        let mut publishers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+        
+        // Query DDS discovery database
+        let ret = rcl_get_publishers_info_by_topic(
+            &amp;self.node,
+            &amp;mut allocator,
+            topic_name_c.as_ptr(),
+            false, // no_mangle: follow ROS naming conventions
+            &amp;mut publishers_info,
+        );
+        
+        if ret != 0 {
+            return Err(anyhow!("Failed to get publishers info: {}", ret));
+        }
+        
+        // Extract information from each endpoint
+        let mut result = Vec::new();
+        for i in 0..publishers_info.size {
+            let info = &amp;*(publishers_info.info_array.add(i));
+            
+            result.push(TopicEndpointInfo {
+                node_name: extract_string(info.node_name),
+                node_namespace: extract_string(info.node_namespace),
+                topic_type: extract_string(info.topic_type),
+                topic_type_hash: format_topic_type_hash(&amp;info.topic_type_hash),
+                endpoint_type: EndpointType::from_rmw(info.endpoint_type),
+                gid: extract_gid(&amp;info.endpoint_gid),
+                qos_profile: QosProfile::from_rmw(&amp;info.qos_profile),
+            });
+        }
+        
+        // Clean up allocated memory
+        rmw_topic_endpoint_info_array_fini(&amp;mut publishers_info, &amp;mut allocator);
+        
+        Ok(result)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="global-identifiers-gids"><a class="header" href="#global-identifiers-gids">Global Identifiers (GIDs)</a></h2>
+<h3 id="gid-structure-and-format"><a class="header" href="#gid-structure-and-format">GID Structure and Format</a></h3>
+<p>GIDs are 16-byte unique identifiers assigned by the DDS implementation:</p>
+<pre><code>Byte Layout: [01][0f][ba][ec][43][55][39][96][00][00][00][00][00][00][14][03]
+Display:     01.0f.ba.ec.43.55.39.96.00.00.00.00.00.00.14.03
+</code></pre>
+<p><strong>GID Components</strong> (implementation-specific):</p>
+<ul>
+<li><strong>Bytes 0-3</strong>: Often participant identifier</li>
+<li><strong>Bytes 4-7</strong>: Usually timestamp or sequence</li>
+<li><strong>Bytes 8-11</strong>: Typically zero padding</li>
+<li><strong>Bytes 12-15</strong>: Entity identifier within participant</li>
+</ul>
+<h3 id="gid-extraction-and-formatting"><a class="header" href="#gid-extraction-and-formatting">GID Extraction and Formatting</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Extract GID from C array
+let gid = std::slice::from_raw_parts(
+    info.endpoint_gid.as_ptr(), 
+    info.endpoint_gid.len()
+).to_vec();
+
+// Format for display
+fn format_gid(gid: &amp;[u8]) -&gt; String {
+    gid.iter()
+       .map(|b| format!("{:02x}", b))
+       .collect::&lt;Vec&lt;String&gt;&gt;()
+       .join(".")
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="gid-uniqueness-properties"><a class="header" href="#gid-uniqueness-properties">GID Uniqueness Properties</a></h3>
+<ul>
+<li><strong>Global</strong>: Unique across entire DDS domain</li>
+<li><strong>Persistent</strong>: Remains same for endpoint lifetime</li>
+<li><strong>Deterministic</strong>: Recreated consistently by DDS</li>
+<li><strong>Opaque</strong>: Implementation-specific internal structure</li>
+</ul>
+<h2 id="topic-type-hashes"><a class="header" href="#topic-type-hashes">Topic Type Hashes</a></h2>
+<h3 id="rihs-format-ros-interface-hash-standard"><a class="header" href="#rihs-format-ros-interface-hash-standard">RIHS Format (ROS Interface Hash Standard)</a></h3>
+<p>Topic type hashes follow the RIHS format:</p>
+<pre><code>RIHS01_&lt;hex_hash&gt;
+</code></pre>
+<p><strong>Components</strong>:</p>
+<ul>
+<li><code>RIHS</code>: ROS Interface Hash Standard identifier</li>
+<li><code>01</code>: Version number (currently 1)</li>
+<li><code>&lt;hex_hash&gt;</code>: SHA-256 hash of message definition</li>
+</ul>
+<h3 id="hash-generation-process"><a class="header" href="#hash-generation-process">Hash Generation Process</a></h3>
+<ol>
+<li><strong>Canonical representation</strong>: Message definition in canonical form</li>
+<li><strong>Hash calculation</strong>: SHA-256 of canonical representation</li>
+<li><strong>Encoding</strong>: Hexadecimal encoding of hash bytes</li>
+<li><strong>Formatting</strong>: Prepend RIHS version identifier</li>
+</ol>
+<h3 id="example-hash"><a class="header" href="#example-hash">Example Hash</a></h3>
+<pre><code>RIHS01_df668c740482bbd48fb39d76a70dfd4bd59db1288021743503259e948f6b1a18
+</code></pre>
+<p>This represents the hash for <code>std_msgs/msg/String</code>.</p>
+<h3 id="hash-extraction"><a class="header" href="#hash-extraction">Hash Extraction</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn format_topic_type_hash(hash: &amp;rosidl_type_hash_t) -&gt; String {
+    let hash_bytes = unsafe {
+        std::slice::from_raw_parts(hash.value.as_ptr(), hash.value.len())
+    };
+    let hex_hash = hash_bytes.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::&lt;String&gt;();
+    format!("RIHS01_{}", hex_hash)
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="discovery-scope-and-filtering"><a class="header" href="#discovery-scope-and-filtering">Discovery Scope and Filtering</a></h2>
+<h3 id="domain-isolation"><a class="header" href="#domain-isolation">Domain Isolation</a></h3>
+<p>Discovery is limited by ROS domain:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Read ROS_DOMAIN_ID from environment (default: 0)
+let domain_id = env::var("ROS_DOMAIN_ID")
+    .ok()
+    .and_then(|s| s.parse::&lt;usize&gt;().ok())
+    .unwrap_or(0);
+
+// Configure RMW with domain ID
+(*rmw_init_options).domain_id = domain_id;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="topic-name-filtering"><a class="header" href="#topic-name-filtering">Topic Name Filtering</a></h3>
+<p>The discovery system can filter by:</p>
+<ul>
+<li><strong>Exact topic name</strong>: <code>rcl_get_publishers_info_by_topic("/chatter", ...)</code></li>
+<li><strong>Name mangling</strong>: <code>no_mangle</code> parameter controls ROS naming conventions</li>
+</ul>
+<h3 id="endpoint-filtering"><a class="header" href="#endpoint-filtering">Endpoint Filtering</a></h3>
+<p>Results can be filtered by:</p>
+<ul>
+<li><strong>Endpoint type</strong>: Publishers vs subscribers</li>
+<li><strong>Node name/namespace</strong>: Filter by owning node</li>
+<li><strong>QoS compatibility</strong>: Only compatible endpoints</li>
+</ul>
+<h2 id="discovery-performance"><a class="header" href="#discovery-performance">Discovery Performance</a></h2>
+<h3 id="timing-characteristics"><a class="header" href="#timing-characteristics">Timing Characteristics</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Operation</th><th>Typical Time</th><th>Factors</th></tr></thead><tbody>
+<tr><td>Context initialization</td><td>150ms</td><td>DDS discovery timeout</td></tr>
+<tr><td>Topic list query</td><td>1-5ms</td><td>Number of topics</td></tr>
+<tr><td>Endpoint count</td><td>1-3ms</td><td>Number of endpoints</td></tr>
+<tr><td>Detailed endpoint info</td><td>5-20ms</td><td>QoS complexity, endpoint count</td></tr>
+</tbody></table>
+</div>
+<h3 id="memory-usage"><a class="header" href="#memory-usage">Memory Usage</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Component</th><th>Memory Usage</th><th>Notes</th></tr></thead><tbody>
+<tr><td>RCL context</td><td>~1MB</td><td>DDS participant overhead</td></tr>
+<tr><td>Topic list</td><td>~1KB per topic</td><td>Name and type strings</td></tr>
+<tr><td>Endpoint info</td><td>~500B per endpoint</td><td>QoS and metadata</td></tr>
+<tr><td>Peak processing</td><td>+50%</td><td>During C to Rust conversion</td></tr>
+</tbody></table>
+</div>
+<h3 id="optimization-strategies"><a class="header" href="#optimization-strategies">Optimization Strategies</a></h3>
+<p><strong>Context Reuse</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Current: Create new context per operation
+let context = RclGraphContext::new()?;
+let info = context.get_publishers_info(topic)?;
+
+// Potential: Reuse context across operations
+let context = RclGraphContext::new()?;
+let info1 = context.get_publishers_info(topic1)?;
+let info2 = context.get_publishers_info(topic2)?;
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Batch Operations</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Current: Separate calls for publishers and subscribers
+let pubs = context.get_publishers_info(topic)?;
+let subs = context.get_subscribers_info(topic)?;
+
+// Potential: Combined endpoint query
+let endpoints = context.get_all_endpoints_info(topic)?;
+<span class="boring">}</span></code></pre></pre>
+<h2 id="error-handling-and-edge-cases"><a class="header" href="#error-handling-and-edge-cases">Error Handling and Edge Cases</a></h2>
+<h3 id="discovery-failures"><a class="header" href="#discovery-failures">Discovery Failures</a></h3>
+<p><strong>No Endpoints Found</strong></p>
+<ul>
+<li>Topic exists but no active endpoints</li>
+<li>Discovery timing issues</li>
+<li>Network connectivity problems</li>
+</ul>
+<p><strong>Partial Discovery</strong></p>
+<ul>
+<li>Some endpoints discovered, others missed</li>
+<li>Network partitions or high latency</li>
+<li>DDS implementation differences</li>
+</ul>
+<p><strong>Invalid Data</strong></p>
+<ul>
+<li>Corrupted endpoint information</li>
+<li>Unsupported QoS policies</li>
+<li>Protocol version mismatches</li>
+</ul>
+<h3 id="error-recovery-strategies"><a class="header" href="#error-recovery-strategies">Error Recovery Strategies</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Retry with longer discovery timeout
+if endpoints.is_empty() {
+    let context = RclGraphContext::new_with_discovery(Duration::from_millis(500))?;
+    endpoints = context.get_publishers_info(topic)?;
+}
+
+// Validate endpoint data
+for endpoint in &amp;endpoints {
+    if endpoint.node_name.is_empty() {
+        warn!("Endpoint with empty node name: {:?}", endpoint.gid);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The endpoint discovery system provides comprehensive visibility into the ROS 2 computation graph, enabling effective debugging and system understanding.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../implementation/qos_profiles.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../implementation/memory_management.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../implementation/qos_profiles.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../implementation/memory_management.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Installation - roc - ROS 2 CLI Tool</title>
+        <title>Basic Usage - roc - ROS 2 CLI Tool</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "";
+            const path_to_root = "../";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc.js"></script>
+        <script src="../toc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -102,7 +102,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
             </noscript>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -137,7 +137,7 @@
                     <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
 
                     <div class="right-buttons">
-                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
 
@@ -166,67 +166,155 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<h2 id="install-ros2"><a class="header" href="#install-ros2">Install ROS2</a></h2>
-<h3 id="setup-sources"><a class="header" href="#setup-sources">Setup Sources</a></h3>
-<p>You will need to add the ROS 2 apt repository to your system.
-First ensure that the Ubuntu Universe repository is enabled.</p>
-<pre><code class="language-bash">sudo apt install software-properties-common
-sudo add-apt-repository universe
+                        <h1 id="basic-usage-examples"><a class="header" href="#basic-usage-examples">Basic Usage Examples</a></h1>
+<p>This chapter provides practical examples of using the <code>roc</code> tool for common ROS 2 introspection tasks.</p>
+<h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
+<p>Before running these examples, ensure:</p>
+<ul>
+<li>ROS 2 is installed and sourced</li>
+<li>At least one ROS 2 node is running (e.g., <code>ros2 run demo_nodes_cpp talker</code>)</li>
+<li>The <code>roc</code> tool is built and available in your PATH</li>
+</ul>
+<h2 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h2>
+<h3 id="1-list-all-topics"><a class="header" href="#1-list-all-topics">1. List All Topics</a></h3>
+<p>The most basic operation is listing all available topics in the ROS 2 graph:</p>
+<pre><code class="language-bash">roc topic list
 </code></pre>
-<p>Now add the ROS 2 GPG key with apt.</p>
-<pre><code class="language-bash">sudo apt update &amp;&amp; sudo apt install curl -y
-sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+<p>Expected output:</p>
+<pre><code>/chatter
+/parameter_events
+/rosout
 </code></pre>
-<p>Then add the repository to your sources list.</p>
-<pre><code class="language-bash">echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release &amp;&amp; echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list &gt; /dev/null
+<h3 id="2-get-basic-topic-information"><a class="header" href="#2-get-basic-topic-information">2. Get Basic Topic Information</a></h3>
+<p>To get basic information about a specific topic:</p>
+<pre><code class="language-bash">roc topic info /chatter
 </code></pre>
-<h3 id="install-ros-2-packages"><a class="header" href="#install-ros-2-packages">Install ROS 2 packages</a></h3>
-<p>Update your apt repository caches after setting up the repositories.</p>
-<pre><code class="language-bash">sudo apt update
+<p>Output:</p>
+<pre><code>Topic: /chatter
+Type: std_msgs/msg/String
+Publishers: 1
+Subscribers: 0
 </code></pre>
-<p>ROS 2 packages are built on frequently updated Ubuntu systems. It is always recommended that you ensure your system is up to date before installing new packages.</p>
-<pre><code class="language-bash">sudo apt upgrade
+<h3 id="3-get-detailed-topic-information"><a class="header" href="#3-get-detailed-topic-information">3. Get Detailed Topic Information</a></h3>
+<p>For comprehensive topic details including QoS profiles and endpoint information:</p>
+<pre><code class="language-bash">roc topic info /chatter --verbose
 </code></pre>
-<h4 id="desktop-install-recommended-ros-rviz-demos-tutorials"><a class="header" href="#desktop-install-recommended-ros-rviz-demos-tutorials">Desktop Install (Recommended): ROS, RViz, demos, tutorials.</a></h4>
-<pre><code class="language-bash">sudo apt install ros-humble-desktop
+<p>Expected verbose output:</p>
+<pre><code>Topic: /chatter
+Type: std_msgs/msg/String
+Publishers: 1
+  Node: /talker
+  Endpoint type: Publisher
+  GID: 01.0f.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx
+  QoS Profile:
+    Reliability: Reliable
+    Durability: Volatile
+    History: Keep last
+    Depth: 10
+    Deadline: Default
+    Lifespan: Default
+    Liveliness: Automatic
+    Liveliness lease duration: Default
+  Type hash: RIHS01_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Subscribers: 0
 </code></pre>
-<h4 id="ros-base-install-bare-bones-communication-libraries-message-packages-command-line-tools-no-gui-tools"><a class="header" href="#ros-base-install-bare-bones-communication-libraries-message-packages-command-line-tools-no-gui-tools">ROS-Base Install (Bare Bones): Communication libraries, message packages, command line tools. No GUI tools.</a></h4>
-<pre><code class="language-bash">sudo apt install ros-humble-ros-base
+<h2 id="common-use-cases"><a class="header" href="#common-use-cases">Common Use Cases</a></h2>
+<h3 id="debugging-communication-issues"><a class="header" href="#debugging-communication-issues">Debugging Communication Issues</a></h3>
+<p>When nodes aren't communicating properly, use verbose topic info to check QoS compatibility:</p>
+<pre><code class="language-bash"># Check publisher QoS
+roc topic info /my_topic --verbose
+
+# Compare with subscriber expectations
+# Look for QoS mismatches in reliability, durability, etc.
 </code></pre>
-<h3 id="install-additional-rmw-implementations"><a class="header" href="#install-additional-rmw-implementations">Install additional RMW implementations</a></h3>
-<pre><code class="language-bash">sudo apt install ros-humble-rmw*
+<h3 id="monitoring-system-health"><a class="header" href="#monitoring-system-health">Monitoring System Health</a></h3>
+<p>Check critical system topics:</p>
+<pre><code class="language-bash"># Monitor rosout for system messages
+roc topic info /rosout --verbose
+
+# Check parameter events
+roc topic info /parameter_events --verbose
 </code></pre>
-<h3 id="development-tools-compilers-and-other-tools-to-build-ros-packages"><a class="header" href="#development-tools-compilers-and-other-tools-to-build-ros-packages">Development tools: Compilers and other tools to build ROS packages</a></h3>
-<pre><code class="language-bash">sudo apt install ros-dev-tools
+<h3 id="network-diagnostics"><a class="header" href="#network-diagnostics">Network Diagnostics</a></h3>
+<p>Use GID information to identify nodes across the network:</p>
+<pre><code class="language-bash"># Get detailed endpoint information
+roc topic info /my_topic --verbose | grep "GID"
 </code></pre>
-<h3 id="install-foxglove-and-rosbridge"><a class="header" href="#install-foxglove-and-rosbridge">Install foxglove and rosbridge</a></h3>
-<pre><code class="language-bash">sudo apt install ros-humble-foxglove*
-sudo apt install ros-humble-rosbridge*
+<h2 id="working-with-multiple-topics"><a class="header" href="#working-with-multiple-topics">Working with Multiple Topics</a></h2>
+<h3 id="batch-information-gathering"><a class="header" href="#batch-information-gathering">Batch Information Gathering</a></h3>
+<pre><code class="language-bash"># Get info for all topics
+for topic in $(roc topic list); do
+    echo "=== $topic ==="
+    roc topic info "$topic"
+    echo
+done
 </code></pre>
-<h3 id="install-ros2-tf2-tools"><a class="header" href="#install-ros2-tf2-tools">Install ros2 tf2 tools</a></h3>
-<pre><code class="language-bash">sudo apt install ros-humble-tf2*
-su
+<h3 id="filtering-by-node"><a class="header" href="#filtering-by-node">Filtering by Node</a></h3>
+<pre><code class="language-bash"># Find topics published by a specific node
+roc topic info /chatter --verbose | grep "Node:"
 </code></pre>
-<h2 id="install-roc"><a class="header" href="#install-roc">Install roc</a></h2>
-<h3 id="cargo"><a class="header" href="#cargo">Cargo</a></h3>
-<pre><code class="language-bash">cargo install rocc
+<h2 id="integration-with-ros-2-tools"><a class="header" href="#integration-with-ros-2-tools">Integration with ROS 2 Tools</a></h2>
+<p>The <code>roc</code> tool complements existing ROS 2 CLI tools:</p>
+<pre><code class="language-bash"># Compare outputs
+ros2 topic info /chatter --verbose
+roc topic info /chatter --verbose
+
+# Use roc for faster queries
+time roc topic list
+time ros2 topic list
 </code></pre>
-<h3 id="from-source"><a class="header" href="#from-source">From Source</a></h3>
-<pre><code class="language-bash">git clone
-cd rocc
-cargo install --path .
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="no-topics-found"><a class="header" href="#no-topics-found">No Topics Found</a></h3>
+<p>If <code>roc topic list</code> returns empty:</p>
+<ol>
+<li>
+<p>Check if ROS 2 nodes are running:</p>
+<pre><code class="language-bash">ros2 node list
 </code></pre>
+</li>
+<li>
+<p>Verify ROS 2 environment:</p>
+<pre><code class="language-bash">echo $ROS_DOMAIN_ID
+printenv | grep ROS
+</code></pre>
+</li>
+<li>
+<p>Test with a simple publisher:</p>
+<pre><code class="language-bash">ros2 run demo_nodes_cpp talker
+</code></pre>
+</li>
+</ol>
+<h3 id="permission-issues"><a class="header" href="#permission-issues">Permission Issues</a></h3>
+<p>If you encounter permission errors:</p>
+<pre><code class="language-bash"># Check RMW implementation
+echo $RMW_IMPLEMENTATION
+
+# Try with different RMW
+export RMW_IMPLEMENTATION=rmw_cyclone_cpp
+roc topic list
+</code></pre>
+<h3 id="performance-considerations"><a class="header" href="#performance-considerations">Performance Considerations</a></h3>
+<p>For systems with many topics:</p>
+<pre><code class="language-bash"># Use targeted queries instead of listing all topics
+roc topic info /specific_topic --verbose
+</code></pre>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li>See <a href="advanced_usage.html">Advanced Usage</a> for complex scenarios</li>
+<li>Check <a href="command_reference.html">Command Reference</a> for all available options</li>
+<li>Read <a href="integration_examples.html">Integration Examples</a> for using roc in scripts and automation</li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="chapter_1.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../implementation/memory_management.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="architecture/ros2_overview.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../examples/advanced_usage.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -236,11 +324,11 @@ cargo install --path .
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="chapter_1.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../implementation/memory_management.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="architecture/ros2_overview.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../examples/advanced_usage.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
@@ -255,13 +343,13 @@ cargo install --path .
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
 
         <!-- Custom JS scripts -->
 

@@ -1,0 +1,459 @@
+<!DOCTYPE HTML>
+<html lang="en" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Topic Information System - roc - ROS 2 CLI Tool</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="topic-information-system"><a class="header" href="#topic-information-system">Topic Information System</a></h1>
+<p>The topic information system in <code>roc</code> provides comprehensive details about ROS 2 topics, including basic metadata and detailed endpoint information with QoS profiles. This chapter explains how the system works and what information it provides.</p>
+<h2 id="command-structure"><a class="header" href="#command-structure">Command Structure</a></h2>
+<p>The topic info command follows this pattern:</p>
+<pre><code class="language-bash">roc topic info &lt;topic_name&gt; [--verbose]
+</code></pre>
+<ul>
+<li><strong>Basic mode</strong>: Shows topic type, publisher count, and subscriber count</li>
+<li><strong>Verbose mode</strong>: Adds detailed endpoint information including QoS profiles, GIDs, and type hashes</li>
+</ul>
+<h2 id="information-hierarchy"><a class="header" href="#information-hierarchy">Information Hierarchy</a></h2>
+<h3 id="basic-information"><a class="header" href="#basic-information">Basic Information</a></h3>
+<pre><code>Type: std_msgs/msg/String
+Publisher count: 1  
+Subscription count: 1
+</code></pre>
+<p>This basic information comes from:</p>
+<ol>
+<li><code>rcl_get_topic_names_and_types()</code> - for the topic type</li>
+<li><code>rcl_count_publishers()</code> - for publisher count</li>
+<li><code>rcl_count_subscribers()</code> - for subscriber count</li>
+</ol>
+<h3 id="detailed-information-verbose-mode"><a class="header" href="#detailed-information-verbose-mode">Detailed Information (Verbose Mode)</a></h3>
+<pre><code>Publishers:
+  Node name: talker
+  Node namespace: /
+  Topic type: std_msgs/msg/String
+  Topic type hash: RIHS01_df668c740482bbd48fb39d76a70dfd4bd59db1288021743503259e948f6b1a18
+  Endpoint type: PUBLISHER
+  GID: 01.0f.ba.ec.43.55.39.96.00.00.00.00.00.00.14.03
+  QoS profile:
+    Reliability: RELIABLE
+    History (KEEP_LAST): 10
+    Durability: VOLATILE
+    Lifespan: Infinite
+    Deadline: Infinite
+    Liveliness: AUTOMATIC
+    Liveliness lease duration: Infinite
+</code></pre>
+<h2 id="data-flow-architecture"><a class="header" href="#data-flow-architecture">Data Flow Architecture</a></h2>
+<pre><code class="language-mermaid">graph TD
+    A[User Command] --&gt; B[Command Parser]
+    B --&gt; C[RclGraphContext::new]
+    C --&gt; D[RCL Initialization]
+    D --&gt; E[DDS Discovery Wait]
+    E --&gt; F{Verbose Mode?}
+    F --&gt;|No| G[Basic Info Queries]
+    F --&gt;|Yes| H[Detailed Info Queries]
+    G --&gt; I[Display Basic Results]
+    H --&gt; J[Extract &amp; Convert Data]
+    J --&gt; K[Display Detailed Results]
+</code></pre>
+<h2 id="implementation-details"><a class="header" href="#implementation-details">Implementation Details</a></h2>
+<h3 id="basic-information-collection"><a class="header" href="#basic-information-collection">Basic Information Collection</a></h3>
+<p>The basic mode uses simple counting operations:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -&gt; Result&lt;()&gt; {
+    let topic_name = matches.get_one::&lt;String&gt;("topic_name")?;
+    let verbose = matches.get_flag("verbose");
+    
+    let create_context = || -&gt; Result&lt;RclGraphContext&gt; {
+        RclGraphContext::new()
+            .map_err(|e| anyhow!("Failed to initialize RCL context: {}", e))
+    };
+    
+    // Get topic type
+    let topic_type = {
+        let context = create_context()?;
+        let topics_and_types = context.get_topic_names_and_types()?;
+        topics_and_types.iter()
+            .find(|(name, _)| name == topic_name)
+            .map(|(_, type_name)| type_name.clone())
+            .ok_or_else(|| anyhow!("Topic '{}' not found", topic_name))?
+    };
+    
+    // Get counts
+    let publisher_count = create_context()?.count_publishers(topic_name)?;
+    let subscriber_count = create_context()?.count_subscribers(topic_name)?;
+    
+    println!("Type: {}", topic_type);
+    println!("Publisher count: {}", publisher_count);
+    println!("Subscription count: {}", subscriber_count);
+    
+    // ... verbose mode handling
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="detailed-information-collection"><a class="header" href="#detailed-information-collection">Detailed Information Collection</a></h3>
+<p>For verbose mode, we query detailed endpoint information:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if verbose {
+    let publishers_info = create_context()?.get_publishers_info(topic_name)?;
+    let subscribers_info = create_context()?.get_subscribers_info(topic_name)?;
+    
+    println!("\nPublishers:");
+    for pub_info in publishers_info {
+        display_endpoint_info(&amp;pub_info);
+    }
+    
+    println!("\nSubscribers:");
+    for sub_info in subscribers_info {
+        display_endpoint_info(&amp;sub_info);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="data-structures"><a class="header" href="#data-structures">Data Structures</a></h2>
+<h3 id="topicendpointinfo-structure"><a class="header" href="#topicendpointinfo-structure">TopicEndpointInfo Structure</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct TopicEndpointInfo {
+    pub node_name: String,              // Node that owns this endpoint
+    pub node_namespace: String,         // Node's namespace  
+    pub topic_type: String,             // Message type name
+    pub topic_type_hash: String,        // Hash of message definition
+    pub endpoint_type: EndpointType,    // PUBLISHER or SUBSCRIPTION
+    pub gid: Vec&lt;u8&gt;,                   // Global unique identifier
+    pub qos_profile: QosProfile,        // Quality of Service settings
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="qosprofile-structure"><a class="header" href="#qosprofile-structure">QosProfile Structure</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct QosProfile {
+    pub history: QosHistoryPolicy,           // KEEP_LAST, KEEP_ALL
+    pub depth: usize,                        // Queue depth for KEEP_LAST
+    pub reliability: QosReliabilityPolicy,   // RELIABLE, BEST_EFFORT
+    pub durability: QosDurabilityPolicy,     // VOLATILE, TRANSIENT_LOCAL
+    pub deadline_sec: u64,                   // Deadline seconds
+    pub deadline_nsec: u64,                  // Deadline nanoseconds
+    pub lifespan_sec: u64,                   // Lifespan seconds
+    pub lifespan_nsec: u64,                  // Lifespan nanoseconds
+    pub liveliness: QosLivelinessPolicy,     // Liveliness policy
+    pub liveliness_lease_duration_sec: u64,  // Lease duration seconds
+    pub liveliness_lease_duration_nsec: u64, // Lease duration nanoseconds
+    pub avoid_ros_namespace_conventions: bool, // Bypass ROS naming
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="information-sources-and-mapping"><a class="header" href="#information-sources-and-mapping">Information Sources and Mapping</a></h2>
+<h3 id="rclrmw-source-mapping"><a class="header" href="#rclrmw-source-mapping">RCL/RMW Source Mapping</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Display Field</th><th>RCL/RMW Source</th><th>Notes</th></tr></thead><tbody>
+<tr><td>Type</td><td><code>rcl_get_topic_names_and_types()</code></td><td>Basic topic type</td></tr>
+<tr><td>Publisher count</td><td><code>rcl_count_publishers()</code></td><td>Simple count</td></tr>
+<tr><td>Subscription count</td><td><code>rcl_count_subscribers()</code></td><td>Simple count</td></tr>
+<tr><td>Node name</td><td><code>rmw_topic_endpoint_info_t.node_name</code></td><td>From detailed query</td></tr>
+<tr><td>Node namespace</td><td><code>rmw_topic_endpoint_info_t.node_namespace</code></td><td>From detailed query</td></tr>
+<tr><td>Topic type hash</td><td><code>rmw_topic_endpoint_info_t.topic_type_hash</code></td><td>Message definition hash</td></tr>
+<tr><td>Endpoint type</td><td><code>rmw_topic_endpoint_info_t.endpoint_type</code></td><td>PUBLISHER/SUBSCRIPTION</td></tr>
+<tr><td>GID</td><td><code>rmw_topic_endpoint_info_t.endpoint_gid</code></td><td>DDS global identifier</td></tr>
+<tr><td>QoS profile</td><td><code>rmw_topic_endpoint_info_t.qos_profile</code></td><td>Complete QoS settings</td></tr>
+</tbody></table>
+</div>
+<h3 id="topic-type-hash-format"><a class="header" href="#topic-type-hash-format">Topic Type Hash Format</a></h3>
+<p>The topic type hash uses the RIHS (ROS Interface Hash Standard) format:</p>
+<pre><code>RIHS01_&lt;hex_hash&gt;
+</code></pre>
+<p>Where:</p>
+<ul>
+<li><code>RIHS01</code> indicates version 1 of the ROS Interface Hash Standard</li>
+<li><code>&lt;hex_hash&gt;</code> is the SHA-256 hash of the message definition</li>
+</ul>
+<h3 id="gid-format"><a class="header" href="#gid-format">GID Format</a></h3>
+<p>Global Identifiers (GIDs) are displayed as dot-separated hexadecimal:</p>
+<pre><code>01.0f.ba.ec.43.55.39.96.00.00.00.00.00.00.14.03
+</code></pre>
+<p>This 16-byte identifier uniquely identifies the DDS endpoint.</p>
+<h2 id="qos-policy-interpretation"><a class="header" href="#qos-policy-interpretation">QoS Policy Interpretation</a></h2>
+<h3 id="reliability"><a class="header" href="#reliability">Reliability</a></h3>
+<ul>
+<li><strong>RELIABLE</strong>: Guarantees delivery, may retry</li>
+<li><strong>BEST_EFFORT</strong>: Attempts delivery, may lose messages</li>
+<li><strong>SYSTEM_DEFAULT</strong>: Uses DDS implementation default</li>
+</ul>
+<h3 id="history"><a class="header" href="#history">History</a></h3>
+<ul>
+<li><strong>KEEP_LAST</strong>: Keep only the last N messages (N = depth)</li>
+<li><strong>KEEP_ALL</strong>: Keep all messages subject to resource limits</li>
+<li><strong>SYSTEM_DEFAULT</strong>: Uses DDS implementation default</li>
+</ul>
+<h3 id="durability"><a class="header" href="#durability">Durability</a></h3>
+<ul>
+<li><strong>VOLATILE</strong>: Messages not persisted</li>
+<li><strong>TRANSIENT_LOCAL</strong>: Messages persisted for late-joining subscribers</li>
+<li><strong>SYSTEM_DEFAULT</strong>: Uses DDS implementation default</li>
+</ul>
+<h3 id="liveliness"><a class="header" href="#liveliness">Liveliness</a></h3>
+<ul>
+<li><strong>AUTOMATIC</strong>: DDS automatically asserts liveliness</li>
+<li><strong>MANUAL_BY_TOPIC</strong>: Application must assert liveliness per topic</li>
+<li><strong>SYSTEM_DEFAULT</strong>: Uses DDS implementation default</li>
+</ul>
+<h3 id="duration-values"><a class="header" href="#duration-values">Duration Values</a></h3>
+<p>Duration values are displayed in nanoseconds:</p>
+<ul>
+<li><strong>Infinite</strong>: <code>9223372036854775807</code> nanoseconds (effectively infinite)</li>
+<li><strong>Zero</strong>: <code>0</code> nanoseconds (immediate)</li>
+<li><strong>Finite</strong>: Actual nanosecond values</li>
+</ul>
+<h2 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h2>
+<h3 id="topic-not-found"><a class="header" href="#topic-not-found">Topic Not Found</a></h3>
+<p>When a topic doesn't exist:</p>
+<pre><code>Error: Topic '/nonexistent' not found. [No daemon running]
+</code></pre>
+<p>The error message includes daemon status for compatibility with <code>ros2</code> CLI.</p>
+<h3 id="context-initialization-failures"><a class="header" href="#context-initialization-failures">Context Initialization Failures</a></h3>
+<p>If RCL initialization fails:</p>
+<pre><code>Error: Failed to initialize RCL context: &lt;error_code&gt;
+</code></pre>
+<h3 id="discovery-timeouts"><a class="header" href="#discovery-timeouts">Discovery Timeouts</a></h3>
+<p>If no endpoints are found but the topic exists, this typically indicates:</p>
+<ol>
+<li>Publishers/subscribers haven't started discovery yet</li>
+<li>Network connectivity issues</li>
+<li>Domain ID mismatches</li>
+</ol>
+<h2 id="performance-considerations"><a class="header" href="#performance-considerations">Performance Considerations</a></h2>
+<h3 id="context-reuse-strategy"><a class="header" href="#context-reuse-strategy">Context Reuse Strategy</a></h3>
+<p>The current implementation creates a new context for each query operation. This trade-off:</p>
+<ul>
+<li><strong>Pros</strong>: Ensures fresh discovery information, prevents stale state</li>
+<li><strong>Cons</strong>: ~150ms overhead per context creation</li>
+</ul>
+<p>Future optimizations could cache contexts with invalidation strategies.</p>
+<h3 id="memory-usage"><a class="header" href="#memory-usage">Memory Usage</a></h3>
+<ul>
+<li>Basic queries: ~1MB (RCL/DDS overhead)</li>
+<li>Detailed queries: +~10KB per endpoint (QoS and string data)</li>
+<li>Peak usage during array processing before conversion to Rust types</li>
+</ul>
+<h3 id="discovery-timing"><a class="header" href="#discovery-timing">Discovery Timing</a></h3>
+<p>The 150ms discovery timeout balances:</p>
+<ul>
+<li><strong>Completeness</strong>: Enough time for DDS discovery protocol</li>
+<li><strong>Responsiveness</strong>: Fast enough for interactive use</li>
+<li><strong>Reliability</strong>: Consistent results across different DDS implementations</li>
+</ul>
+<p>This information system provides the foundation for understanding ROS 2 system behavior and debugging communication issues.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../architecture/graph_context.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../implementation/qos_profiles.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../architecture/graph_context.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../implementation/qos_profiles.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

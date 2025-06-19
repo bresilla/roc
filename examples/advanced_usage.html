@@ -1,0 +1,580 @@
+<!DOCTYPE HTML>
+<html lang="en" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Advanced Usage - roc - ROS 2 CLI Tool</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="advanced-usage-examples"><a class="header" href="#advanced-usage-examples">Advanced Usage Examples</a></h1>
+<p>This chapter covers advanced usage patterns and complex scenarios for the <code>roc</code> tool.</p>
+<h2 id="advanced-topic-analysis"><a class="header" href="#advanced-topic-analysis">Advanced Topic Analysis</a></h2>
+<h3 id="qos-profile-comparison"><a class="header" href="#qos-profile-comparison">QoS Profile Comparison</a></h3>
+<p>When debugging communication issues, compare QoS profiles between publishers and subscribers:</p>
+<pre><code class="language-bash">#!/bin/bash
+# qos_compare.sh - Compare QoS profiles for a topic
+
+TOPIC="$1"
+if [ -z "$TOPIC" ]; then
+    echo "Usage: $0 &lt;topic_name&gt;"
+    exit 1
+fi
+
+echo "=== QoS Analysis for $TOPIC ==="
+roc topic info "$TOPIC" --verbose | grep -A 10 "QoS Profile:"
+</code></pre>
+<h3 id="multi-domain-discovery"><a class="header" href="#multi-domain-discovery">Multi-Domain Discovery</a></h3>
+<p>Working across multiple ROS domains:</p>
+<pre><code class="language-bash">#!/bin/bash
+# multi_domain_scan.sh - Scan topics across multiple domains
+
+for domain in {0..10}; do
+    export ROS_DOMAIN_ID=$domain
+    echo "=== Domain $domain ==="
+    topics=$(roc topic list 2&gt;/dev/null)
+    if [ -n "$topics" ]; then
+        echo "$topics"
+        echo "Topic count: $(echo "$topics" | wc -l)"
+    else
+        echo "No topics found"
+    fi
+    echo
+done
+</code></pre>
+<h2 id="performance-monitoring"><a class="header" href="#performance-monitoring">Performance Monitoring</a></h2>
+<h3 id="topic-discovery-timing"><a class="header" href="#topic-discovery-timing">Topic Discovery Timing</a></h3>
+<p>Measure topic discovery performance:</p>
+<pre><code class="language-bash">#!/bin/bash
+# discovery_benchmark.sh - Benchmark topic discovery
+
+echo "Benchmarking topic discovery..."
+
+echo "roc topic list:"
+time roc topic list &gt; /dev/null
+
+echo "ros2 topic list:"
+time ros2 topic list &gt; /dev/null
+
+echo "roc topic info (verbose):"
+TOPIC=$(roc topic list | head -1)
+if [ -n "$TOPIC" ]; then
+    time roc topic info "$TOPIC" --verbose &gt; /dev/null
+fi
+</code></pre>
+<h3 id="memory-usage-analysis"><a class="header" href="#memory-usage-analysis">Memory Usage Analysis</a></h3>
+<p>Monitor memory usage during large-scale discovery:</p>
+<pre><code class="language-bash">#!/bin/bash
+# memory_profile.sh - Profile memory usage
+
+echo "Memory usage during topic discovery:"
+
+# Get baseline memory
+baseline=$(ps -o rss= -p $$)
+echo "Baseline memory: ${baseline}KB"
+
+# Run topic discovery and monitor memory
+(
+    while true; do
+        ps -o rss= -p $$ 2&gt;/dev/null || break
+        sleep 0.1
+    done
+) &amp;
+monitor_pid=$!
+
+# Perform discovery operations
+roc topic list &gt; /dev/null
+roc topic info /chatter --verbose &gt; /dev/null 2&gt;&amp;1
+
+kill $monitor_pid 2&gt;/dev/null
+</code></pre>
+<h2 id="integration-patterns"><a class="header" href="#integration-patterns">Integration Patterns</a></h2>
+<h3 id="continuous-monitoring"><a class="header" href="#continuous-monitoring">Continuous Monitoring</a></h3>
+<p>Monitor topic health continuously:</p>
+<pre><code class="language-bash">#!/bin/bash
+# topic_monitor.sh - Continuous topic monitoring
+
+TOPIC="$1"
+INTERVAL="${2:-5}"
+
+if [ -z "$TOPIC" ]; then
+    echo "Usage: $0 &lt;topic_name&gt; [interval_seconds]"
+    exit 1
+fi
+
+echo "Monitoring $TOPIC every ${INTERVAL}s (Ctrl+C to stop)"
+
+while true; do
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "=== $timestamp ==="
+    
+    # Get current topic info
+    info=$(roc topic info "$TOPIC" 2&gt;/dev/null)
+    if [ $? -eq 0 ]; then
+        echo "$info"
+        
+        # Extract publisher/subscriber counts
+        pub_count=$(echo "$info" | grep "Publishers:" | awk '{print $2}')
+        sub_count=$(echo "$info" | grep "Subscribers:" | awk '{print $2}')
+        
+        echo "Status: $pub_count publishers, $sub_count subscribers"
+    else
+        echo "Topic not found or error occurred"
+    fi
+    
+    echo
+    sleep "$INTERVAL"
+done
+</code></pre>
+<h3 id="automated-health-checks"><a class="header" href="#automated-health-checks">Automated Health Checks</a></h3>
+<p>Create health check scripts for ROS 2 systems:</p>
+<pre><code class="language-bash">#!/bin/bash
+# ros2_health_check.sh - Comprehensive ROS 2 system health check
+
+echo "=== ROS 2 System Health Check ==="
+echo "Timestamp: $(date)"
+echo
+
+# Check critical topics
+critical_topics=("/rosout" "/parameter_events")
+for topic in "${critical_topics[@]}"; do
+    echo "Checking $topic..."
+    info=$(roc topic info "$topic" 2&gt;/dev/null)
+    if [ $? -eq 0 ]; then
+        echo "✓ $topic: OK"
+        echo "$info" | grep -E "(Publishers|Subscribers):"
+    else
+        echo "✗ $topic: MISSING"
+    fi
+    echo
+done
+
+# Check for common issues
+echo "=== Potential Issues ==="
+
+# Find topics with no publishers or subscribers
+all_topics=$(roc topic list 2&gt;/dev/null)
+if [ -n "$all_topics" ]; then
+    while IFS= read -r topic; do
+        info=$(roc topic info "$topic" 2&gt;/dev/null)
+        if echo "$info" | grep -q "Publishers: 0"; then
+            echo "⚠ $topic: No publishers"
+        fi
+        if echo "$info" | grep -q "Subscribers: 0"; then
+            echo "⚠ $topic: No subscribers"
+        fi
+    done &lt;&lt;&lt; "$all_topics"
+else
+    echo "✗ No topics found - ROS 2 system may be down"
+fi
+</code></pre>
+<h2 id="data-export-and-analysis"><a class="header" href="#data-export-and-analysis">Data Export and Analysis</a></h2>
+<h3 id="json-export"><a class="header" href="#json-export">JSON Export</a></h3>
+<p>Export topic information in structured format:</p>
+<pre><code class="language-bash">#!/bin/bash
+# export_topics.sh - Export topic information to JSON
+
+output_file="topics_$(date +%Y%m%d_%H%M%S).json"
+
+echo "Exporting topic information to $output_file..."
+
+echo "{" &gt; "$output_file"
+echo '  "timestamp": "'$(date -Iseconds)'",' &gt;&gt; "$output_file"
+echo '  "topics": [' &gt;&gt; "$output_file"
+
+topics=$(roc topic list 2&gt;/dev/null)
+if [ -n "$topics" ]; then
+    first=true
+    while IFS= read -r topic; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            echo "    ," &gt;&gt; "$output_file"
+        fi
+        
+        echo "    {" &gt;&gt; "$output_file"
+        echo '      "name": "'$topic'",' &gt;&gt; "$output_file"
+        
+        # Get topic info and parse it
+        info=$(roc topic info "$topic" --verbose 2&gt;/dev/null)
+        if [ $? -eq 0 ]; then
+            type=$(echo "$info" | grep "Type:" | cut -d' ' -f2-)
+            pub_count=$(echo "$info" | grep "Publishers:" | awk '{print $2}')
+            sub_count=$(echo "$info" | grep "Subscribers:" | awk '{print $2}')
+            
+            echo '      "type": "'$type'",' &gt;&gt; "$output_file"
+            echo '      "publishers": '$pub_count',' &gt;&gt; "$output_file"
+            echo '      "subscribers": '$sub_count &gt;&gt; "$output_file"
+        else
+            echo '      "error": "Failed to get topic info"' &gt;&gt; "$output_file"
+        fi
+        
+        echo -n "    }" &gt;&gt; "$output_file"
+    done &lt;&lt;&lt; "$topics"
+    echo &gt;&gt; "$output_file"
+fi
+
+echo "  ]" &gt;&gt; "$output_file"
+echo "}" &gt;&gt; "$output_file"
+
+echo "Export complete: $output_file"
+</code></pre>
+<h3 id="csv-export-for-analysis"><a class="header" href="#csv-export-for-analysis">CSV Export for Analysis</a></h3>
+<pre><code class="language-bash">#!/bin/bash
+# export_csv.sh - Export topic data to CSV for analysis
+
+output_file="topics_$(date +%Y%m%d_%H%M%S).csv"
+
+echo "Exporting topic information to $output_file..."
+
+# CSV header
+echo "Timestamp,Topic,Type,Publishers,Subscribers" &gt; "$output_file"
+
+topics=$(roc topic list 2&gt;/dev/null)
+if [ -n "$topics" ]; then
+    while IFS= read -r topic; do
+        timestamp=$(date -Iseconds)
+        info=$(roc topic info "$topic" 2&gt;/dev/null)
+        
+        if [ $? -eq 0 ]; then
+            type=$(echo "$info" | grep "Type:" | cut -d' ' -f2- | tr ',' '_')
+            pub_count=$(echo "$info" | grep "Publishers:" | awk '{print $2}')
+            sub_count=$(echo "$info" | grep "Subscribers:" | awk '{print $2}')
+            
+            echo "$timestamp,$topic,$type,$pub_count,$sub_count" &gt;&gt; "$output_file"
+        else
+            echo "$timestamp,$topic,ERROR,0,0" &gt;&gt; "$output_file"
+        fi
+    done &lt;&lt;&lt; "$topics"
+fi
+
+echo "Export complete: $output_file"
+echo "Analyze with: python3 -c \"import pandas as pd; df=pd.read_csv('$output_file'); print(df.describe())\""
+</code></pre>
+<h2 id="custom-rmw-configuration"><a class="header" href="#custom-rmw-configuration">Custom RMW Configuration</a></h2>
+<h3 id="testing-different-rmw-implementations"><a class="header" href="#testing-different-rmw-implementations">Testing Different RMW Implementations</a></h3>
+<pre><code class="language-bash">#!/bin/bash
+# rmw_comparison.sh - Compare performance across RMW implementations
+
+rmw_implementations=(
+    "rmw_cyclone_cpp"
+    "rmw_fastrtps_cpp"
+    "rmw_connext_cpp"
+)
+
+for rmw in "${rmw_implementations[@]}"; do
+    echo "=== Testing with $rmw ==="
+    export RMW_IMPLEMENTATION="$rmw"
+    
+    # Test basic discovery
+    echo "Topic discovery test:"
+    time roc topic list &gt; /dev/null 2&gt;&amp;1
+    
+    if [ $? -eq 0 ]; then
+        topic_count=$(roc topic list 2&gt;/dev/null | wc -l)
+        echo "Success: Found $topic_count topics"
+        
+        # Test detailed info
+        first_topic=$(roc topic list 2&gt;/dev/null | head -1)
+        if [ -n "$first_topic" ]; then
+            echo "Detailed info test:"
+            time roc topic info "$first_topic" --verbose &gt; /dev/null 2&gt;&amp;1
+        fi
+    else
+        echo "Failed: $rmw not available or error occurred"
+    fi
+    echo
+done
+</code></pre>
+<h2 id="error-handling-and-debugging"><a class="header" href="#error-handling-and-debugging">Error Handling and Debugging</a></h2>
+<h3 id="verbose-debugging"><a class="header" href="#verbose-debugging">Verbose Debugging</a></h3>
+<p>Enable detailed debugging for troubleshooting:</p>
+<pre><code class="language-bash">#!/bin/bash
+# debug_roc.sh - Debug roc tool issues
+
+echo "=== ROS 2 Environment ==="
+printenv | grep ROS | sort
+
+echo -e "\n=== RMW Implementation ==="
+echo "RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-default}"
+
+echo -e "\n=== System Info ==="
+echo "OS: $(uname -a)"
+echo "User: $(whoami)"
+echo "Groups: $(groups)"
+
+echo -e "\n=== ROS 2 Process Check ==="
+ps aux | grep -E "(ros|dds)" | grep -v grep
+
+echo -e "\n=== Network Interfaces ==="
+ip addr show | grep -E "(inet|UP|DOWN)"
+
+echo -e "\n=== ROC Tool Test ==="
+echo "Testing roc topic list..."
+if roc topic list; then
+    echo "✓ Basic functionality works"
+    
+    echo -e "\nTesting verbose info..."
+    first_topic=$(roc topic list | head -1)
+    if [ -n "$first_topic" ]; then
+        echo "Testing with topic: $first_topic"
+        roc topic info "$first_topic" --verbose
+    fi
+else
+    echo "✗ Basic functionality failed"
+    echo "Exit code: $?"
+fi
+</code></pre>
+<h2 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h2>
+<h3 id="batch-operations"><a class="header" href="#batch-operations">Batch Operations</a></h3>
+<p>Optimize for scenarios with many topics:</p>
+<pre><code class="language-bash">#!/bin/bash
+# batch_optimize.sh - Optimized batch topic analysis
+
+# Get all topics once
+topics=($(roc topic list 2&gt;/dev/null))
+topic_count=${#topics[@]}
+
+echo "Found $topic_count topics"
+
+if [ $topic_count -eq 0 ]; then
+    echo "No topics found"
+    exit 1
+fi
+
+# Process in batches to avoid overwhelming the system
+batch_size=10
+batch_count=$(( (topic_count + batch_size - 1) / batch_size ))
+
+echo "Processing in $batch_count batches of $batch_size..."
+
+for ((batch=0; batch&lt;batch_count; batch++)); do
+    start=$((batch * batch_size))
+    end=$((start + batch_size))
+    
+    echo "Batch $((batch+1))/$batch_count (topics $start-$((end-1)))"
+    
+    for ((i=start; i&lt;end &amp;&amp; i&lt;topic_count; i++)); do
+        topic="${topics[i]}"
+        echo "  Processing: $topic"
+        roc topic info "$topic" &gt; /dev/null 2&gt;&amp;1
+    done
+    
+    # Small delay between batches
+    sleep 0.1
+done
+
+echo "Batch processing complete"
+</code></pre>
+<p>This completes the advanced usage examples. Next, let me create a command reference guide.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../examples/basic_usage.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../examples/integration_examples.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../examples/basic_usage.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../examples/integration_examples.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

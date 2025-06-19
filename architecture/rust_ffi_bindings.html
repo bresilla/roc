@@ -1,0 +1,469 @@
+<!DOCTYPE HTML>
+<html lang="en" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Rust FFI Bindings - roc - ROS 2 CLI Tool</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="rust-ffi-bindings"><a class="header" href="#rust-ffi-bindings">Rust FFI Bindings</a></h1>
+<p>Creating effective Rust bindings for ROS 2's C libraries requires careful handling of Foreign Function Interface (FFI) concepts, memory management, and type safety.</p>
+<h2 id="overview-of-our-binding-strategy"><a class="header" href="#overview-of-our-binding-strategy">Overview of Our Binding Strategy</a></h2>
+<p>The <code>roc</code> project uses a custom FFI binding approach located in the <code>rclrs/</code> subdirectory. This provides direct access to RCL and RMW functions without the overhead of higher-level abstractions.</p>
+<h2 id="project-structure"><a class="header" href="#project-structure">Project Structure</a></h2>
+<pre><code>rclrs/
+├── build.rs              # Build script for bindgen
+├── Cargo.toml             # Crate configuration
+├── wrapper.h              # C header wrapper
+└── src/
+    └── lib.rs             # Rust bindings and wrappers
+</code></pre>
+<h2 id="build-system-buildrs"><a class="header" href="#build-system-buildrs">Build System (<code>build.rs</code>)</a></h2>
+<p>Our build script uses <code>bindgen</code> to automatically generate Rust bindings from C headers:</p>
+<pre><pre class="playground"><code class="language-rust">use bindgen;
+use std::env;
+use std::path::PathBuf;
+
+fn main() {
+    // Tell cargo to look for ROS 2 installation
+    println!("cargo:rustc-link-search=native=/opt/ros/jazzy/lib");
+    
+    // Link against RCL libraries
+    println!("cargo:rustc-link-lib=rcl");
+    println!("cargo:rustc-link-lib=rmw");
+    println!("cargo:rustc-link-lib=rcutils");
+    
+    // Generate bindings
+    let bindings = bindgen::Builder::default()
+        .header("wrapper.h")
+        .clang_arg("-I/opt/ros/jazzy/include")
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .generate()
+        .expect("Unable to generate bindings");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
+}</code></pre></pre>
+<h2 id="header-wrapper-wrapperh"><a class="header" href="#header-wrapper-wrapperh">Header Wrapper (<code>wrapper.h</code>)</a></h2>
+<p>We create a minimal wrapper that includes only the headers we need:</p>
+<pre><code class="language-c">#ifndef WRAPPER_H
+#define WRAPPER_H
+
+// Core RCL headers
+#include "rcl/rcl/allocator.h"
+#include "rcl/rcl/context.h"
+#include "rcl/rcl/graph.h"
+#include "rcl/rcl/init.h"
+#include "rcl/rcl/init_options.h"
+#include "rcl/rcl/node.h"
+
+// RMW headers for detailed topic information
+#include "rmw/rmw/allocators.h"
+#include "rmw/rmw/init.h"
+#include "rmw/rmw/init_options.h"
+#include "rmw/rmw/ret_types.h"
+#include "rmw/rmw/types.h"
+#include "rmw/rmw/topic_endpoint_info.h"
+
+#endif // WRAPPER_H
+</code></pre>
+<p>This selective inclusion keeps compilation fast and only exposes the APIs we actually use.</p>
+<h2 id="generated-bindings"><a class="header" href="#generated-bindings">Generated Bindings</a></h2>
+<p>The <code>bindgen</code> tool generates Rust equivalents for C types and functions:</p>
+<h3 id="c-structs--rust-structs"><a class="header" href="#c-structs--rust-structs">C Structs → Rust Structs</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// C: rmw_topic_endpoint_info_t
+#[repr(C)]
+pub struct rmw_topic_endpoint_info_s {
+    pub node_name: *const ::std::os::raw::c_char,
+    pub node_namespace: *const ::std::os::raw::c_char,
+    pub topic_type: *const ::std::os::raw::c_char,
+    pub topic_type_hash: rosidl_type_hash_t,
+    pub endpoint_type: rmw_endpoint_type_t,
+    pub endpoint_gid: [u8; 16usize],
+    pub qos_profile: rmw_qos_profile_t,
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="c-enums--rust-constants"><a class="header" href="#c-enums--rust-constants">C Enums → Rust Constants</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// C: rmw_endpoint_type_e
+pub const rmw_endpoint_type_e_RMW_ENDPOINT_INVALID: rmw_endpoint_type_e = 0;
+pub const rmw_endpoint_type_e_RMW_ENDPOINT_PUBLISHER: rmw_endpoint_type_e = 1;
+pub const rmw_endpoint_type_e_RMW_ENDPOINT_SUBSCRIPTION: rmw_endpoint_type_e = 2;
+pub type rmw_endpoint_type_e = ::std::os::raw::c_uint;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="c-functions--rust-extern-functions"><a class="header" href="#c-functions--rust-extern-functions">C Functions → Rust Extern Functions</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>extern "C" {
+    pub fn rcl_get_publishers_info_by_topic(
+        node: *const rcl_node_t,
+        allocator: *mut rcutils_allocator_t,
+        topic_name: *const ::std::os::raw::c_char,
+        no_mangle: bool,
+        publishers_info: *mut rcl_topic_endpoint_info_array_t,
+    ) -&gt; rcl_ret_t;
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="safe-rust-wrappers"><a class="header" href="#safe-rust-wrappers">Safe Rust Wrappers</a></h2>
+<p>Our implementation wraps the raw FFI with safe Rust abstractions:</p>
+<h3 id="string-handling"><a class="header" href="#string-handling">String Handling</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Convert C strings to Rust strings safely
+let node_name = if info.node_name.is_null() {
+    "unknown".to_string()
+} else {
+    std::ffi::CStr::from_ptr(info.node_name)
+        .to_string_lossy()
+        .to_string()
+};
+<span class="boring">}</span></code></pre></pre>
+<h3 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Convert C return codes to Rust Results
+let ret = rcl_get_publishers_info_by_topic(
+    &amp;self.node,
+    &amp;mut allocator,
+    topic_name_c.as_ptr(),
+    false,
+    &amp;mut publishers_info,
+);
+
+if ret != 0 {
+    return Err(anyhow!("Failed to get publishers info: {}", ret));
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="memory-management"><a class="header" href="#memory-management">Memory Management</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Ensure proper cleanup with RAII
+unsafe {
+    let mut allocator = rcutils_get_default_allocator();
+    let mut publishers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+    
+    // ... use the data ...
+    
+    // Automatic cleanup when leaving scope
+    rmw_topic_endpoint_info_array_fini(&amp;mut publishers_info, &amp;mut allocator);
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="type-conversions"><a class="header" href="#type-conversions">Type Conversions</a></h2>
+<p>We provide safe conversions between C types and idiomatic Rust types:</p>
+<h3 id="enum-conversions"><a class="header" href="#enum-conversions">Enum Conversions</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl EndpointType {
+    fn from_rmw(endpoint_type: rmw_endpoint_type_t) -&gt; Self {
+        match endpoint_type {
+            rmw_endpoint_type_e_RMW_ENDPOINT_PUBLISHER =&gt; EndpointType::Publisher,
+            rmw_endpoint_type_e_RMW_ENDPOINT_SUBSCRIPTION =&gt; EndpointType::Subscription,
+            _ =&gt; EndpointType::Invalid,
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="complex-structure-conversions"><a class="header" href="#complex-structure-conversions">Complex Structure Conversions</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl QosProfile {
+    fn from_rmw(qos: &amp;rmw_qos_profile_t) -&gt; Self {
+        QosProfile {
+            history: QosHistoryPolicy::from_rmw(qos.history),
+            depth: qos.depth,
+            reliability: QosReliabilityPolicy::from_rmw(qos.reliability),
+            durability: QosDurabilityPolicy::from_rmw(qos.durability),
+            deadline_sec: qos.deadline.sec,
+            deadline_nsec: qos.deadline.nsec,
+            // ... other fields
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="challenges-and-solutions"><a class="header" href="#challenges-and-solutions">Challenges and Solutions</a></h2>
+<h3 id="1-null-pointer-handling"><a class="header" href="#1-null-pointer-handling">1. Null Pointer Handling</a></h3>
+<p><strong>Challenge</strong>: C APIs can return null pointers
+<strong>Solution</strong>: Check for null before dereferencing</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let topic_type = if info.topic_type.is_null() {
+    "unknown".to_string()
+} else {
+    std::ffi::CStr::from_ptr(info.topic_type).to_string_lossy().to_string()
+};
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-memory-ownership"><a class="header" href="#2-memory-ownership">2. Memory Ownership</a></h3>
+<p><strong>Challenge</strong>: Complex ownership semantics between C and Rust
+<strong>Solution</strong>: Clear ownership boundaries and explicit cleanup</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// C owns the memory in the array, we just read it
+let gid = std::slice::from_raw_parts(
+    info.endpoint_gid.as_ptr(), 
+    info.endpoint_gid.len()
+).to_vec(); // Copy to Rust-owned Vec
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-type-size-mismatches"><a class="header" href="#3-type-size-mismatches">3. Type Size Mismatches</a></h3>
+<p><strong>Challenge</strong>: C <code>int</code> vs Rust <code>i32</code> vs <code>c_int</code>
+<strong>Solution</strong>: Use <code>std::os::raw</code> types consistently</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::os::raw::{c_char, c_int, c_uint};
+<span class="boring">}</span></code></pre></pre>
+<h3 id="4-array-handling"><a class="header" href="#4-array-handling">4. Array Handling</a></h3>
+<p><strong>Challenge</strong>: C arrays with separate size fields
+<strong>Solution</strong>: Safe iteration with bounds checking</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for i in 0..publishers_info.size {
+    let info = &amp;*(publishers_info.info_array.add(i));
+    // ... process info safely
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="testing-ffi-code"><a class="header" href="#testing-ffi-code">Testing FFI Code</a></h2>
+<p>FFI code requires careful testing:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_context_creation() {
+        let context = RclGraphContext::new();
+        assert!(context.is_ok());
+    }
+
+    #[test]
+    fn test_topic_discovery() {
+        let context = RclGraphContext::new().unwrap();
+        let topics = context.get_topic_names();
+        assert!(topics.is_ok());
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="performance-considerations"><a class="header" href="#performance-considerations">Performance Considerations</a></h2>
+<ol>
+<li><strong>Minimize FFI Calls</strong>: Batch operations when possible</li>
+<li><strong>Avoid String Conversions</strong>: Cache converted strings</li>
+<li><strong>Memory Locality</strong>: Process data in the order it's laid out in memory</li>
+<li><strong>Error Path Optimization</strong>: Fast paths for common success cases</li>
+</ol>
+<p>This FFI design provides the foundation for <code>roc</code>'s powerful introspection capabilities while maintaining safety and performance.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../architecture/rcl_rmw_layers.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../architecture/graph_context.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../architecture/rcl_rmw_layers.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../architecture/graph_context.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
