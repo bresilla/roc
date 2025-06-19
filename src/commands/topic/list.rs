@@ -5,8 +5,14 @@ use anyhow::Result;
 
 fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
     // Create RCL graph context for direct API access
+    // Note: Our implementation always does direct DDS discovery (daemon-free by design)
     let graph_context = RclGraphContext::new()
         .map_err(|e| anyhow::anyhow!("Failed to initialize RCL graph context: {}", e))?;
+    
+    // Log a note about daemon usage if the flag is explicitly set
+    if common_args.no_daemon {
+        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+    }
 
     // Get topic names using direct RCL API calls
     let topics = graph_context.get_topic_names()
@@ -85,7 +91,8 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 
     // Show helpful message if no topics found
     if filtered_topics.is_empty() {
-        eprintln!("No topics found.");
+        let daemon_status = RclGraphContext::get_daemon_status();
+        eprintln!("No topics found. [{}]", daemon_status);
     }
 
     Ok(())

@@ -2,6 +2,8 @@ use rclrs::*;
 use std::ptr;
 use std::ffi::CString;
 use std::env;
+use std::process::Command;
+use std::net::TcpStream;
 use anyhow::{Result, anyhow};
 
 /// A simple RCL context manager for graph operations  
@@ -24,7 +26,20 @@ pub struct TopicEndpointInfo {
 
 impl RclGraphContext {
     /// Create a new RCL context for graph operations
+    /// Note: This implementation always performs direct DDS discovery (equivalent to --no-daemon)
     pub fn new() -> Result<Self> {
+        Self::new_with_discovery(std::time::Duration::from_millis(150))
+    }
+
+    /// Create a new RCL context for graph operations  
+    /// Note: Our implementation is daemon-free by design, so this is identical to new()
+    pub fn new_no_daemon() -> Result<Self> {
+        // Our implementation always does direct discovery, so this is the same as new()
+        Self::new()
+    }
+
+    /// Create a new RCL context for graph operations with custom discovery time
+    pub fn new_with_discovery(discovery_time: std::time::Duration) -> Result<Self> {
         unsafe {
             // Read ROS_DOMAIN_ID from environment (default to 0 if not set)
             let domain_id = env::var("ROS_DOMAIN_ID")
@@ -75,11 +90,16 @@ impl RclGraphContext {
                 return Err(anyhow!("Failed to initialize node: {}", ret));
             }
 
-            Ok(RclGraphContext {
+            let graph_context = RclGraphContext {
                 context,
                 node,
                 is_initialized: true,
-            })
+            };
+
+            // Allow time for graph discovery
+            graph_context.wait_for_graph_discovery(discovery_time)?;
+
+            Ok(graph_context)
         }
     }
 
@@ -91,6 +111,20 @@ impl RclGraphContext {
         unsafe {
             rcl_context_is_valid(&self.context) && rcl_node_is_valid(&self.node)
         }
+    }
+
+    /// Wait for graph discovery with a reasonable timeout
+    /// Since we always do direct DDS discovery, we need to allow time for DDS to discover peers
+    fn wait_for_graph_discovery(&self, discovery_time: std::time::Duration) -> Result<()> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+
+        // For direct DDS discovery, we need to wait for the network discovery protocol
+        // This is necessary because DDS discovery is asynchronous
+        std::thread::sleep(discovery_time);
+        
+        Ok(())
     }
 
     /// Get all topics in the ROS graph using direct RCL API calls
@@ -536,6 +570,41 @@ impl RclGraphContext {
             rmw_topic_endpoint_info_array_fini(&mut subscribers_info, &mut allocator);
             
             Ok(result)
+        }
+    }
+
+    /// Check if a ROS 2 daemon is currently running
+    pub fn is_daemon_running() -> bool {
+        // Method 1: Try to check if ros2 daemon status command succeeds
+        if let Ok(output) = Command::new("ros2")
+            .args(&["daemon", "status"])
+            .output()
+        {
+            // If the command succeeds and doesn't contain "not running", daemon is likely running
+            let status_str = String::from_utf8_lossy(&output.stdout);
+            return !status_str.contains("not running") && !status_str.contains("No daemon");
+        }
+
+        // Method 2: Check for typical daemon ports (fallback)
+        // ROS 2 daemon typically uses port 11811 for the default domain
+        let daemon_port = 11811 + env::var("ROS_DOMAIN_ID")
+            .ok()
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(0);
+        
+        if let Ok(_) = TcpStream::connect(format!("127.0.0.1:{}", daemon_port)) {
+            return true;
+        }
+
+        false
+    }
+
+    /// Get daemon status as a human-readable string
+    pub fn get_daemon_status() -> String {
+        if Self::is_daemon_running() {
+            "Daemon running".to_string()
+        } else {
+            "No daemon running".to_string()
         }
     }
 }
