@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.3] - 2025-06-19
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Upgrade development environment to Jazzy OS
+
 ## [0.2.2] - 2025-06-19
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks
