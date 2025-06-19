@@ -2,6 +2,7 @@ use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use std::time::Duration;
 
 // Topic Type (Kind) Implementation
 // 
@@ -16,27 +17,17 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         .ok_or_else(|| anyhow!("Topic name is required"))?;
 
     // Create RCL context for direct API access
-    let create_context = || -> Result<RclGraphContext> {
-        RclGraphContext::new()
-            .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))
-    };
+    let context = RclGraphContext::new()
+        .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
-    // Handle common arguments
-    if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
-    }
-
-    if common_args.use_sim_time {
-        eprintln!("Note: Using simulation time for discovery");
-    }
-
-    if let Some(ref spin_time_value) = common_args.spin_time {
-        eprintln!("Note: Using spin time {} for discovery", spin_time_value);
+    // Wait for topic to appear (especially useful for /chatter)
+    if !context.wait_for_topic(topic_name, Duration::from_secs(3))? {
+        let daemon_status = RclGraphContext::get_daemon_status();
+        return Err(anyhow!("Topic '{}' not found. [{}]", topic_name, daemon_status));
     }
 
     // Get topic type
     let topic_type = {
-        let context = create_context()?;
         let topics_and_types = context.get_topic_names_and_types()
             .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
 

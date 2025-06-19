@@ -2,6 +2,7 @@ use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use std::time::Duration;
 
 // Topic Find Implementation
 // 
@@ -17,27 +18,14 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         .ok_or_else(|| anyhow!("Message type is required"))?;
 
     // Create RCL context for direct API access
-    let create_context = || -> Result<RclGraphContext> {
-        RclGraphContext::new()
-            .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))
-    };
+    let context = RclGraphContext::new()
+        .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
-    // Handle common arguments
-    if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
-    }
-
-    if common_args.use_sim_time {
-        eprintln!("Note: Using simulation time for discovery");
-    }
-
-    if let Some(ref spin_time_value) = common_args.spin_time {
-        eprintln!("Note: Using spin time {} for discovery", spin_time_value);
-    }
+    // Allow some time for topic discovery (helpful for /chatter)
+    std::thread::sleep(Duration::from_millis(500));
 
     // Get topics with their types
     let topics_with_types = {
-        let context = create_context()?;
         context.get_topics_with_types()
             .map_err(|e| anyhow!("Failed to get topic types: {}", e))?
     };

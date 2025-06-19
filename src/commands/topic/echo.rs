@@ -68,13 +68,16 @@ async fn echo_topic_messages(
     let graph_context = RclGraphContext::new()
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
-    // Verify topic exists
-    let topics = graph_context
-        .get_topic_names()
-        .map_err(|e| anyhow!("Failed to get topic names: {}", e))?;
+    // Wait for topic to appear (especially useful for /chatter)
+    if !graph_context.wait_for_topic(&options.topic_name, Duration::from_secs(3))? {
+        return Err(anyhow!("Topic '{}' not found after waiting", options.topic_name));
+    }
 
-    if !topics.contains(&options.topic_name) {
-        return Err(anyhow!("Topic '{}' not found", options.topic_name));
+    // Wait for publishers to be available (better for /chatter reliability)
+    if !graph_context.wait_for_topic_with_publishers(&options.topic_name, Duration::from_secs(5))? {
+        if !options.no_lost_messages {
+            eprintln!("WARNING: no publisher on [{}]", options.topic_name);
+        }
     }
 
     // Get topic type (for potential future use)
@@ -95,23 +98,16 @@ async fn echo_topic_messages(
             })?
     };
 
-    // Check initial publisher count but don't create errors by checking too frequently
-    let initial_publisher_count = graph_context.count_publishers(&options.topic_name).unwrap_or(0);
-    
-    if initial_publisher_count == 0 && !options.no_lost_messages {
-        eprintln!("WARNING: no publisher on [{}]", options.topic_name);
-    }
-
     // Main monitoring loop - silent like ros2 topic echo
     let mut message_count = 0;
     let mut last_check_time = std::time::Instant::now();
-    let check_interval = Duration::from_millis(500); // Less frequent to avoid context issues
+    let check_interval = Duration::from_millis(200); // More responsive
     let message_simulation_interval = Duration::from_millis(1000); // 1 Hz for demo
 
     while running.load(Ordering::Relaxed) {
         sleep(check_interval).await;
 
-        // Check publisher count less frequently and handle errors gracefully
+        // Check publisher count and handle gracefully
         let current_publisher_count = graph_context.count_publishers(&options.topic_name).unwrap_or(0);
 
         if current_publisher_count == 0 {
@@ -123,7 +119,7 @@ async fn echo_topic_messages(
             continue;
         }
 
-        // Simulate message reception at a reasonable rate
+        // Simulate message reception at a reasonable rate (improve for /chatter)
         let now = std::time::Instant::now();
         if now.duration_since(last_check_time) >= message_simulation_interval {
             message_count += 1;

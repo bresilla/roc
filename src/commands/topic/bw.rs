@@ -96,15 +96,15 @@ async fn monitor_topic_bandwidth(
             .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))
     };
 
-    // Verify topic exists
-    let topics = {
-        let context = create_context()?;
-        context.get_topic_names()
-            .map_err(|e| anyhow!("Failed to get topic names: {}", e))?
-    };
+    // Wait for topic to appear (better for /chatter)
+    let context = create_context()?;
+    if !context.wait_for_topic(topic_name, Duration::from_secs(3))? {
+        return Err(anyhow!("Topic '{}' not found after waiting", topic_name));
+    }
 
-    if !topics.contains(&topic_name.to_string()) {
-        return Err(anyhow!("Topic '{}' not found", topic_name));
+    // Wait for publishers to be available (better reliability for /chatter)
+    if !context.wait_for_topic_with_publishers(topic_name, Duration::from_secs(5))? {
+        println!("WARNING: no publisher on [{}]", topic_name);
     }
 
     // Get topic type

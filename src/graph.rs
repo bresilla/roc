@@ -6,6 +6,7 @@ use std::ffi::CString;
 use std::env;
 use std::process::Command;
 use std::net::TcpStream;
+use std::time::Duration;
 use anyhow::{Result, anyhow};
 
 /// A simple RCL context manager for graph operations  
@@ -99,7 +100,7 @@ impl RclGraphContext {
     /// Create a new RCL context for graph operations
     /// Note: This implementation always performs direct DDS discovery (equivalent to --no-daemon)
     pub fn new() -> Result<Self> {
-        Self::new_with_discovery(std::time::Duration::from_millis(150))
+        Self::new_with_discovery(std::time::Duration::from_millis(300))
     }
 
     /// Create a new RCL context for graph operations  
@@ -704,6 +705,50 @@ impl RclGraphContext {
         } else {
             "No daemon running".to_string()
         }
+    }
+
+    /// Wait for a specific topic to appear in the graph
+    /// This is useful when subscribing to topics that might not be discovered yet
+    pub fn wait_for_topic(&self, topic_name: &str, timeout: Duration) -> Result<bool> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+
+        let start_time = std::time::Instant::now();
+        let check_interval = Duration::from_millis(50);
+
+        while start_time.elapsed() < timeout {
+            if let Ok(topics) = self.get_topic_names() {
+                if topics.contains(&topic_name.to_string()) {
+                    return Ok(true);
+                }
+            }
+            std::thread::sleep(check_interval);
+        }
+
+        Ok(false)
+    }
+
+    /// Wait for a specific topic with publishers to appear
+    /// This ensures not just that the topic exists, but that it has active publishers
+    pub fn wait_for_topic_with_publishers(&self, topic_name: &str, timeout: Duration) -> Result<bool> {
+        if !self.is_valid() {
+            return Err(anyhow!("RCL context is not valid"));
+        }
+
+        let start_time = std::time::Instant::now();
+        let check_interval = Duration::from_millis(100);
+
+        while start_time.elapsed() < timeout {
+            if let Ok(pub_count) = self.count_publishers(topic_name) {
+                if pub_count > 0 {
+                    return Ok(true);
+                }
+            }
+            std::thread::sleep(check_interval);
+        }
+
+        Ok(false)
     }
 }
 

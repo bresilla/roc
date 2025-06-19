@@ -43,7 +43,7 @@ impl PublishOptions {
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(1.0);
 
-        let print = matches.get_flag("print") || matches.get_one::<String>("print").is_some();
+        let print = matches.get_one::<String>("print").is_some();
 
         let once = matches.get_flag("once");
 
