@@ -1,5 +1,5 @@
 
-<img align="right" width="32%" src="./misc/roc_2.png">
+<img align="right" width="32%" src="./misc/logo.png">
 
 # ROC - Robot Operations Command
 

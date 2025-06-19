@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/roc.png" />
+  <img src="images/logo.png" />
 </p>
 
 
