@@ -1,3 +1,5 @@
+#![allow(non_upper_case_globals)]
+
 use rclrs::*;
 use std::ptr;
 use std::ffi::CString;
@@ -36,6 +38,7 @@ pub enum EndpointType {
 
 /// QoS Profile information
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct QosProfile {
     pub history: QosHistoryPolicy,
     pub depth: usize,
@@ -82,6 +85,7 @@ pub enum QosDurabilityPolicy {
 
 /// QoS Liveliness Policy
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum QosLivelinessPolicy {
     SystemDefault,
     Automatic,
@@ -100,6 +104,7 @@ impl RclGraphContext {
 
     /// Create a new RCL context for graph operations  
     /// Note: Our implementation is daemon-free by design, so this is identical to new()
+    #[allow(dead_code)]
     pub fn new_no_daemon() -> Result<Self> {
         // Our implementation always does direct discovery, so this is the same as new()
         Self::new()
@@ -240,6 +245,7 @@ impl RclGraphContext {
     }
 
     /// Get all nodes in the ROS graph using direct RCL API calls
+    #[allow(dead_code)]
     pub fn get_node_names(&self) -> Result<Vec<String>> {
         if !self.is_valid() {
             return Err(anyhow!("RCL context is not valid"));
@@ -284,6 +290,7 @@ impl RclGraphContext {
     }
 
     /// Get all services in the ROS graph using direct RCL API calls
+    #[allow(dead_code)]
     pub fn get_service_names(&self) -> Result<Vec<String>> {
         if !self.is_valid() {
             return Err(anyhow!("RCL context is not valid"));
@@ -860,6 +867,7 @@ fn format_topic_type_hash(hash: &rosidl_type_hash_t) -> String {
 }
 
 // Helper function to format GID
+#[allow(dead_code)]
 fn format_gid(gid: &[u8]) -> String {
     gid.iter().map(|b| format!("{:02x}", b)).collect::<Vec<String>>().join(".")
 }
