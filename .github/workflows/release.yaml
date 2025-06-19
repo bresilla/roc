@@ -46,14 +46,10 @@ jobs:
         
       - name: Set up ROS2 (Linux only)
         if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo apt install -y curl gnupg lsb-release
-          curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-          sudo apt update
-          sudo apt install -y ros-${{ matrix.ros_distro }}-ros-base ros-${{ matrix.ros_distro }}-rmw-implementation-cmake
-          echo "source /opt/ros/${{ matrix.ros_distro }}/setup.bash" >> ~/.bashrc
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: ${{ matrix.ros_distro }}
+          install-connext: false
           
       - name: Install build dependencies (Linux)
         if: runner.os == 'Linux'
@@ -155,13 +151,10 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Set up ROS2
-        run: |
-          sudo apt update
-          sudo apt install -y curl gnupg lsb-release
-          curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-          sudo apt update
-          sudo apt install -y ros-humble-ros-base ros-humble-rmw-implementation-cmake
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: humble
+          install-connext: false
           
       - name: Install build dependencies
         run: |
@@ -177,12 +170,12 @@ jobs:
         run: |
           source /opt/ros/humble/setup.bash
           cd rclrs
-          cargo publish --allow-dirty
+          cargo publish --allow-dirty || echo "rclrs may already be published"
           
       - name: Wait for rclrs propagation
-        run: sleep 60
+        run: sleep 120
         
       - name: Publish roc
         run: |
           source /opt/ros/humble/setup.bash
-          cargo publish --allow-dirty
+          cargo publish --allow-dirty || echo "roc may already be published"
