@@ -53,11 +53,47 @@ Implement a `roc topic delay` command that can actually delay/buffer messages fl
 - `rmw_publish()` - Intercept message publishing
 - Buffer management at RMW level
 
-## Current Status
+## Current Status - Reality Check ⚠️
 - ✅ **Successfully expanded RCL/RMW bindings** - Added subscription/publisher functions
 - ✅ **RMW callback interception available** - `rmw_subscription_set_on_new_message_callback()`
 - ✅ **Direct RMW access** - Can use `rmw_take()`, `rmw_publish()` functions
-- ✅ **Avoided DDS dependency** - Working purely at RMW level
+- ❌ **BUT: Direct topic delay is NOT possible at RMW level** 
+
+## Key Discovery: Direct Topic Delay is Architecturally Impossible 🚫
+
+### Why Direct RMW Interception Won't Work:
+1. **`rmw_take()` is called by SUBSCRIBERS** - We can't intercept what other nodes are doing
+2. **RMW functions are in shared libraries** - We can't override them without replacing the entire RMW implementation
+3. **Message flow is P2P** - Publishers send directly to subscribers via DDS, no central point to intercept
+4. **No middleware hooks** - RMW doesn't provide middleware plugin architecture for message interception
+
+### The Architecture Reality:
+```
+Publisher -> DDS -> Subscriber (calls rmw_take())
+     ^              ^
+     |              |
+We can't          We can't 
+control this      control other
+                  processes
+```
+
+### What We CAN Do (Proxy Approach):
+```
+Publisher -> DDS -> [Our Interceptor] -> DDS -> Subscriber
+                         |
+                    Buffer + Delay
+                         |
+                    Re-publish on 
+                    delayed topic
+```
+
+## Final Assessment: ❌ Direct Topic Delay Not Possible
+
+**Direct in-place topic delay requires DDS/middleware level intervention**, which is beyond what we can achieve with RMW API calls. The RMW layer is just an abstraction over DDS - it doesn't provide interception hooks for modifying message flow.
+
+## Recommendation: Keep Proxy Implementation ✅
+
+The current proxy approach (subscribe -> buffer -> re-publish) is the **correct and only feasible solution** for topic delay at the application level. This is how real-world ROS2 tools implement message manipulation.
 
 ## Available RMW Interception Points
 

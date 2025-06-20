@@ -4,6 +4,7 @@ pub mod service;
 pub mod param;
 pub mod node;
 pub mod interface;
+pub mod idl;
 pub mod frame;
 
 pub mod run;
@@ -37,6 +38,9 @@ pub fn handle(matches: ArgMatches) {
         }
         Some(("interface", submatch)) => {
             interface::handle(submatch.clone());
+        }
+        Some(("idl", submatch)) => {
+            idl::handle(submatch.clone());
         }
         Some(("frame", submatch)) => {
             frame::handle(submatch.clone());

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package test_debug;
+
+// Nested message
+message Robot {
+    message Status {
+        bool is_active = 1;
+    }
+    
+    Status my_status = 1;
+}
+
+// Simple test message with qualified reference
+message Command {
+    Robot.Status required_status = 1;
+    string command_text = 2;
+}

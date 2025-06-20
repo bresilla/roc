@@ -17,6 +17,13 @@
 - [Endpoint Discovery](./implementation/endpoint_discovery.md)
 - [Memory Management](./implementation/memory_management.md)
 
+# Interface Definition Language (IDL)
+
+- [IDL Tools Overview](./idl/overview.md)
+- [Protobuf Integration](./idl/protobuf.md)
+- [ROS2 Message System](./idl/ros2_messages.md)
+- [Type Mapping](./idl/type_mapping.md)
+
 # Workspace Management
 
 - [Workspace Overview](./workspace/overview.md)

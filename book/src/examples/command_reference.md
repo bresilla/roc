@@ -313,6 +313,124 @@ roc topic list --format json
 roc topic info /chatter --format json --verbose
 ```
 
+## IDL Commands
+
+### `roc idl protobuf`
+
+Bidirectional conversion between Protobuf (.proto) and ROS 2 (.msg) files with automatic direction detection.
+
+**Syntax:**
+```bash
+roc idl protobuf [OPTIONS] <INPUT_FILES>...
+```
+
+**Arguments:**
+- `<INPUT_FILES>...`: Input files to convert (.proto or .msg files)
+
+**Options:**
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--output <DIR>` | `-o` | Output directory for generated files | Same directory as input |
+| `--package <NAME>` | `-p` | Package name for generated files | Derived from input |
+| `--config <FILE>` | `-c` | Configuration file for type mappings (YAML) | None |
+| `--include <DIRS>...` | `-I` | Include directories for protobuf imports | None |
+| `--verbose` | `-v` | Show verbose output | False |
+| `--dry-run` | `-n` | Show what would be generated without writing files | False |
+
+**Examples:**
+
+```bash
+# Convert .proto files to .msg files (automatic detection)
+roc idl protobuf robot.proto sensor_data.proto
+
+# Convert .msg files to .proto files (automatic detection)  
+roc idl protobuf RobotStatus.msg SensorData.msg
+
+# Specify output directory
+roc idl protobuf --output ./generated robot.proto
+
+# Dry run to preview conversion
+roc idl protobuf --dry-run --verbose robot.proto
+
+# Convert with include directories for imports
+roc idl protobuf -I ./proto_deps -I ./common robot.proto
+
+# Convert with custom package name
+roc idl protobuf --package my_robot_msgs robot.proto
+```
+
+**Protobuf to ROS2 (.proto → .msg):**
+```bash
+# Input: robot.proto
+roc idl protobuf robot.proto
+
+# Output: Robot.msg, RobotStatus.msg (based on message definitions)
+```
+
+**ROS2 to Protobuf (.msg → .proto):**
+```bash
+# Input: RobotStatus.msg
+roc idl protobuf RobotStatus.msg  
+
+# Output: robot_status.proto
+```
+
+**Advanced Usage:**
+```bash
+# Convert entire directory with verbose output
+roc idl protobuf --verbose src/proto/*.proto --output msg/
+
+# Mixed conversion with error handling
+roc idl protobuf file1.proto file2.proto || echo "Conversion failed"
+
+# Pipeline with other tools
+find . -name "*.proto" -exec roc idl protobuf {} --output ./ros_msgs \;
+```
+
+**Supported Protobuf Features:**
+- Proto3 syntax
+- Nested messages (automatically flattened)
+- Enums (converted to constants)
+- Repeated fields (arrays)
+- Maps (converted to key-value arrays)
+- Oneof fields (converted to separate optional fields)
+- Comments (preserved when possible)
+- Import statements and dependencies
+
+**Type Mappings:**
+| Protobuf | ROS2 | Notes |
+|----------|------|-------|
+| `bool` | `bool` | Direct mapping |
+| `int32` | `int32` | Direct mapping |
+| `int64` | `int64` | Direct mapping |
+| `uint32` | `uint32` | Direct mapping |
+| `uint64` | `uint64` | Direct mapping |
+| `float` | `float32` | Single precision |
+| `double` | `float64` | Double precision |
+| `string` | `string` | UTF-8 strings |
+| `bytes` | `uint8[]` | Byte arrays |
+| `repeated T` | `T[]` | Dynamic arrays |
+| `map<K,V>` | `Entry[]` | Key-value pairs |
+
+**Exit Codes:**
+- `0`: Success
+- `1`: Error (invalid syntax, file not found, permission issues, etc.)
+
+**Error Examples:**
+```bash
+# Mixed file types (not allowed)
+roc idl protobuf robot.proto RobotStatus.msg
+# Error: Cannot mix .proto and .msg files in the same conversion
+
+# Unsupported file extension
+roc idl protobuf data.json
+# Error: Unsupported file extension: .json
+
+# File not found
+roc idl protobuf nonexistent.proto
+# Error: Input file does not exist: nonexistent.proto
+```
+
 ## Troubleshooting
 
 ### Common Issues

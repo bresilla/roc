@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+message Test {
+    string field1 = 1;  // comment
+    string field2 = 2; // comment
+    string field3 = 3;//comment  
+    string field4 = 4;
+}

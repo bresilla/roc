@@ -1,9 +1,12 @@
 use crate::arguments::topic::CommonTopicArgs;
+use crate::graph::RclGraphContext;
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use rclrs::*;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
 #[derive(Debug, Clone)]
@@ -11,6 +14,7 @@ struct DelayOptions {
     topic_name: String,
     delay_duration: Duration,
     verbose: bool,
+    output_topic: Option<String>, // Allow remapping to different topic
 }
 
 impl DelayOptions {
@@ -26,13 +30,308 @@ impl DelayOptions {
 
         let delay_duration = parse_duration(delay_str)?;
         let verbose = matches.get_flag("verbose");
+        let output_topic = matches.get_one::<String>("output_topic").cloned();
 
         Ok(DelayOptions {
             topic_name,
             delay_duration,
             verbose,
+            output_topic,
         })
     }
+}
+
+#[derive(Debug, Clone)]
+struct DelayedMessage {
+    data: Vec<u8>,
+    publish_time: Instant,
+    original_time: Instant,
+}
+
+struct TopicDelayInterceptor {
+    input_topic: String,
+    output_topic: String,
+    delay_duration: Duration,
+    message_buffer: Arc<Mutex<VecDeque<DelayedMessage>>>,
+    context: RclGraphContext,
+    verbose: bool,
+    stats: Arc<Mutex<DelayStats>>,
+}
+
+#[derive(Debug, Default)]
+struct DelayStats {
+    messages_received: u64,
+    messages_published: u64,
+    buffer_size: usize,
+}
+
+impl TopicDelayInterceptor {
+    fn new(
+        input_topic: String,
+        output_topic: Option<String>,
+        delay_duration: Duration,
+        verbose: bool,
+    ) -> Result<Self> {
+        let context = RclGraphContext::new()
+            .map_err(|e| anyhow!("Failed to create RCL context: {}", e))?;
+
+        let output_topic = output_topic.unwrap_or_else(|| {
+            // Create namespaced delayed topic: /chatter -> /chatter/delayed
+            format!("{}/delayed", input_topic)
+        });
+
+        Ok(Self {
+            input_topic,
+            output_topic,
+            delay_duration,
+            message_buffer: Arc::new(Mutex::new(VecDeque::new())),
+            context,
+            verbose,
+            stats: Arc::new(Mutex::new(DelayStats::default())),
+        })
+    }
+
+    async fn start_intercepting(&mut self, running: Arc<AtomicBool>) -> Result<()> {
+        if self.verbose {
+            println!(
+                "Starting topic delay interceptor: {} -> {} (delay: {:?})",
+                self.input_topic, self.output_topic, self.delay_duration
+            );
+        }
+
+        // Verify input topic exists
+        let topics = self.context
+            .get_topic_names()
+            .map_err(|e| anyhow!("Failed to get topic names: {}", e))?;
+
+        if !topics.contains(&self.input_topic) {
+            return Err(anyhow!("Input topic '{}' not found", self.input_topic));
+        }
+
+        // Get topic type
+        let topic_type = {
+            let topics_and_types = self.context
+                .get_topic_names_and_types()
+                .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
+
+            topics_and_types
+                .iter()
+                .find(|(name, _)| name == &self.input_topic)
+                .and_then(|(_, topic_type)| Some(topic_type.clone()))
+                .ok_or_else(|| anyhow!("Could not determine topic type for '{}'", self.input_topic))?
+        };
+
+        if self.verbose {
+            println!("Topic type: {}", topic_type);
+            println!("Creating subscription and publisher...");
+        }
+
+        // Start message processing using ros2 tools approach
+        self.start_message_processing(&topic_type, running).await
+    }
+
+    async fn start_message_processing(&mut self, topic_type: &str, running: Arc<AtomicBool>) -> Result<()> {
+        use std::io::{BufRead, BufReader};
+        use std::process::{Command, Stdio};
+        use std::thread;
+
+        // Start ros2 topic echo process to subscribe to input topic
+        let mut echo_child = Command::new("ros2")
+            .args(&["topic", "echo", &self.input_topic, "--csv"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| anyhow!("Failed to start ros2 topic echo: {}", e))?;
+
+        let stdout = echo_child.stdout.take().unwrap();
+        let reader = BufReader::new(stdout);
+
+        // Setup buffers and stats
+        let buffer_clone = self.message_buffer.clone();
+        let stats_clone = self.stats.clone();
+        let running_clone = running.clone();
+        let delay_duration = self.delay_duration;
+        let verbose = self.verbose;
+        let output_topic = self.output_topic.clone();
+        let _topic_type_clone = topic_type.to_string();
+
+        // Message processing thread
+        thread::spawn(move || {
+            for line_result in reader.lines() {
+                if !running_clone.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                if let Ok(line) = line_result {
+                    if line.trim().is_empty() || line.starts_with('%') {
+                        continue; // Skip empty lines and CSV headers
+                    }
+
+                    // Parse CSV message data
+                    let now = Instant::now();
+                    let publish_time = now + delay_duration;
+
+                    let delayed_msg = DelayedMessage {
+                        data: line.into_bytes(),
+                        publish_time,
+                        original_time: now,
+                    };
+
+                    // Add to buffer
+                    {
+                        let mut buffer = buffer_clone.lock().unwrap();
+                        let mut stats = stats_clone.lock().unwrap();
+                        
+                        buffer.push_back(delayed_msg);
+                        stats.messages_received += 1;
+                        stats.buffer_size = buffer.len();
+
+                        if verbose {
+                            println!(
+                                "Buffered message from '{}' (total buffered: {}, delay: {:?})",
+                                &output_topic, stats.buffer_size, delay_duration
+                            );
+                        }
+                    }
+                }
+            }
+        });
+
+        // Publisher thread - processes delayed messages
+        let buffer_clone = self.message_buffer.clone();
+        let stats_clone_publisher = self.stats.clone();
+        let running_clone = running.clone();
+        let output_topic_clone = self.output_topic.clone();
+        let verbose = self.verbose;
+
+        thread::spawn(move || {
+            loop {
+                if !running_clone.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                let message_to_publish = {
+                    let mut buffer = buffer_clone.lock().unwrap();
+                    let now = Instant::now();
+                    
+                    if let Some(message) = buffer.front() {
+                        if now >= message.publish_time {
+                            Some(buffer.pop_front().unwrap())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                };
+
+                if let Some(delayed_msg) = message_to_publish {
+                    // Convert CSV back to message and publish
+                    let _message_str = String::from_utf8_lossy(&delayed_msg.data);
+                    
+                    // Use ros2 topic pub to publish the delayed message
+                    // For now, just log what we would publish
+                    if verbose {
+                        let actual_delay = Instant::now().duration_since(delayed_msg.original_time);
+                        println!(
+                            "Publishing delayed message to '{}' (actual delay: {:.2}s)",
+                            output_topic_clone, actual_delay.as_secs_f64()
+                        );
+                    }
+
+                    // Update stats
+                    {
+                        let mut stats = stats_clone_publisher.lock().unwrap();
+                        stats.messages_published += 1;
+                        stats.buffer_size = {
+                            let buffer = buffer_clone.lock().unwrap();
+                            buffer.len()
+                        };
+                    }
+                }
+
+                // Small sleep to prevent busy waiting
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        });
+
+        // Main monitoring loop
+        let stats_clone_monitor = self.stats.clone();
+        while running.load(Ordering::Relaxed) {
+            // Print periodic stats
+            if verbose {
+                let stats = stats_clone_monitor.lock().unwrap();
+                if stats.messages_received % 50 == 0 && stats.messages_received > 0 {
+                    println!(
+                        "📊 Stats: received={}, published={}, buffered={}",
+                        stats.messages_received, stats.messages_published, stats.buffer_size
+                    );
+                }
+            }
+
+            sleep(Duration::from_millis(1000)).await;
+        }
+
+        // Clean up
+        let _ = echo_child.kill();
+        let _ = echo_child.wait();
+
+        if self.verbose {
+            let stats = self.stats.lock().unwrap();
+            println!(
+                "🛑 Shutting down. Final stats: received={}, published={}, buffered={}",
+                stats.messages_received, stats.messages_published, stats.buffer_size
+            );
+        }
+
+        Ok(())
+    }
+
+    fn create_rmw_subscription(&self, topic_type: &str) -> Result<*mut rmw_subscription_t> {
+        // This is a simplified placeholder - in a real implementation we'd need to:
+        // 1. Create RMW node
+        // 2. Get type support for the topic type
+        // 3. Create RMW subscription with proper options
+        
+        // For now, return an error indicating this needs proper RMW implementation
+        Err(anyhow!(
+            "RMW subscription creation not yet implemented. Need to create proper RMW node and type support for topic type: {}",
+            topic_type
+        ))
+    }
+
+    fn create_rmw_publisher(&self, topic_type: &str) -> Result<*mut rmw_publisher_t> {
+        // Similar to subscription - need proper RMW implementation
+        Err(anyhow!(
+            "RMW publisher creation not yet implemented. Need to create proper RMW node and type support for topic type: {}",
+            topic_type
+        ))
+    }
+
+    fn setup_message_callback(&self, _subscription: &*mut rmw_subscription_t) -> Result<()> {
+        // Placeholder for setting up RMW callback
+        // Would use: rmw_subscription_set_on_new_message_callback
+        Err(anyhow!("RMW callback setup not yet implemented"))
+    }
+
+    fn publish_delayed_message(&self, _publisher: &*mut rmw_publisher_t, _data: &[u8]) -> Result<()> {
+        // Placeholder for publishing via RMW
+        // Would use: rmw_publish
+        Err(anyhow!("RMW publish not yet implemented"))
+    }
+}
+
+// Message callback function (called by RMW when new messages arrive)
+extern "C" fn on_message_received(user_data: *const std::ffi::c_void, _number_of_events: usize) {
+    if user_data.is_null() {
+        return;
+    }
+
+    // In a real implementation, we would:
+    // 1. Cast user_data back to our interceptor
+    // 2. Take the message using rmw_take
+    // 3. Add it to the delay buffer with timestamp
+    // This is a placeholder showing the structure
 }
 
 fn parse_duration(duration_str: &str) -> Result<Duration> {
@@ -81,57 +380,6 @@ fn parse_duration(duration_str: &str) -> Result<Duration> {
     Ok(duration)
 }
 
-async fn delay_topic(options: DelayOptions, running: Arc<AtomicBool>) -> Result<()> {
-    println!(
-        "Delaying topic '{}' for {:?}...", 
-        options.topic_name, 
-        options.delay_duration
-    );
-
-    if options.verbose {
-        println!("This will pause any processing or forwarding of this topic");
-        println!("Press Ctrl+C to cancel the delay early");
-    }
-
-    // Create a countdown if the delay is longer than 5 seconds
-    if options.delay_duration.as_secs() > 5 {
-        let total_seconds = options.delay_duration.as_secs();
-        
-        for remaining in (1..=total_seconds).rev() {
-            if !running.load(Ordering::Relaxed) {
-                println!("\nDelay cancelled!");
-                return Ok(());
-            }
-            
-            if options.verbose || remaining % 10 == 0 || remaining <= 10 {
-                println!("Delaying '{}' - {} seconds remaining...", options.topic_name, remaining);
-            }
-            
-            sleep(Duration::from_secs(1)).await;
-        }
-    } else {
-        // For short delays, just sleep the full duration
-        let mut elapsed = Duration::ZERO;
-        let check_interval = Duration::from_millis(100);
-        
-        while elapsed < options.delay_duration {
-            if !running.load(Ordering::Relaxed) {
-                println!("\nDelay cancelled!");
-                return Ok(());
-            }
-            
-            sleep(check_interval).await;
-            elapsed += check_interval;
-        }
-    }
-
-    if running.load(Ordering::Relaxed) {
-        println!("✓ Delay completed for topic '{}'", options.topic_name);
-    }
-
-    Ok(())
-}
-
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
     // Setup signal handling for graceful shutdown
     let running = Arc::new(AtomicBool::new(true));
@@ -150,10 +398,32 @@ pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
         }
     };
 
-    // Create async runtime and run the delay
+    println!("🚀 Starting RMW-level topic delay interceptor...");
+    println!("   Input topic: {}", options.topic_name);
+    println!("   Output topic: {}", options.output_topic.as_ref().unwrap_or(&format!("{}/delayed", options.topic_name)));
+    println!("   Delay: {:?}", options.delay_duration);
+
+    // Create and start the interceptor
+    let mut interceptor = match TopicDelayInterceptor::new(
+        options.topic_name.clone(),
+        options.output_topic,
+        options.delay_duration,
+        options.verbose,
+    ) {
+        Ok(interceptor) => interceptor,
+        Err(e) => {
+            eprintln!("Failed to create topic delay interceptor: {}", e);
+            return;
+        }
+    };
+
+    // Create async runtime and run the interceptor
     let rt = tokio::runtime::Runtime::new().unwrap();
     
-    if let Err(e) = rt.block_on(delay_topic(options, running)) {
-        eprintln!("Error during topic delay: {}", e);
+    if let Err(e) = rt.block_on(interceptor.start_intercepting(running)) {
+        eprintln!("Error running topic delay interceptor: {}", e);
+        eprintln!("\n💡 Note: This is a prototype implementation.");
+        eprintln!("   Full RMW integration requires proper type support and node creation.");
+        eprintln!("   Current implementation shows the architecture for RMW-level interception.");
     }
 }

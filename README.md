@@ -61,6 +61,8 @@ roc <COMMAND> [SUBCOMMAND] [OPTIONS] [ARGS]
 - `daemon` `[d]` - Daemon and bridge management
 - `middleware` `[m]` - RMW configuration and diagnostics
 - `frame` `[f]` - Transform frame utilities
+- `idl` `[interface-def]` - **Interface Definition Language tools**
+  - `protobuf` - **Bidirectional conversion between Protobuf (.proto) and ROS2 (.msg) files**
 
 ## 🎯 Key Advantages
 
@@ -101,7 +103,77 @@ cd book
 mdbook serve
 ```
 
-## 🛠️ Workspace Management
+## � Interface Definition Language (IDL) Tools
+
+ROC includes powerful tools for working with different interface definition languages, enabling seamless interoperability between ROS2 and other systems.
+
+### Protobuf ↔ ROS2 Conversion (`roc idl protobuf`)
+
+Convert between Protobuf (.proto) and ROS2 (.msg) formats with automatic direction detection:
+
+```bash
+# Convert .proto files to .msg files
+roc idl protobuf robot.proto sensor_data.proto
+
+# Convert .msg files to .proto files  
+roc idl protobuf RobotStatus.msg SensorData.msg
+
+# Specify output directory
+roc idl protobuf --output ./generated robot.proto
+
+# Dry run to preview output
+roc idl protobuf --dry-run robot.proto
+```
+
+**Key Features:**
+- **Automatic Direction Detection**: Detects conversion direction based on file extensions
+- **Advanced Protobuf Support**: Handles nested messages, enums, oneofs, maps, and comments
+- **Dependency Resolution**: Generates files in correct dependency order
+- **Inplace Output**: Generates files in the same directory as input by default
+- **Type Mapping**: Intelligent conversion between Protobuf and ROS2 types
+- **Pure Rust Implementation**: No external dependencies or tools required
+
+**Supported Protobuf Features:**
+- Primitive types (int32, string, bool, etc.)
+- Repeated fields (arrays)
+- Nested messages and custom types
+- Enums with value mapping
+- Oneof fields
+- Map types
+- Comments and documentation
+- Proto3 syntax
+
+**Example Conversion:**
+```protobuf
+// robot.proto
+syntax = "proto3";
+package robotics;
+
+message RobotStatus {
+  bool active = 1;
+  string name = 2;
+  repeated double joint_positions = 3;
+}
+
+message Robot {
+  RobotStatus status = 1;
+  int32 id = 2;
+}
+```
+
+Converts to:
+```msg
+# RobotStatus.msg
+bool active
+string name
+float64[] joint_positions
+
+# Robot.msg  
+RobotStatus status
+int32 id
+```
+
+## �🛠️ Workspace Management
 
 ROC includes a complete workspace management system that serves as a **drop-in replacement for colcon**:
 
@@ -185,6 +257,11 @@ ROC is actively developed and production-ready for most ROS2 workflows. Current 
 - ✅ **Node Operations**: Node discovery and detailed information
 - ✅ **Parameter Operations**: Full parameter management
 - ✅ **Interface Operations**: Message and service type introspection
+- ✅ **IDL Tools**: **Complete Protobuf ↔ ROS2 conversion**
+  - ✅ Bidirectional conversion with automatic direction detection
+  - ✅ Advanced Protobuf feature support (nested messages, enums, oneofs, maps)
+  - ✅ Pure Rust implementation with no external dependencies
+  - ✅ Intelligent type mapping and dependency resolution
 - ✅ **Workspace Operations**: **Complete colcon replacement build system**
   - ✅ Build system with parallel execution and dependency resolution
   - ✅ Package creation wizard for all major build types

@@ -10,6 +10,7 @@ pub mod frame;
 pub mod run;
 pub mod launch;
 pub mod work;
+pub mod idl;
 
 pub mod bag;
 pub mod daemon;
@@ -73,6 +74,7 @@ Workspace Commands:".bright_blue().bold().to_string().as_str()+"
   "+ &command_str("run") + "         "+&letter_str("r")+ &descriptin_str("Run an executable file") + "
   "+ &command_str("launch") + "      "+&letter_str("l")+ &descriptin_str("Run a launch file") + "
   "+ &command_str("work") + "        "+&letter_str("w")+ &descriptin_str("Packages and workspace") + "
+  "+ &command_str("idl") + "         "+&letter_str("d")+ &descriptin_str("Various idl subcommands [WIP]") + "
 
 Communication Commands:".bright_blue().bold().to_string().as_str()+"     
   "+ &command_str("bag") + "         "+&letter_str("b")+ &descriptin_str("ROS bag tools") + "
@@ -106,6 +108,7 @@ Shell Integration:".bright_blue().bold().to_string().as_str()+"
         .subcommand(param::cmd())
         .subcommand(node::cmd())
         .subcommand(interface::cmd())
+        .subcommand(idl::cmd())
         .subcommand(frame::cmd())
         .subcommand(run::cmd())
         .subcommand(launch::cmd())

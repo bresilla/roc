@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+message Robot {
+    message Status {
+        bool active = 1;
+    }
+    Status my_status = 1;
+}
+
+message Command {
+    Robot.Status required_status = 1;
+}

@@ -1,0 +1,1 @@
+RobotStatus required_status
