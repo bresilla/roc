@@ -25,6 +25,7 @@ fn main() {
         .clang_arg("-I/opt/ros/jazzy/include/rcl_yaml_param_parser")
         .clang_arg("-I/opt/ros/jazzy/include/rosidl_runtime_c")
         .clang_arg("-I/opt/ros/jazzy/include/rosidl_typesupport_interface")
+        .clang_arg("-I/opt/ros/jazzy/include/rosidl_dynamic_typesupport")
         .clang_arg("-I/opt/ros/jazzy/include/type_description_interfaces")
         .clang_arg("-I/opt/ros/jazzy/include/service_msgs")
         .clang_arg("-I/opt/ros/jazzy/include/builtin_interfaces")
@@ -70,6 +71,22 @@ fn main() {
         .allowlist_function("rcl_get_publishers_info_by_topic")
         .allowlist_function("rcl_get_subscriptions_info_by_topic")
         .allowlist_function("rmw_topic_endpoint_info_array_fini")
+        // Subscription and Publisher functions for interception
+        .allowlist_function("rcl_subscription_init")
+        .allowlist_function("rcl_subscription_fini")
+        .allowlist_function("rcl_take")
+        .allowlist_function("rcl_publisher_init")
+        .allowlist_function("rcl_publisher_fini")
+        .allowlist_function("rcl_publish")
+        // RMW-level functions for direct access
+        .allowlist_function("rmw_create_subscription")
+        .allowlist_function("rmw_destroy_subscription")
+        .allowlist_function("rmw_take")
+        .allowlist_function("rmw_take_with_info")
+        .allowlist_function("rmw_create_publisher")
+        .allowlist_function("rmw_destroy_publisher")
+        .allowlist_function("rmw_publish")
+        .allowlist_function("rmw_subscription_set_on_new_message_callback")
         // String array functions
         .allowlist_function("rcutils_get_zero_initialized_string_array")
         .allowlist_function("rcutils_string_array_fini")
@@ -86,6 +103,18 @@ fn main() {
         // Topic info types
         .allowlist_type("rcl_topic_endpoint_info_array_t")
         .allowlist_type("rcl_topic_endpoint_info_t")
+        // Subscription and Publisher types
+        .allowlist_type("rcl_subscription_t")
+        .allowlist_type("rcl_subscription_options_t")
+        .allowlist_type("rcl_publisher_t")
+        .allowlist_type("rcl_publisher_options_t")
+        // RMW message types
+        .allowlist_type("rmw_subscription_t")
+        .allowlist_type("rmw_publisher_t")
+        .allowlist_type("rmw_message_info_t")
+        .allowlist_type("rmw_event_callback_t")
+        // Message type support
+        .allowlist_type("rosidl_message_type_support_t")
         // RMW basic types
         .allowlist_type("rmw_init_options_t")
         .allowlist_type("rmw_context_t")
