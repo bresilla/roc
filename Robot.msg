@@ -1,1 +1,0 @@
-RobotStatus my_status
