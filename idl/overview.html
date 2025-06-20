@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Workspace Overview - roc - ROS 2 CLI Tool</title>
+        <title>IDL Tools Overview - roc - ROS 2 CLI Tool</title>
 
 
         <!-- Custom HTML head -->
@@ -166,77 +166,126 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="workspace-management-overview"><a class="header" href="#workspace-management-overview">Workspace Management Overview</a></h1>
-<p>ROC includes a comprehensive workspace management system that serves as a modern, high-performance replacement for colcon. The <code>roc work</code> command provides a complete suite of tools for ROS2 workspace management, including package creation, discovery, dependency resolution, and building.</p>
-<h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
-<h3 id="complete-colcon-replacement"><a class="header" href="#complete-colcon-replacement">Complete Colcon Replacement</a></h3>
-<p>ROC's build system (<code>roc work build</code>) is designed as a drop-in replacement for <code>colcon build</code> with the following advantages:</p>
+                        <h1 id="idl-tools-overview"><a class="header" href="#idl-tools-overview">IDL Tools Overview</a></h1>
+<p>ROC provides comprehensive Interface Definition Language (IDL) tools that enable seamless interoperability between ROS2 and other robotics ecosystems. These tools are designed to facilitate cross-platform communication and protocol conversion without requiring external dependencies.</p>
+<h2 id="what-is-interface-definition-language"><a class="header" href="#what-is-interface-definition-language">What is Interface Definition Language?</a></h2>
+<p>Interface Definition Language (IDL) is a specification language used to describe a software component's interface. In robotics and distributed systems, IDLs serve several critical purposes:</p>
 <ul>
-<li><strong>Native Performance</strong>: Written in Rust for superior performance and memory safety</li>
-<li><strong>Parallel Execution</strong>: Multi-threaded builds with intelligent dependency resolution</li>
-<li><strong>Environment Isolation</strong>: Clean environment management preventing build contamination</li>
-<li><strong>Comprehensive Logging</strong>: Detailed build logs and error reporting</li>
-<li><strong>Full Compatibility</strong>: Supports all major colcon command-line options</li>
+<li><strong>Platform Independence</strong>: Define data structures and APIs that work across different programming languages and systems</li>
+<li><strong>Code Generation</strong>: Automatically generate serialization/deserialization code from specifications</li>
+<li><strong>Protocol Interoperability</strong>: Enable communication between systems using different message formats</li>
+<li><strong>Version Management</strong>: Maintain backward/forward compatibility through structured schemas</li>
 </ul>
-<h3 id="package-management"><a class="header" href="#package-management">Package Management</a></h3>
-<ul>
-<li><strong>Intelligent Discovery</strong>: Automatic workspace scanning and package.xml parsing</li>
-<li><strong>Metadata Extraction</strong>: Complete package information including dependencies, maintainers, and build types</li>
-<li><strong>Build Type Support</strong>: Full support for ament_cmake, ament_python, and cmake packages</li>
-<li><strong>Dependency Validation</strong>: Circular dependency detection and resolution</li>
-</ul>
-<h3 id="development-workflow"><a class="header" href="#development-workflow">Development Workflow</a></h3>
-<ul>
-<li><strong>Package Creation</strong>: Intelligent wizard for creating properly structured ROS2 packages</li>
-<li><strong>Build Optimization</strong>: Incremental builds and parallel execution</li>
-<li><strong>Environment Setup</strong>: Automatic generation of setup scripts for workspace activation</li>
-</ul>
-<h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
-<p>The workspace management system is built on several core components:</p>
-<ol>
-<li><strong>Package Discovery Engine</strong>: Recursively scans workspace directories for <code>package.xml</code> files</li>
-<li><strong>Dependency Graph Resolver</strong>: Builds and validates package dependency graphs</li>
-<li><strong>Build Executor</strong>: Manages parallel build execution with proper environment isolation</li>
-<li><strong>Environment Manager</strong>: Handles environment variable setup and setup script generation</li>
-</ol>
-<h2 id="command-structure"><a class="header" href="#command-structure">Command Structure</a></h2>
-<pre><code class="language-bash">roc work &lt;subcommand&gt; [options]
+<h2 id="ros2-message-system"><a class="header" href="#ros2-message-system">ROS2 Message System</a></h2>
+<p>ROS2 uses its own IDL format (<code>.msg</code> files) to define message structures:</p>
+<pre><code class="language-msg"># Example: RobotStatus.msg
+string robot_name
+bool is_active
+float64 battery_level
+geometry_msgs/Pose current_pose
+sensor_msgs/LaserScan[] recent_scans
 </code></pre>
-<h3 id="available-subcommands"><a class="header" href="#available-subcommands">Available Subcommands</a></h3>
+<p><strong>Key Characteristics:</strong></p>
 <ul>
-<li><code>build</code> - Build packages in the workspace (colcon replacement)</li>
-<li><code>create</code> - Create new ROS2 packages with templates</li>
-<li><code>list</code> - List and discover packages in the workspace</li>
-<li><code>info</code> - Display detailed package information</li>
+<li><strong>Simple Syntax</strong>: Human-readable format with minimal boilerplate</li>
+<li><strong>Type System</strong>: Built-in primitive types plus support for nested messages</li>
+<li><strong>Array Support</strong>: Fixed-size and dynamic arrays</li>
+<li><strong>Package Namespacing</strong>: Messages organized by ROS2 packages</li>
+<li><strong>Constants</strong>: Support for constant definitions within messages</li>
 </ul>
-<h2 id="compatibility"><a class="header" href="#compatibility">Compatibility</a></h2>
-<p>ROC's workspace system is designed to be fully compatible with existing ROS2 workflows:</p>
+<h2 id="protobuf-integration"><a class="header" href="#protobuf-integration">Protobuf Integration</a></h2>
+<p>Protocol Buffers (protobuf) is Google's language-neutral, platform-neutral extensible mechanism for serializing structured data:</p>
+<pre><code class="language-protobuf">// Example: robot_status.proto
+syntax = "proto3";
+package robotics;
+
+message RobotStatus {
+  string robot_name = 1;
+  bool is_active = 2;
+  double battery_level = 3;
+  Pose current_pose = 4;
+  repeated LaserScan recent_scans = 5;
+}
+</code></pre>
+<p><strong>Key Characteristics:</strong></p>
 <ul>
-<li><strong>Colcon Arguments</strong>: All major colcon build options are supported</li>
-<li><strong>Package Formats</strong>: Supports package.xml formats 2 and 3</li>
-<li><strong>Build Systems</strong>: Works with ament_cmake, ament_python, and plain cmake</li>
-<li><strong>Environment</strong>: Generates standard ROS2 setup scripts compatible with existing tools</li>
+<li><strong>Efficient Serialization</strong>: Compact binary format</li>
+<li><strong>Schema Evolution</strong>: Built-in versioning and backward compatibility</li>
+<li><strong>Language Support</strong>: Code generation for 20+ programming languages</li>
+<li><strong>Advanced Features</strong>: Oneof fields, maps, enums, and nested definitions</li>
+<li><strong>Performance</strong>: Optimized for speed and memory usage</li>
 </ul>
-<h2 id="performance-benefits"><a class="header" href="#performance-benefits">Performance Benefits</a></h2>
-<p>Compared to colcon, ROC provides:</p>
+<h2 id="why-bidirectional-conversion"><a class="header" href="#why-bidirectional-conversion">Why Bidirectional Conversion?</a></h2>
+<p>The ability to convert between ROS2 <code>.msg</code> and Protobuf <code>.proto</code> formats enables:</p>
+<h3 id="integration-with-non-ros-systems"><a class="header" href="#integration-with-non-ros-systems">Integration with Non-ROS Systems</a></h3>
 <ul>
-<li><strong>Faster Startup</strong>: Native binary with minimal overhead</li>
-<li><strong>Better Parallelization</strong>: More efficient worker thread management</li>
-<li><strong>Memory Efficiency</strong>: Lower memory usage during builds</li>
-<li><strong>Cleaner Environment</strong>: Better isolation prevents build environment pollution</li>
-<li><strong>Superior Error Handling</strong>: More detailed error messages and recovery options</li>
+<li><strong>Cloud Services</strong>: Many cloud platforms use Protobuf for APIs</li>
+<li><strong>Mobile Applications</strong>: Protobuf is standard in mobile development</li>
+<li><strong>Microservices</strong>: Modern architectures often rely on Protobuf for service communication</li>
+<li><strong>AI/ML Pipelines</strong>: TensorFlow, gRPC, and other ML tools use Protobuf extensively</li>
 </ul>
-<p>The following sections provide detailed information about each component of the workspace management system.</p>
+<h3 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h3>
+<ul>
+<li><strong>Reduced Overhead</strong>: Protobuf's binary format is more efficient than ROS2's CDR serialization in some scenarios</li>
+<li><strong>Bandwidth Conservation</strong>: Smaller message sizes for network communication</li>
+<li><strong>Processing Speed</strong>: Faster serialization/deserialization in high-throughput applications</li>
+</ul>
+<h3 id="protocol-migration"><a class="header" href="#protocol-migration">Protocol Migration</a></h3>
+<ul>
+<li><strong>Legacy System Integration</strong>: Convert existing Protobuf schemas to ROS2 messages</li>
+<li><strong>Gradual Migration</strong>: Incrementally move systems between protocols</li>
+<li><strong>Multi-Protocol Support</strong>: Support both formats during transition periods</li>
+</ul>
+<h2 id="rocs-idl-implementation"><a class="header" href="#rocs-idl-implementation">ROC's IDL Implementation</a></h2>
+<p>ROC's IDL tools provide several advantages over existing solutions:</p>
+<h3 id="pure-rust-implementation"><a class="header" href="#pure-rust-implementation">Pure Rust Implementation</a></h3>
+<ul>
+<li><strong>No External Dependencies</strong>: Self-contained parser and generator</li>
+<li><strong>Performance</strong>: Native speed without Python or C++ overhead</li>
+<li><strong>Reliability</strong>: Memory-safe implementation with robust error handling</li>
+<li><strong>Maintainability</strong>: Single codebase without complex build dependencies</li>
+</ul>
+<h3 id="intelligent-conversion"><a class="header" href="#intelligent-conversion">Intelligent Conversion</a></h3>
+<ul>
+<li><strong>Automatic Direction Detection</strong>: Determines conversion direction from file extensions</li>
+<li><strong>Advanced Feature Support</strong>: Handles complex Protobuf constructs (nested messages, enums, oneofs, maps)</li>
+<li><strong>Type Mapping</strong>: Intelligent conversion between type systems</li>
+<li><strong>Dependency Resolution</strong>: Generates files in correct dependency order</li>
+</ul>
+<h3 id="developer-experience"><a class="header" href="#developer-experience">Developer Experience</a></h3>
+<ul>
+<li><strong>Inplace Output</strong>: Generates files alongside source files by default</li>
+<li><strong>Dry Run Mode</strong>: Preview conversions without writing files</li>
+<li><strong>Verbose Logging</strong>: Detailed information about conversion process</li>
+<li><strong>Error Reporting</strong>: Clear, actionable error messages</li>
+</ul>
+<h2 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h2>
+<h3 id="robotics-cloud-integration"><a class="header" href="#robotics-cloud-integration">Robotics Cloud Integration</a></h3>
+<p>Convert ROS2 sensor data to Protobuf for cloud processing:</p>
+<pre><code class="language-bash"># Convert sensor messages for cloud upload
+roc idl protobuf sensor_msgs/LaserScan.msg sensor_msgs/PointCloud2.msg --output ./cloud_api/
+</code></pre>
+<h3 id="cross-platform-development"><a class="header" href="#cross-platform-development">Cross-Platform Development</a></h3>
+<p>Generate ROS2 messages from existing Protobuf schemas:</p>
+<pre><code class="language-bash"># Convert existing Protobuf API to ROS2 messages
+roc idl protobuf api_definitions/*.proto --output ./ros2_interfaces/msg/
+</code></pre>
+<h3 id="protocol-modernization"><a class="header" href="#protocol-modernization">Protocol Modernization</a></h3>
+<p>Migrate legacy systems to modern formats:</p>
+<pre><code class="language-bash"># Update old message definitions
+roc idl protobuf legacy_messages/*.msg --output ./proto_definitions/
+</code></pre>
+<p>The following sections provide detailed information about specific aspects of ROC's IDL implementation.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../idl/type_mapping.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../implementation/memory_management.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../workspace/build_system.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../idl/protobuf.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -246,11 +295,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../idl/type_mapping.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../implementation/memory_management.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../workspace/build_system.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../idl/protobuf.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

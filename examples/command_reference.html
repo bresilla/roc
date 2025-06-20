@@ -428,6 +428,111 @@ get_topic_stats() {
 roc topic list --format json
 roc topic info /chatter --format json --verbose
 </code></pre>
+<h2 id="idl-commands"><a class="header" href="#idl-commands">IDL Commands</a></h2>
+<h3 id="roc-idl-protobuf"><a class="header" href="#roc-idl-protobuf"><code>roc idl protobuf</code></a></h3>
+<p>Bidirectional conversion between Protobuf (.proto) and ROS 2 (.msg) files with automatic direction detection.</p>
+<p><strong>Syntax:</strong></p>
+<pre><code class="language-bash">roc idl protobuf [OPTIONS] &lt;INPUT_FILES&gt;...
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>&lt;INPUT_FILES&gt;...</code>: Input files to convert (.proto or .msg files)</li>
+</ul>
+<p><strong>Options:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Option</th><th>Short</th><th>Description</th><th>Default</th></tr></thead><tbody>
+<tr><td><code>--output &lt;DIR&gt;</code></td><td><code>-o</code></td><td>Output directory for generated files</td><td>Same directory as input</td></tr>
+<tr><td><code>--package &lt;NAME&gt;</code></td><td><code>-p</code></td><td>Package name for generated files</td><td>Derived from input</td></tr>
+<tr><td><code>--config &lt;FILE&gt;</code></td><td><code>-c</code></td><td>Configuration file for type mappings (YAML)</td><td>None</td></tr>
+<tr><td><code>--include &lt;DIRS&gt;...</code></td><td><code>-I</code></td><td>Include directories for protobuf imports</td><td>None</td></tr>
+<tr><td><code>--verbose</code></td><td><code>-v</code></td><td>Show verbose output</td><td>False</td></tr>
+<tr><td><code>--dry-run</code></td><td><code>-n</code></td><td>Show what would be generated without writing files</td><td>False</td></tr>
+</tbody></table>
+</div>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-bash"># Convert .proto files to .msg files (automatic detection)
+roc idl protobuf robot.proto sensor_data.proto
+
+# Convert .msg files to .proto files (automatic detection)  
+roc idl protobuf RobotStatus.msg SensorData.msg
+
+# Specify output directory
+roc idl protobuf --output ./generated robot.proto
+
+# Dry run to preview conversion
+roc idl protobuf --dry-run --verbose robot.proto
+
+# Convert with include directories for imports
+roc idl protobuf -I ./proto_deps -I ./common robot.proto
+
+# Convert with custom package name
+roc idl protobuf --package my_robot_msgs robot.proto
+</code></pre>
+<p><strong>Protobuf to ROS2 (.proto → .msg):</strong></p>
+<pre><code class="language-bash"># Input: robot.proto
+roc idl protobuf robot.proto
+
+# Output: Robot.msg, RobotStatus.msg (based on message definitions)
+</code></pre>
+<p><strong>ROS2 to Protobuf (.msg → .proto):</strong></p>
+<pre><code class="language-bash"># Input: RobotStatus.msg
+roc idl protobuf RobotStatus.msg  
+
+# Output: robot_status.proto
+</code></pre>
+<p><strong>Advanced Usage:</strong></p>
+<pre><code class="language-bash"># Convert entire directory with verbose output
+roc idl protobuf --verbose src/proto/*.proto --output msg/
+
+# Mixed conversion with error handling
+roc idl protobuf file1.proto file2.proto || echo "Conversion failed"
+
+# Pipeline with other tools
+find . -name "*.proto" -exec roc idl protobuf {} --output ./ros_msgs \;
+</code></pre>
+<p><strong>Supported Protobuf Features:</strong></p>
+<ul>
+<li>Proto3 syntax</li>
+<li>Nested messages (automatically flattened)</li>
+<li>Enums (converted to constants)</li>
+<li>Repeated fields (arrays)</li>
+<li>Maps (converted to key-value arrays)</li>
+<li>Oneof fields (converted to separate optional fields)</li>
+<li>Comments (preserved when possible)</li>
+<li>Import statements and dependencies</li>
+</ul>
+<p><strong>Type Mappings:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Protobuf</th><th>ROS2</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>bool</code></td><td><code>bool</code></td><td>Direct mapping</td></tr>
+<tr><td><code>int32</code></td><td><code>int32</code></td><td>Direct mapping</td></tr>
+<tr><td><code>int64</code></td><td><code>int64</code></td><td>Direct mapping</td></tr>
+<tr><td><code>uint32</code></td><td><code>uint32</code></td><td>Direct mapping</td></tr>
+<tr><td><code>uint64</code></td><td><code>uint64</code></td><td>Direct mapping</td></tr>
+<tr><td><code>float</code></td><td><code>float32</code></td><td>Single precision</td></tr>
+<tr><td><code>double</code></td><td><code>float64</code></td><td>Double precision</td></tr>
+<tr><td><code>string</code></td><td><code>string</code></td><td>UTF-8 strings</td></tr>
+<tr><td><code>bytes</code></td><td><code>uint8[]</code></td><td>Byte arrays</td></tr>
+<tr><td><code>repeated T</code></td><td><code>T[]</code></td><td>Dynamic arrays</td></tr>
+<tr><td><code>map&lt;K,V&gt;</code></td><td><code>Entry[]</code></td><td>Key-value pairs</td></tr>
+</tbody></table>
+</div>
+<p><strong>Exit Codes:</strong></p>
+<ul>
+<li><code>0</code>: Success</li>
+<li><code>1</code>: Error (invalid syntax, file not found, permission issues, etc.)</li>
+</ul>
+<p><strong>Error Examples:</strong></p>
+<pre><code class="language-bash"># Mixed file types (not allowed)
+roc idl protobuf robot.proto RobotStatus.msg
+# Error: Cannot mix .proto and .msg files in the same conversion
+
+# Unsupported file extension
+roc idl protobuf data.json
+# Error: Unsupported file extension: .json
+
+# File not found
+roc idl protobuf nonexistent.proto
+# Error: Input file does not exist: nonexistent.proto
+</code></pre>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="common-issues"><a class="header" href="#common-issues">Common Issues</a></h3>
 <ol>

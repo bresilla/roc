@@ -2321,6 +2321,907 @@ fn test_topic_info_memory_management() {
 }
 <span class="boring">}</span></code></pre></pre>
 <p>This comprehensive memory management ensures that the <code>roc</code> tool is both safe and efficient when interfacing with ROS 2's C libraries.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="idl-tools-overview"><a class="header" href="#idl-tools-overview">IDL Tools Overview</a></h1>
+<p>ROC provides comprehensive Interface Definition Language (IDL) tools that enable seamless interoperability between ROS2 and other robotics ecosystems. These tools are designed to facilitate cross-platform communication and protocol conversion without requiring external dependencies.</p>
+<h2 id="what-is-interface-definition-language"><a class="header" href="#what-is-interface-definition-language">What is Interface Definition Language?</a></h2>
+<p>Interface Definition Language (IDL) is a specification language used to describe a software component's interface. In robotics and distributed systems, IDLs serve several critical purposes:</p>
+<ul>
+<li><strong>Platform Independence</strong>: Define data structures and APIs that work across different programming languages and systems</li>
+<li><strong>Code Generation</strong>: Automatically generate serialization/deserialization code from specifications</li>
+<li><strong>Protocol Interoperability</strong>: Enable communication between systems using different message formats</li>
+<li><strong>Version Management</strong>: Maintain backward/forward compatibility through structured schemas</li>
+</ul>
+<h2 id="ros2-message-system"><a class="header" href="#ros2-message-system">ROS2 Message System</a></h2>
+<p>ROS2 uses its own IDL format (<code>.msg</code> files) to define message structures:</p>
+<pre><code class="language-msg"># Example: RobotStatus.msg
+string robot_name
+bool is_active
+float64 battery_level
+geometry_msgs/Pose current_pose
+sensor_msgs/LaserScan[] recent_scans
+</code></pre>
+<p><strong>Key Characteristics:</strong></p>
+<ul>
+<li><strong>Simple Syntax</strong>: Human-readable format with minimal boilerplate</li>
+<li><strong>Type System</strong>: Built-in primitive types plus support for nested messages</li>
+<li><strong>Array Support</strong>: Fixed-size and dynamic arrays</li>
+<li><strong>Package Namespacing</strong>: Messages organized by ROS2 packages</li>
+<li><strong>Constants</strong>: Support for constant definitions within messages</li>
+</ul>
+<h2 id="protobuf-integration"><a class="header" href="#protobuf-integration">Protobuf Integration</a></h2>
+<p>Protocol Buffers (protobuf) is Google's language-neutral, platform-neutral extensible mechanism for serializing structured data:</p>
+<pre><code class="language-protobuf">// Example: robot_status.proto
+syntax = "proto3";
+package robotics;
+
+message RobotStatus {
+  string robot_name = 1;
+  bool is_active = 2;
+  double battery_level = 3;
+  Pose current_pose = 4;
+  repeated LaserScan recent_scans = 5;
+}
+</code></pre>
+<p><strong>Key Characteristics:</strong></p>
+<ul>
+<li><strong>Efficient Serialization</strong>: Compact binary format</li>
+<li><strong>Schema Evolution</strong>: Built-in versioning and backward compatibility</li>
+<li><strong>Language Support</strong>: Code generation for 20+ programming languages</li>
+<li><strong>Advanced Features</strong>: Oneof fields, maps, enums, and nested definitions</li>
+<li><strong>Performance</strong>: Optimized for speed and memory usage</li>
+</ul>
+<h2 id="why-bidirectional-conversion"><a class="header" href="#why-bidirectional-conversion">Why Bidirectional Conversion?</a></h2>
+<p>The ability to convert between ROS2 <code>.msg</code> and Protobuf <code>.proto</code> formats enables:</p>
+<h3 id="integration-with-non-ros-systems"><a class="header" href="#integration-with-non-ros-systems">Integration with Non-ROS Systems</a></h3>
+<ul>
+<li><strong>Cloud Services</strong>: Many cloud platforms use Protobuf for APIs</li>
+<li><strong>Mobile Applications</strong>: Protobuf is standard in mobile development</li>
+<li><strong>Microservices</strong>: Modern architectures often rely on Protobuf for service communication</li>
+<li><strong>AI/ML Pipelines</strong>: TensorFlow, gRPC, and other ML tools use Protobuf extensively</li>
+</ul>
+<h3 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h3>
+<ul>
+<li><strong>Reduced Overhead</strong>: Protobuf's binary format is more efficient than ROS2's CDR serialization in some scenarios</li>
+<li><strong>Bandwidth Conservation</strong>: Smaller message sizes for network communication</li>
+<li><strong>Processing Speed</strong>: Faster serialization/deserialization in high-throughput applications</li>
+</ul>
+<h3 id="protocol-migration"><a class="header" href="#protocol-migration">Protocol Migration</a></h3>
+<ul>
+<li><strong>Legacy System Integration</strong>: Convert existing Protobuf schemas to ROS2 messages</li>
+<li><strong>Gradual Migration</strong>: Incrementally move systems between protocols</li>
+<li><strong>Multi-Protocol Support</strong>: Support both formats during transition periods</li>
+</ul>
+<h2 id="rocs-idl-implementation"><a class="header" href="#rocs-idl-implementation">ROC's IDL Implementation</a></h2>
+<p>ROC's IDL tools provide several advantages over existing solutions:</p>
+<h3 id="pure-rust-implementation"><a class="header" href="#pure-rust-implementation">Pure Rust Implementation</a></h3>
+<ul>
+<li><strong>No External Dependencies</strong>: Self-contained parser and generator</li>
+<li><strong>Performance</strong>: Native speed without Python or C++ overhead</li>
+<li><strong>Reliability</strong>: Memory-safe implementation with robust error handling</li>
+<li><strong>Maintainability</strong>: Single codebase without complex build dependencies</li>
+</ul>
+<h3 id="intelligent-conversion"><a class="header" href="#intelligent-conversion">Intelligent Conversion</a></h3>
+<ul>
+<li><strong>Automatic Direction Detection</strong>: Determines conversion direction from file extensions</li>
+<li><strong>Advanced Feature Support</strong>: Handles complex Protobuf constructs (nested messages, enums, oneofs, maps)</li>
+<li><strong>Type Mapping</strong>: Intelligent conversion between type systems</li>
+<li><strong>Dependency Resolution</strong>: Generates files in correct dependency order</li>
+</ul>
+<h3 id="developer-experience"><a class="header" href="#developer-experience">Developer Experience</a></h3>
+<ul>
+<li><strong>Inplace Output</strong>: Generates files alongside source files by default</li>
+<li><strong>Dry Run Mode</strong>: Preview conversions without writing files</li>
+<li><strong>Verbose Logging</strong>: Detailed information about conversion process</li>
+<li><strong>Error Reporting</strong>: Clear, actionable error messages</li>
+</ul>
+<h2 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h2>
+<h3 id="robotics-cloud-integration"><a class="header" href="#robotics-cloud-integration">Robotics Cloud Integration</a></h3>
+<p>Convert ROS2 sensor data to Protobuf for cloud processing:</p>
+<pre><code class="language-bash"># Convert sensor messages for cloud upload
+roc idl protobuf sensor_msgs/LaserScan.msg sensor_msgs/PointCloud2.msg --output ./cloud_api/
+</code></pre>
+<h3 id="cross-platform-development"><a class="header" href="#cross-platform-development">Cross-Platform Development</a></h3>
+<p>Generate ROS2 messages from existing Protobuf schemas:</p>
+<pre><code class="language-bash"># Convert existing Protobuf API to ROS2 messages
+roc idl protobuf api_definitions/*.proto --output ./ros2_interfaces/msg/
+</code></pre>
+<h3 id="protocol-modernization"><a class="header" href="#protocol-modernization">Protocol Modernization</a></h3>
+<p>Migrate legacy systems to modern formats:</p>
+<pre><code class="language-bash"># Update old message definitions
+roc idl protobuf legacy_messages/*.msg --output ./proto_definitions/
+</code></pre>
+<p>The following sections provide detailed information about specific aspects of ROC's IDL implementation.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="protobuf-integration-1"><a class="header" href="#protobuf-integration-1">Protobuf Integration</a></h1>
+<p>ROC provides comprehensive support for Protocol Buffers (Protobuf), enabling seamless conversion between <code>.proto</code> and ROS2 <code>.msg</code> formats. This chapter details the technical implementation and capabilities of ROC's Protobuf integration.</p>
+<h2 id="protobuf-parser-implementation"><a class="header" href="#protobuf-parser-implementation">Protobuf Parser Implementation</a></h2>
+<p>ROC implements a pure Rust Protobuf parser that handles the complete proto3 specification without external dependencies. The parser is built with performance and accuracy in mind.</p>
+<h3 id="supported-protobuf-features"><a class="header" href="#supported-protobuf-features">Supported Protobuf Features</a></h3>
+<h4 id="basic-syntax-elements"><a class="header" href="#basic-syntax-elements">Basic Syntax Elements</a></h4>
+<ul>
+<li><strong>Syntax Declaration</strong>: <code>syntax = "proto3";</code></li>
+<li><strong>Package Declaration</strong>: <code>package com.example.robotics;</code></li>
+<li><strong>Import Statements</strong>: <code>import "google/protobuf/timestamp.proto";</code></li>
+<li><strong>Comments</strong>: Single-line (<code>//</code>) and multi-line (<code>/* */</code>) comments</li>
+</ul>
+<h4 id="message-definitions"><a class="header" href="#message-definitions">Message Definitions</a></h4>
+<pre><code class="language-protobuf">message RobotStatus {
+  // Basic field definition
+  string name = 1;
+  int32 id = 2;
+  bool active = 3;
+  
+  // Repeated fields (arrays)
+  repeated double joint_positions = 4;
+  repeated string error_messages = 5;
+}
+</code></pre>
+<h4 id="nested-messages"><a class="header" href="#nested-messages">Nested Messages</a></h4>
+<pre><code class="language-protobuf">message Robot {
+  message Status {
+    bool online = 1;
+    string last_error = 2;
+  }
+  
+  Status current_status = 1;
+  string robot_id = 2;
+}
+</code></pre>
+<p><strong>Flattening Behavior</strong>: ROC automatically flattens nested message names:</p>
+<ul>
+<li><code>Robot.Status</code> becomes <code>RobotStatus.msg</code></li>
+<li><code>Sensor.Camera.Configuration</code> becomes <code>SensorCameraConfiguration.msg</code></li>
+</ul>
+<h4 id="enumerations"><a class="header" href="#enumerations">Enumerations</a></h4>
+<pre><code class="language-protobuf">enum RobotState {
+  ROBOT_STATE_UNKNOWN = 0;
+  ROBOT_STATE_IDLE = 1;
+  ROBOT_STATE_MOVING = 2;
+  ROBOT_STATE_ERROR = 3;
+}
+
+message RobotCommand {
+  RobotState desired_state = 1;
+}
+</code></pre>
+<p>ROC converts enums to ROS2 constants within messages:</p>
+<pre><code class="language-msg"># RobotCommand.msg
+uint8 ROBOT_STATE_UNKNOWN=0
+uint8 ROBOT_STATE_IDLE=1
+uint8 ROBOT_STATE_MOVING=2
+uint8 ROBOT_STATE_ERROR=3
+uint8 desired_state
+</code></pre>
+<h4 id="oneof-fields"><a class="header" href="#oneof-fields">Oneof Fields</a></h4>
+<pre><code class="language-protobuf">message Command {
+  oneof command_type {
+    string text_command = 1;
+    int32 numeric_command = 2;
+    bool boolean_command = 3;
+  }
+}
+</code></pre>
+<p>Oneof fields are converted to separate optional fields in ROS2:</p>
+<pre><code class="language-msg"># Command.msg
+string text_command
+int32 numeric_command  
+bool boolean_command
+</code></pre>
+<h4 id="map-types"><a class="header" href="#map-types">Map Types</a></h4>
+<pre><code class="language-protobuf">message Configuration {
+  map&lt;string, string&gt; parameters = 1;
+  map&lt;int32, double&gt; sensor_readings = 2;
+}
+</code></pre>
+<p>Maps are converted to arrays of key-value pairs:</p>
+<pre><code class="language-msg"># Configuration.msg
+# Generated from map&lt;string, string&gt; parameters
+ConfigurationParametersEntry[] parameters
+# Generated from map&lt;int32, double&gt; sensor_readings  
+ConfigurationSensorReadingsEntry[] sensor_readings
+
+# ConfigurationParametersEntry.msg
+string key
+string value
+
+# ConfigurationSensorReadingsEntry.msg
+int32 key
+float64 value
+</code></pre>
+<h2 id="type-conversion-system"><a class="header" href="#type-conversion-system">Type Conversion System</a></h2>
+<p>ROC implements intelligent type mapping between Protobuf and ROS2 type systems:</p>
+<h3 id="primitive-types"><a class="header" href="#primitive-types">Primitive Types</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Protobuf Type</th><th>ROS2 Type</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>bool</code></td><td><code>bool</code></td><td>Direct mapping</td></tr>
+<tr><td><code>int32</code></td><td><code>int32</code></td><td>Direct mapping</td></tr>
+<tr><td><code>int64</code></td><td><code>int64</code></td><td>Direct mapping</td></tr>
+<tr><td><code>uint32</code></td><td><code>uint32</code></td><td>Direct mapping</td></tr>
+<tr><td><code>uint64</code></td><td><code>uint64</code></td><td>Direct mapping</td></tr>
+<tr><td><code>sint32</code></td><td><code>int32</code></td><td>Signed integer</td></tr>
+<tr><td><code>sint64</code></td><td><code>int64</code></td><td>Signed integer</td></tr>
+<tr><td><code>fixed32</code></td><td><code>uint32</code></td><td>Fixed-width unsigned</td></tr>
+<tr><td><code>fixed64</code></td><td><code>uint64</code></td><td>Fixed-width unsigned</td></tr>
+<tr><td><code>sfixed32</code></td><td><code>int32</code></td><td>Fixed-width signed</td></tr>
+<tr><td><code>sfixed64</code></td><td><code>int64</code></td><td>Fixed-width signed</td></tr>
+<tr><td><code>float</code></td><td><code>float32</code></td><td>Single precision</td></tr>
+<tr><td><code>double</code></td><td><code>float64</code></td><td>Double precision</td></tr>
+<tr><td><code>string</code></td><td><code>string</code></td><td>UTF-8 strings</td></tr>
+<tr><td><code>bytes</code></td><td><code>uint8[]</code></td><td>Byte arrays</td></tr>
+</tbody></table>
+</div>
+<h3 id="repeated-fields"><a class="header" href="#repeated-fields">Repeated Fields</a></h3>
+<p>Protobuf repeated fields map directly to ROS2 arrays:</p>
+<pre><code class="language-protobuf">repeated double values = 1;        // → float64[] values
+repeated string names = 2;         // → string[] names
+repeated RobotStatus robots = 3;   // → RobotStatus[] robots
+</code></pre>
+<h3 id="well-known-types"><a class="header" href="#well-known-types">Well-Known Types</a></h3>
+<p>ROC provides mappings for common Protobuf well-known types:</p>
+<pre><code class="language-protobuf">import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+message TimedData {
+  google.protobuf.Timestamp timestamp = 1;  // → builtin_interfaces/Time
+  google.protobuf.Duration timeout = 2;     // → builtin_interfaces/Duration
+}
+</code></pre>
+<h2 id="conversion-process"><a class="header" href="#conversion-process">Conversion Process</a></h2>
+<h3 id="proto-to-msg-conversion"><a class="header" href="#proto-to-msg-conversion">Proto to Msg Conversion</a></h3>
+<ol>
+<li><strong>Parsing</strong>: Parse <code>.proto</code> file into abstract syntax tree</li>
+<li><strong>Validation</strong>: Validate proto3 syntax and semantic rules</li>
+<li><strong>Dependency Analysis</strong>: Build dependency graph of message types</li>
+<li><strong>Type Resolution</strong>: Resolve all type references and nested definitions</li>
+<li><strong>Flattening</strong>: Flatten nested messages into separate files</li>
+<li><strong>Generation</strong>: Generate <code>.msg</code> files in dependency order</li>
+</ol>
+<h3 id="msg-to-proto-conversion"><a class="header" href="#msg-to-proto-conversion">Msg to Proto Conversion</a></h3>
+<ol>
+<li><strong>Parsing</strong>: Parse <code>.msg</code> files and extract field definitions</li>
+<li><strong>Type Mapping</strong>: Convert ROS2 types to Protobuf equivalents</li>
+<li><strong>Packaging</strong>: Organize messages into appropriate proto packages</li>
+<li><strong>Generation</strong>: Generate <code>.proto</code> files with proper syntax</li>
+</ol>
+<h2 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h2>
+<h3 id="comment-preservation"><a class="header" href="#comment-preservation">Comment Preservation</a></h3>
+<p>ROC preserves comments during conversion when possible:</p>
+<pre><code class="language-protobuf">// This is a robot status message
+message RobotStatus {
+  // The robot's unique identifier
+  string id = 1;
+  
+  // Whether the robot is currently active
+  bool active = 2;
+}
+</code></pre>
+<p>Becomes:</p>
+<pre><code class="language-msg"># This is a robot status message
+# The robot's unique identifier
+string id
+# Whether the robot is currently active
+bool active
+</code></pre>
+<h3 id="package-handling"><a class="header" href="#package-handling">Package Handling</a></h3>
+<p>ROC intelligently handles package declarations:</p>
+<ul>
+<li><strong>Proto to Msg</strong>: Uses package name as prefix for generated message names</li>
+<li><strong>Msg to Proto</strong>: Groups related messages into logical packages</li>
+<li><strong>Namespace Mapping</strong>: Converts between proto packages and ROS2 namespaces</li>
+</ul>
+<h3 id="import-resolution"><a class="header" href="#import-resolution">Import Resolution</a></h3>
+<p>For proto files with imports, ROC:</p>
+<ol>
+<li>Tracks imported dependencies</li>
+<li>Generates corresponding ROS2 message files</li>
+<li>Updates field references to use correct message types</li>
+<li>Maintains dependency order in output</li>
+</ol>
+<h2 id="error-handling-and-validation-1"><a class="header" href="#error-handling-and-validation-1">Error Handling and Validation</a></h2>
+<p>ROC provides comprehensive error reporting:</p>
+<h3 id="syntax-errors"><a class="header" href="#syntax-errors">Syntax Errors</a></h3>
+<pre><code>Error parsing robot.proto:5:10
+  |
+5 | message Robot {
+  |          ^^^^^ Expected message name
+</code></pre>
+<h3 id="semantic-errors"><a class="header" href="#semantic-errors">Semantic Errors</a></h3>
+<pre><code>Error: Undefined message type 'UnknownStatus' referenced in field 'status'
+  --&gt; robot.proto:15:3
+</code></pre>
+<h3 id="conversion-warnings"><a class="header" href="#conversion-warnings">Conversion Warnings</a></h3>
+<pre><code>Warning: Oneof field 'command_type' converted to separate optional fields
+Note: ROS2 messages don't support oneof semantics
+</code></pre>
+<h2 id="performance-characteristics-1"><a class="header" href="#performance-characteristics-1">Performance Characteristics</a></h2>
+<p>ROC's Protobuf implementation is optimized for:</p>
+<ul>
+<li><strong>Speed</strong>: Pure Rust implementation with zero-copy parsing where possible</li>
+<li><strong>Memory</strong>: Minimal memory allocations during parsing</li>
+<li><strong>Scalability</strong>: Handles large proto files and complex dependency graphs</li>
+<li><strong>Reliability</strong>: Comprehensive error handling and validation</li>
+</ul>
+<h2 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h2>
+<h3 id="basic-conversion"><a class="header" href="#basic-conversion">Basic Conversion</a></h3>
+<pre><code class="language-bash"># Convert proto to msg
+roc idl protobuf robot_api.proto sensor_data.proto
+
+# Convert msg to proto
+roc idl protobuf RobotStatus.msg SensorReading.msg
+</code></pre>
+<h3 id="advanced-options"><a class="header" href="#advanced-options">Advanced Options</a></h3>
+<pre><code class="language-bash"># Specify output directory
+roc idl protobuf --output ./generated *.proto
+
+# Dry run to preview output
+roc idl protobuf --dry-run complex_robot.proto
+
+# Verbose output for debugging
+roc idl protobuf --verbose robot_messages/*.proto
+</code></pre>
+<h3 id="integration-with-build-systems"><a class="header" href="#integration-with-build-systems">Integration with Build Systems</a></h3>
+<pre><code class="language-bash"># Generate messages as part of build process
+roc idl protobuf src/proto/*.proto --output msg/
+colcon build --packages-select my_robot_interfaces
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="ros2-message-system-1"><a class="header" href="#ros2-message-system-1">ROS2 Message System</a></h1>
+<p>ROS2 uses a simple yet powerful message definition format that enables efficient communication between nodes. This chapter explains how ROC processes and converts ROS2 message definitions.</p>
+<h2 id="ros2-message-format"><a class="header" href="#ros2-message-format">ROS2 Message Format</a></h2>
+<p>ROS2 messages are defined in <code>.msg</code> files using a straightforward syntax:</p>
+<h3 id="basic-message-structure"><a class="header" href="#basic-message-structure">Basic Message Structure</a></h3>
+<pre><code class="language-msg"># Comments start with hash symbols
+# Field definitions: type field_name [default_value]
+string robot_name
+int32 robot_id
+float64 battery_level
+bool is_active
+</code></pre>
+<h3 id="field-types"><a class="header" href="#field-types">Field Types</a></h3>
+<h4 id="primitive-types-1"><a class="header" href="#primitive-types-1">Primitive Types</a></h4>
+<p>ROS2 supports these built-in primitive types:</p>
+<div class="table-wrapper"><table><thead><tr><th>Type</th><th>Size</th><th>Range</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>bool</code></td><td>1 byte</td><td>true/false</td><td>Boolean value</td></tr>
+<tr><td><code>byte</code></td><td>1 byte</td><td>0-255</td><td>Unsigned 8-bit integer</td></tr>
+<tr><td><code>char</code></td><td>1 byte</td><td>-128 to 127</td><td>Signed 8-bit integer</td></tr>
+<tr><td><code>int8</code></td><td>1 byte</td><td>-128 to 127</td><td>Signed 8-bit integer</td></tr>
+<tr><td><code>uint8</code></td><td>1 byte</td><td>0 to 255</td><td>Unsigned 8-bit integer</td></tr>
+<tr><td><code>int16</code></td><td>2 bytes</td><td>-32,768 to 32,767</td><td>Signed 16-bit integer</td></tr>
+<tr><td><code>uint16</code></td><td>2 bytes</td><td>0 to 65,535</td><td>Unsigned 16-bit integer</td></tr>
+<tr><td><code>int32</code></td><td>4 bytes</td><td>-2^31 to 2^31-1</td><td>Signed 32-bit integer</td></tr>
+<tr><td><code>uint32</code></td><td>4 bytes</td><td>0 to 2^32-1</td><td>Unsigned 32-bit integer</td></tr>
+<tr><td><code>int64</code></td><td>8 bytes</td><td>-2^63 to 2^63-1</td><td>Signed 64-bit integer</td></tr>
+<tr><td><code>uint64</code></td><td>8 bytes</td><td>0 to 2^63-1</td><td>Unsigned 64-bit integer</td></tr>
+<tr><td><code>float32</code></td><td>4 bytes</td><td>IEEE 754</td><td>Single-precision float</td></tr>
+<tr><td><code>float64</code></td><td>8 bytes</td><td>IEEE 754</td><td>Double-precision float</td></tr>
+<tr><td><code>string</code></td><td>Variable</td><td>UTF-8</td><td>Unicode string</td></tr>
+</tbody></table>
+</div>
+<h4 id="array-types"><a class="header" href="#array-types">Array Types</a></h4>
+<p>ROS2 supports both fixed-size and dynamic arrays:</p>
+<pre><code class="language-msg"># Fixed-size arrays
+int32[10] fixed_array          # Array of exactly 10 integers
+float64[3] position           # 3D position vector
+
+# Dynamic arrays (unbounded)
+string[] names                # Variable number of strings
+geometry_msgs/Point[] waypoints  # Array of custom message types
+
+# Bounded arrays
+int32[&lt;=100] bounded_readings # At most 100 readings
+</code></pre>
+<h4 id="message-types"><a class="header" href="#message-types">Message Types</a></h4>
+<p>Messages can contain other messages as fields:</p>
+<pre><code class="language-msg"># Using standard ROS2 messages
+geometry_msgs/Pose current_pose
+sensor_msgs/LaserScan scan_data
+
+# Using custom messages from same package
+RobotStatus status
+BatteryInfo battery
+
+# Using messages from other packages
+my_package/CustomMessage custom_field
+</code></pre>
+<h3 id="constants-and-default-values"><a class="header" href="#constants-and-default-values">Constants and Default Values</a></h3>
+<p>ROS2 messages support constant definitions:</p>
+<pre><code class="language-msg"># Integer constants
+int32 STATUS_OK=0
+int32 STATUS_WARNING=1  
+int32 STATUS_ERROR=2
+
+# String constants
+string DEFAULT_NAME="DefaultRobot"
+
+# Float constants
+float64 MAX_SPEED=10.5
+
+# Using constants with fields
+int32 current_status STATUS_OK  # Default value
+string name DEFAULT_NAME
+</code></pre>
+<h3 id="comments-and-documentation"><a class="header" href="#comments-and-documentation">Comments and Documentation</a></h3>
+<p>Comments provide documentation and are preserved during conversion:</p>
+<pre><code class="language-msg"># This message represents the complete state of a robot
+# 
+# The robot state includes position, orientation, and operational status.
+# This message is published periodically by the robot state publisher.
+
+std_msgs/Header header          # Standard ROS header with timestamp
+geometry_msgs/Pose pose         # Robot position and orientation  
+geometry_msgs/Twist velocity    # Current linear and angular velocity
+uint8 operational_mode          # Current operational mode
+</code></pre>
+<h2 id="rocs-ros2-message-parser"><a class="header" href="#rocs-ros2-message-parser">ROC's ROS2 Message Parser</a></h2>
+<p>ROC implements a comprehensive parser for ROS2 message definitions:</p>
+<h3 id="parsing-process"><a class="header" href="#parsing-process">Parsing Process</a></h3>
+<ol>
+<li><strong>Lexical Analysis</strong>: Tokenize the message file into meaningful elements</li>
+<li><strong>Syntax Parsing</strong>: Build abstract syntax tree from tokens</li>
+<li><strong>Type Resolution</strong>: Resolve all message type references</li>
+<li><strong>Validation</strong>: Validate field names, types, and constraints</li>
+<li><strong>Dependency Tracking</strong>: Build dependency graph for proper ordering</li>
+</ol>
+<h3 id="advanced-features-supported"><a class="header" href="#advanced-features-supported">Advanced Features Supported</a></h3>
+<h4 id="header-information"><a class="header" href="#header-information">Header Information</a></h4>
+<p>ROC extracts and preserves:</p>
+<ul>
+<li>Package names from message paths</li>
+<li>Comments and documentation</li>
+<li>Field ordering and grouping</li>
+<li>Constant definitions</li>
+</ul>
+<h4 id="type-analysis"><a class="header" href="#type-analysis">Type Analysis</a></h4>
+<p>ROC analyzes:</p>
+<ul>
+<li>Primitive vs. composite types</li>
+<li>Array bounds and constraints</li>
+<li>Message dependencies</li>
+<li>Namespace resolution</li>
+</ul>
+<h4 id="error-detection"><a class="header" href="#error-detection">Error Detection</a></h4>
+<p>ROC validates:</p>
+<ul>
+<li>Type name correctness</li>
+<li>Array syntax validity</li>
+<li>Constant value compatibility</li>
+<li>Circular dependency detection</li>
+</ul>
+<h2 id="message-to-protobuf-conversion"><a class="header" href="#message-to-protobuf-conversion">Message to Protobuf Conversion</a></h2>
+<p>When converting ROS2 messages to Protobuf, ROC applies intelligent transformations:</p>
+<h3 id="type-mapping-strategy"><a class="header" href="#type-mapping-strategy">Type Mapping Strategy</a></h3>
+<h4 id="direct-mappings"><a class="header" href="#direct-mappings">Direct Mappings</a></h4>
+<pre><code class="language-msg"># ROS2 → Protobuf
+bool active          # → bool active = 1;
+int32 count         # → int32 count = 2;
+float64 value       # → double value = 3;
+string name         # → string name = 4;
+</code></pre>
+<h4 id="array-conversions"><a class="header" href="#array-conversions">Array Conversions</a></h4>
+<pre><code class="language-msg"># ROS2 arrays → Protobuf repeated fields
+int32[] numbers              # → repeated int32 numbers = 1;
+string[10] fixed_strings     # → repeated string fixed_strings = 2;
+geometry_msgs/Point[] points # → repeated geometry_msgs.Point points = 3;
+</code></pre>
+<h4 id="message-reference-resolution"><a class="header" href="#message-reference-resolution">Message Reference Resolution</a></h4>
+<pre><code class="language-msg"># ROS2 message reference
+geometry_msgs/Pose current_pose
+
+# Becomes Protobuf field
+geometry_msgs.Pose current_pose = 1;
+</code></pre>
+<h3 id="package-and-namespace-handling"><a class="header" href="#package-and-namespace-handling">Package and Namespace Handling</a></h3>
+<p>ROC converts ROS2 package structure to Protobuf packages:</p>
+<pre><code class="language-msg"># File: my_robot_msgs/msg/RobotStatus.msg
+std_msgs/Header header
+geometry_msgs/Pose pose
+</code></pre>
+<p>Becomes:</p>
+<pre><code class="language-protobuf">// robot_status.proto
+syntax = "proto3";
+package my_robot_msgs;
+
+import "std_msgs/header.proto";
+import "geometry_msgs/pose.proto";
+
+message RobotStatus {
+  std_msgs.Header header = 1;
+  geometry_msgs.Pose pose = 2;
+}
+</code></pre>
+<h3 id="constant-handling"><a class="header" href="#constant-handling">Constant Handling</a></h3>
+<p>ROS2 constants are converted to Protobuf enums when appropriate:</p>
+<pre><code class="language-msg"># ROS2 constants
+uint8 MODE_MANUAL=0
+uint8 MODE_AUTO=1
+uint8 MODE_EMERGENCY=2
+uint8 current_mode
+</code></pre>
+<p>Becomes:</p>
+<pre><code class="language-protobuf">enum Mode {
+  MODE_MANUAL = 0;
+  MODE_AUTO = 1;
+  MODE_EMERGENCY = 2;
+}
+
+message RobotControl {
+  Mode current_mode = 1;
+}
+</code></pre>
+<h2 id="common-ros2-message-patterns"><a class="header" href="#common-ros2-message-patterns">Common ROS2 Message Patterns</a></h2>
+<h3 id="standard-header-pattern"><a class="header" href="#standard-header-pattern">Standard Header Pattern</a></h3>
+<p>Many ROS2 messages include a standard header:</p>
+<pre><code class="language-msg">std_msgs/Header header
+# ... other fields
+</code></pre>
+<p>ROC recognizes this pattern and handles the std_msgs dependency appropriately.</p>
+<h3 id="sensor-data-pattern"><a class="header" href="#sensor-data-pattern">Sensor Data Pattern</a></h3>
+<p>Sensor messages often follow this structure:</p>
+<pre><code class="language-msg">std_msgs/Header header
+# Sensor-specific data fields
+float64[] ranges
+float64 angle_min
+float64 angle_max
+float64 angle_increment
+</code></pre>
+<h3 id="statusdiagnostic-pattern"><a class="header" href="#statusdiagnostic-pattern">Status/Diagnostic Pattern</a></h3>
+<p>Status messages typically include:</p>
+<pre><code class="language-msg">std_msgs/Header header
+uint8 level                    # Status level (OK, WARN, ERROR)
+string name                    # Component name
+string message                 # Human-readable status message
+string hardware_id             # Hardware identifier
+diagnostic_msgs/KeyValue[] values  # Additional diagnostic data
+</code></pre>
+<h2 id="integration-with-ros2-ecosystem"><a class="header" href="#integration-with-ros2-ecosystem">Integration with ROS2 Ecosystem</a></h2>
+<h3 id="package-dependencies"><a class="header" href="#package-dependencies">Package Dependencies</a></h3>
+<p>ROC understands common ROS2 message packages:</p>
+<ul>
+<li><code>std_msgs</code>: Standard message types (Header, String, etc.)</li>
+<li><code>geometry_msgs</code>: Geometric primitives (Point, Pose, Twist, etc.)</li>
+<li><code>sensor_msgs</code>: Sensor data (LaserScan, Image, PointCloud, etc.)</li>
+<li><code>nav_msgs</code>: Navigation messages (Path, OccupancyGrid, etc.)</li>
+<li><code>action_msgs</code>: Action-related messages</li>
+<li><code>diagnostic_msgs</code>: System diagnostics</li>
+</ul>
+<h3 id="build-system-integration"><a class="header" href="#build-system-integration">Build System Integration</a></h3>
+<p>ROC-generated protobuf files can be integrated into ROS2 build systems:</p>
+<pre><code class="language-cmake"># CMakeLists.txt
+find_package(protobuf REQUIRED)
+
+# Convert ROS2 messages to protobuf
+execute_process(
+  COMMAND roc idl protobuf ${CMAKE_CURRENT_SOURCE_DIR}/msg/*.msg
+          --output ${CMAKE_CURRENT_BINARY_DIR}/proto/
+)
+
+# Add protobuf generation
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="message-design"><a class="header" href="#message-design">Message Design</a></h3>
+<ul>
+<li>Keep messages simple and focused</li>
+<li>Use descriptive field names</li>
+<li>Include appropriate documentation</li>
+<li>Follow ROS2 naming conventions</li>
+</ul>
+<h3 id="conversion-considerations"><a class="header" href="#conversion-considerations">Conversion Considerations</a></h3>
+<ul>
+<li>Be aware of type precision differences</li>
+<li>Consider array bounds in target format</li>
+<li>Plan for constant handling strategy</li>
+<li>Document conversion decisions</li>
+</ul>
+<h3 id="performance-tips"><a class="header" href="#performance-tips">Performance Tips</a></h3>
+<ul>
+<li>Use appropriate numeric types</li>
+<li>Minimize nested message depth</li>
+<li>Consider serialization efficiency</li>
+<li>Profile converted message performance</li>
+</ul>
+<h2 id="limitations-and-considerations"><a class="header" href="#limitations-and-considerations">Limitations and Considerations</a></h2>
+<h3 id="ros2-to-protobuf-limitations"><a class="header" href="#ros2-to-protobuf-limitations">ROS2 to Protobuf Limitations</a></h3>
+<ol>
+<li><strong>Service Definitions</strong>: ROC currently focuses on message definitions</li>
+<li><strong>Action Definitions</strong>: Action definitions require special handling</li>
+<li><strong>Complex Constants</strong>: Some constant expressions may not convert directly</li>
+<li><strong>Custom Types</strong>: Very specialized ROS2 types may need manual attention</li>
+</ol>
+<h3 id="protobuf-to-ros2-limitations"><a class="header" href="#protobuf-to-ros2-limitations">Protobuf to ROS2 Limitations</a></h3>
+<ol>
+<li><strong>Oneof Fields</strong>: ROS2 doesn't have direct oneof equivalent</li>
+<li><strong>Map Types</strong>: Converted to key-value pair arrays</li>
+<li><strong>Any Types</strong>: Not directly supported in ROS2</li>
+<li><strong>Extensions</strong>: Protobuf extensions don't map to ROS2</li>
+</ol>
+<p>Understanding these patterns and limitations helps ensure successful conversion between ROS2 message formats and Protobuf schemas.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="type-mapping"><a class="header" href="#type-mapping">Type Mapping</a></h1>
+<p>Effective conversion between Protobuf and ROS2 message formats requires careful consideration of type system differences. This chapter provides comprehensive information about how ROC maps types between these systems.</p>
+<h2 id="type-system-comparison"><a class="header" href="#type-system-comparison">Type System Comparison</a></h2>
+<h3 id="protobuf-type-system"><a class="header" href="#protobuf-type-system">Protobuf Type System</a></h3>
+<p>Protobuf uses a rich type system designed for cross-language compatibility:</p>
+<ul>
+<li><strong>Primitive Types</strong>: Integers of various sizes, floating-point, boolean, string, bytes</li>
+<li><strong>Composite Types</strong>: Messages (structs), enums, oneofs (unions)</li>
+<li><strong>Container Types</strong>: Repeated fields (arrays), maps</li>
+<li><strong>Special Types</strong>: Well-known types (Timestamp, Duration, Any, etc.)</li>
+<li><strong>Advanced Features</strong>: Optional fields, default values, extensions</li>
+</ul>
+<h3 id="ros2-type-system"><a class="header" href="#ros2-type-system">ROS2 Type System</a></h3>
+<p>ROS2 uses a simpler, more constrained type system:</p>
+<ul>
+<li><strong>Primitive Types</strong>: Fixed-size integers, floating-point, boolean, string</li>
+<li><strong>Composite Types</strong>: Messages (structs), constants</li>
+<li><strong>Container Types</strong>: Fixed and dynamic arrays</li>
+<li><strong>Special Types</strong>: Standard message types (Header, etc.)</li>
+<li><strong>Constraints</strong>: Bounded arrays, default values</li>
+</ul>
+<h2 id="comprehensive-type-mapping-tables"><a class="header" href="#comprehensive-type-mapping-tables">Comprehensive Type Mapping Tables</a></h2>
+<h3 id="protobuf-to-ros2-mapping"><a class="header" href="#protobuf-to-ros2-mapping">Protobuf to ROS2 Mapping</a></h3>
+<h4 id="numeric-types"><a class="header" href="#numeric-types">Numeric Types</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>Protobuf Type</th><th>ROS2 Type</th><th>Size</th><th>Signed</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>bool</code></td><td><code>bool</code></td><td>1 byte</td><td>N/A</td><td>Direct mapping</td></tr>
+<tr><td><code>int32</code></td><td><code>int32</code></td><td>4 bytes</td><td>Yes</td><td>Direct mapping</td></tr>
+<tr><td><code>int64</code></td><td><code>int64</code></td><td>8 bytes</td><td>Yes</td><td>Direct mapping</td></tr>
+<tr><td><code>uint32</code></td><td><code>uint32</code></td><td>4 bytes</td><td>No</td><td>Direct mapping</td></tr>
+<tr><td><code>uint64</code></td><td><code>uint64</code></td><td>8 bytes</td><td>No</td><td>Direct mapping</td></tr>
+<tr><td><code>sint32</code></td><td><code>int32</code></td><td>4 bytes</td><td>Yes</td><td>ZigZag encoded in protobuf</td></tr>
+<tr><td><code>sint64</code></td><td><code>int64</code></td><td>8 bytes</td><td>Yes</td><td>ZigZag encoded in protobuf</td></tr>
+<tr><td><code>fixed32</code></td><td><code>uint32</code></td><td>4 bytes</td><td>No</td><td>Fixed-width encoding</td></tr>
+<tr><td><code>fixed64</code></td><td><code>uint64</code></td><td>8 bytes</td><td>No</td><td>Fixed-width encoding</td></tr>
+<tr><td><code>sfixed32</code></td><td><code>int32</code></td><td>4 bytes</td><td>Yes</td><td>Fixed-width signed</td></tr>
+<tr><td><code>sfixed64</code></td><td><code>int64</code></td><td>8 bytes</td><td>Yes</td><td>Fixed-width signed</td></tr>
+<tr><td><code>float</code></td><td><code>float32</code></td><td>4 bytes</td><td>Yes</td><td>IEEE 754 single precision</td></tr>
+<tr><td><code>double</code></td><td><code>float64</code></td><td>8 bytes</td><td>Yes</td><td>IEEE 754 double precision</td></tr>
+</tbody></table>
+</div>
+<h4 id="string-and-binary-types"><a class="header" href="#string-and-binary-types">String and Binary Types</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>Protobuf Type</th><th>ROS2 Type</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>string</code></td><td><code>string</code></td><td>UTF-8 encoded strings</td></tr>
+<tr><td><code>bytes</code></td><td><code>uint8[]</code></td><td>Binary data as byte array</td></tr>
+</tbody></table>
+</div>
+<h4 id="container-types"><a class="header" href="#container-types">Container Types</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>Protobuf Type</th><th>ROS2 Type</th><th>Example</th></tr></thead><tbody>
+<tr><td><code>repeated T</code></td><td><code>T[]</code></td><td><code>repeated int32 values</code> → <code>int32[] values</code></td></tr>
+<tr><td><code>map&lt;K,V&gt;</code></td><td><code>MapEntry[]</code></td><td><code>map&lt;string,int32&gt; data</code> → <code>DataEntry[] data</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="ros2-to-protobuf-mapping"><a class="header" href="#ros2-to-protobuf-mapping">ROS2 to Protobuf Mapping</a></h3>
+<h4 id="numeric-types-1"><a class="header" href="#numeric-types-1">Numeric Types</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>ROS2 Type</th><th>Protobuf Type</th><th>Rationale</th></tr></thead><tbody>
+<tr><td><code>bool</code></td><td><code>bool</code></td><td>Direct mapping</td></tr>
+<tr><td><code>byte</code></td><td><code>uint32</code></td><td>ROS2 byte is unsigned 8-bit</td></tr>
+<tr><td><code>char</code></td><td><code>int32</code></td><td>ROS2 char is signed 8-bit</td></tr>
+<tr><td><code>int8</code></td><td><code>int32</code></td><td>Protobuf doesn't have 8-bit integers</td></tr>
+<tr><td><code>uint8</code></td><td><code>uint32</code></td><td>Protobuf doesn't have 8-bit integers</td></tr>
+<tr><td><code>int16</code></td><td><code>int32</code></td><td>Protobuf doesn't have 16-bit integers</td></tr>
+<tr><td><code>uint16</code></td><td><code>uint32</code></td><td>Protobuf doesn't have 16-bit integers</td></tr>
+<tr><td><code>int32</code></td><td><code>int32</code></td><td>Direct mapping</td></tr>
+<tr><td><code>uint32</code></td><td><code>uint32</code></td><td>Direct mapping</td></tr>
+<tr><td><code>int64</code></td><td><code>int64</code></td><td>Direct mapping</td></tr>
+<tr><td><code>uint64</code></td><td><code>uint64</code></td><td>Direct mapping</td></tr>
+<tr><td><code>float32</code></td><td><code>float</code></td><td>Direct mapping</td></tr>
+<tr><td><code>float64</code></td><td><code>double</code></td><td>Direct mapping</td></tr>
+<tr><td><code>string</code></td><td><code>string</code></td><td>Direct mapping</td></tr>
+</tbody></table>
+</div>
+<h4 id="array-types-1"><a class="header" href="#array-types-1">Array Types</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>ROS2 Type</th><th>Protobuf Type</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>T[]</code></td><td><code>repeated T</code></td><td>Dynamic arrays</td></tr>
+<tr><td><code>T[N]</code></td><td><code>repeated T</code></td><td>Fixed-size arrays (size constraint lost)</td></tr>
+<tr><td><code>T[&lt;=N]</code></td><td><code>repeated T</code></td><td>Bounded arrays (bound constraint lost)</td></tr>
+</tbody></table>
+</div>
+<h2 id="special-type-conversions"><a class="header" href="#special-type-conversions">Special Type Conversions</a></h2>
+<h3 id="protobuf-oneof-to-ros2"><a class="header" href="#protobuf-oneof-to-ros2">Protobuf Oneof to ROS2</a></h3>
+<p>Protobuf oneof fields don't have a direct equivalent in ROS2. ROC handles this by creating separate optional fields:</p>
+<pre><code class="language-protobuf">// Protobuf
+message Command {
+  oneof command_type {
+    string text_command = 1;
+    int32 numeric_command = 2;
+    bool flag_command = 3;
+  }
+}
+</code></pre>
+<p>Converts to:</p>
+<pre><code class="language-msg"># ROS2 - all fields are optional, only one should be set
+string text_command
+int32 numeric_command
+bool flag_command
+</code></pre>
+<h3 id="protobuf-maps-to-ros2"><a class="header" href="#protobuf-maps-to-ros2">Protobuf Maps to ROS2</a></h3>
+<p>Maps are converted to arrays of key-value pair messages:</p>
+<pre><code class="language-protobuf">// Protobuf
+message Configuration {
+  map&lt;string, double&gt; parameters = 1;
+}
+</code></pre>
+<p>Converts to:</p>
+<pre><code class="language-msg"># Configuration.msg
+ConfigurationParametersEntry[] parameters
+
+# ConfigurationParametersEntry.msg (auto-generated)
+string key
+float64 value
+</code></pre>
+<h3 id="ros2-constants-to-protobuf"><a class="header" href="#ros2-constants-to-protobuf">ROS2 Constants to Protobuf</a></h3>
+<p>ROS2 constants are converted to enum values when they represent a set of related values:</p>
+<pre><code class="language-msg"># ROS2
+uint8 STATE_IDLE=0
+uint8 STATE_MOVING=1
+uint8 STATE_ERROR=2
+uint8 current_state
+</code></pre>
+<p>Converts to:</p>
+<pre><code class="language-protobuf">// Protobuf
+enum State {
+  STATE_IDLE = 0;
+  STATE_MOVING = 1;
+  STATE_ERROR = 2;
+}
+
+message RobotStatus {
+  State current_state = 1;
+}
+</code></pre>
+<h2 id="well-known-type-mappings"><a class="header" href="#well-known-type-mappings">Well-Known Type Mappings</a></h2>
+<h3 id="protobuf-well-known-types"><a class="header" href="#protobuf-well-known-types">Protobuf Well-Known Types</a></h3>
+<p>ROC provides special handling for common Protobuf well-known types:</p>
+<div class="table-wrapper"><table><thead><tr><th>Protobuf Type</th><th>ROS2 Equivalent</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>google.protobuf.Timestamp</code></td><td><code>builtin_interfaces/Time</code></td><td>Nanosecond precision</td></tr>
+<tr><td><code>google.protobuf.Duration</code></td><td><code>builtin_interfaces/Duration</code></td><td>Nanosecond precision</td></tr>
+<tr><td><code>google.protobuf.Empty</code></td><td>Empty message</td><td>No fields</td></tr>
+<tr><td><code>google.protobuf.StringValue</code></td><td><code>string</code></td><td>Wrapper type flattened</td></tr>
+<tr><td><code>google.protobuf.Int32Value</code></td><td><code>int32</code></td><td>Wrapper type flattened</td></tr>
+<tr><td><code>google.protobuf.BoolValue</code></td><td><code>bool</code></td><td>Wrapper type flattened</td></tr>
+</tbody></table>
+</div>
+<h3 id="standard-ros2-types"><a class="header" href="#standard-ros2-types">Standard ROS2 Types</a></h3>
+<p>Common ROS2 types have conventional Protobuf mappings:</p>
+<div class="table-wrapper"><table><thead><tr><th>ROS2 Type</th><th>Protobuf Equivalent</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>std_msgs/Header</code></td><td>Custom message</td><td>Timestamp + frame_id</td></tr>
+<tr><td><code>geometry_msgs/Point</code></td><td>Custom message</td><td>x, y, z coordinates</td></tr>
+<tr><td><code>geometry_msgs/Quaternion</code></td><td>Custom message</td><td>x, y, z, w components</td></tr>
+<tr><td><code>geometry_msgs/Pose</code></td><td>Custom message</td><td>Position + orientation</td></tr>
+<tr><td><code>geometry_msgs/Twist</code></td><td>Custom message</td><td>Linear + angular velocity</td></tr>
+</tbody></table>
+</div>
+<h2 id="type-conversion-edge-cases"><a class="header" href="#type-conversion-edge-cases">Type Conversion Edge Cases</a></h2>
+<h3 id="precision-and-range-considerations"><a class="header" href="#precision-and-range-considerations">Precision and Range Considerations</a></h3>
+<h4 id="integer-overflow-scenarios"><a class="header" href="#integer-overflow-scenarios">Integer Overflow Scenarios</a></h4>
+<pre><code class="language-msg"># ROS2 uint8 field
+uint8 small_value 255  # Maximum value for uint8
+</code></pre>
+<p>When converted to Protobuf <code>uint32</code>, the range increases significantly. ROC preserves the original constraint information in comments:</p>
+<pre><code class="language-protobuf">// Protobuf
+message Example {
+  uint32 small_value = 1;  // Originally uint8, max value 255
+}
+</code></pre>
+<h4 id="floating-point-precision"><a class="header" href="#floating-point-precision">Floating-Point Precision</a></h4>
+<pre><code class="language-msg"># ROS2 float32
+float32 precise_value 3.14159265359
+</code></pre>
+<p>Converting to Protobuf maintains the precision level:</p>
+<pre><code class="language-protobuf">float precise_value = 1;  // 32-bit precision maintained
+</code></pre>
+<h3 id="array-bound-handling"><a class="header" href="#array-bound-handling">Array Bound Handling</a></h3>
+<h4 id="fixed-size-arrays"><a class="header" href="#fixed-size-arrays">Fixed-Size Arrays</a></h4>
+<pre><code class="language-msg"># ROS2 fixed-size array
+float64[3] position
+</code></pre>
+<p>Protobuf doesn't support fixed-size arrays, so this becomes:</p>
+<pre><code class="language-protobuf">repeated double position = 1;  // Size constraint documented separately
+</code></pre>
+<h4 id="bounded-arrays"><a class="header" href="#bounded-arrays">Bounded Arrays</a></h4>
+<pre><code class="language-msg"># ROS2 bounded array
+int32[&lt;=100] readings
+</code></pre>
+<p>The bound constraint is preserved in documentation:</p>
+<pre><code class="language-protobuf">repeated int32 readings = 1;  // Maximum 100 elements
+</code></pre>
+<h2 id="advanced-mapping-strategies"><a class="header" href="#advanced-mapping-strategies">Advanced Mapping Strategies</a></h2>
+<h3 id="nested-message-flattening"><a class="header" href="#nested-message-flattening">Nested Message Flattening</a></h3>
+<p>ROC flattens nested Protobuf messages for ROS2 compatibility:</p>
+<pre><code class="language-protobuf">// Protobuf nested messages
+message Robot {
+  message Status {
+    bool active = 1;
+    string state = 2;
+  }
+  Status current_status = 1;
+  string robot_id = 2;
+}
+</code></pre>
+<p>Becomes:</p>
+<pre><code class="language-msg"># Robot.msg
+RobotStatus current_status
+string robot_id
+
+# RobotStatus.msg (flattened)
+bool active
+string state
+</code></pre>
+<h3 id="package-and-namespace-translation"><a class="header" href="#package-and-namespace-translation">Package and Namespace Translation</a></h3>
+<h4 id="protobuf-package-to-ros2-package"><a class="header" href="#protobuf-package-to-ros2-package">Protobuf Package to ROS2 Package</a></h4>
+<pre><code class="language-protobuf">// Protobuf
+syntax = "proto3";
+package robotics.sensors;
+
+message LaserData { ... }
+</code></pre>
+<p>Becomes:</p>
+<pre><code class="language-msg"># File: robotics_sensors_msgs/msg/LaserData.msg
+# Content of the message...
+</code></pre>
+<h4 id="ros2-package-to-protobuf-package"><a class="header" href="#ros2-package-to-protobuf-package">ROS2 Package to Protobuf Package</a></h4>
+<pre><code class="language-msg"># File: my_robot_msgs/msg/Status.msg
+# Message content...
+</code></pre>
+<p>Becomes:</p>
+<pre><code class="language-protobuf">syntax = "proto3";
+package my_robot_msgs;
+
+message Status { ... }
+</code></pre>
+<h2 id="configuration-and-customization"><a class="header" href="#configuration-and-customization">Configuration and Customization</a></h2>
+<h3 id="custom-type-mappings"><a class="header" href="#custom-type-mappings">Custom Type Mappings</a></h3>
+<p>ROC supports configuration files for custom type mappings:</p>
+<pre><code class="language-yaml"># type_mappings.yaml
+protobuf_to_ros2:
+  "my.custom.Timestamp": "builtin_interfaces/Time"
+  "my.custom.Position": "geometry_msgs/Point"
+
+ros2_to_protobuf:
+  "my_msgs/CustomType": "my.package.CustomMessage"
+</code></pre>
+<p>Usage:</p>
+<pre><code class="language-bash">roc idl protobuf --config type_mappings.yaml input_files...
+</code></pre>
+<h3 id="mapping-validation"><a class="header" href="#mapping-validation">Mapping Validation</a></h3>
+<p>ROC validates type mappings and warns about potential issues:</p>
+<pre><code>Warning: Converting uint64 to int64 may cause overflow for large values
+Warning: Map type conversion may affect lookup performance
+Warning: Oneof semantics lost in ROS2 conversion
+</code></pre>
+<h3 id="performance-implications"><a class="header" href="#performance-implications">Performance Implications</a></h3>
+<h4 id="serialization-efficiency"><a class="header" href="#serialization-efficiency">Serialization Efficiency</a></h4>
+<p>Different type choices affect serialization performance:</p>
+<ul>
+<li><strong>Protobuf varint encoding</strong>: Smaller integers encode more efficiently</li>
+<li><strong>Fixed-width types</strong>: Predictable size but potentially wasteful</li>
+<li><strong>String vs bytes</strong>: UTF-8 validation overhead for strings</li>
+</ul>
+<h4 id="memory-usage-2"><a class="header" href="#memory-usage-2">Memory Usage</a></h4>
+<p>Type conversions can affect memory usage:</p>
+<ul>
+<li><strong>Array bounds</strong>: ROS2 bounded arrays vs Protobuf repeated fields</li>
+<li><strong>Message size</strong>: Nested vs flattened message structures</li>
+<li><strong>Field ordering</strong>: Affects struct packing and cache efficiency</li>
+</ul>
+<h2 id="best-practices-for-type-mapping"><a class="header" href="#best-practices-for-type-mapping">Best Practices for Type Mapping</a></h2>
+<h3 id="design-considerations"><a class="header" href="#design-considerations">Design Considerations</a></h3>
+<ol>
+<li><strong>Choose appropriate numeric types</strong>: Don't use int64 when int32 suffices</li>
+<li><strong>Consider array bounds</strong>: Use bounded arrays in ROS2 when possible</li>
+<li><strong>Document constraints</strong>: Preserve semantic meaning across conversions</li>
+<li><strong>Plan for evolution</strong>: Design messages that can evolve over time</li>
+</ol>
+<h3 id="conversion-guidelines"><a class="header" href="#conversion-guidelines">Conversion Guidelines</a></h3>
+<ol>
+<li><strong>Test thoroughly</strong>: Validate converted messages with real data</li>
+<li><strong>Preserve semantics</strong>: Maintain the original meaning of fields</li>
+<li><strong>Document decisions</strong>: Record rationale for non-obvious mappings</li>
+<li><strong>Monitor performance</strong>: Profile converted message performance</li>
+</ol>
+<h3 id="maintenance-strategies"><a class="header" href="#maintenance-strategies">Maintenance Strategies</a></h3>
+<ol>
+<li><strong>Version control</strong>: Track message schema changes</li>
+<li><strong>Backward compatibility</strong>: Plan for schema evolution</li>
+<li><strong>Testing automation</strong>: Automated conversion validation</li>
+<li><strong>Documentation updates</strong>: Keep mapping documentation current</li>
+</ol>
+<p>Understanding these type mapping strategies ensures successful and maintainable conversions between Protobuf and ROS2 message formats.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="workspace-management-overview"><a class="header" href="#workspace-management-overview">Workspace Management Overview</a></h1>
 <p>ROC includes a comprehensive workspace management system that serves as a modern, high-performance replacement for colcon. The <code>roc work</code> command provides a complete suite of tools for ROS2 workspace management, including package creation, discovery, dependency resolution, and building.</p>
 <h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
@@ -2705,7 +3606,7 @@ pub enum BuildType {
 <li>Useful for integrating non-ROS libraries</li>
 <li>Less common but fully supported</li>
 </ul>
-<h2 id="error-handling-and-validation-1"><a class="header" href="#error-handling-and-validation-1">Error Handling and Validation</a></h2>
+<h2 id="error-handling-and-validation-2"><a class="header" href="#error-handling-and-validation-2">Error Handling and Validation</a></h2>
 <h3 id="xml-parsing-errors"><a class="header" href="#xml-parsing-errors">XML Parsing Errors</a></h3>
 <p>The discovery system handles various XML parsing issues:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -3625,7 +4526,7 @@ impl From&lt;&amp;str&gt; for BuildType {
 }
 <span class="boring">}</span></code></pre></pre>
 <h2 id="build-process-compatibility"><a class="header" href="#build-process-compatibility">Build Process Compatibility</a></h2>
-<h3 id="build-system-integration"><a class="header" href="#build-system-integration">Build System Integration</a></h3>
+<h3 id="build-system-integration-1"><a class="header" href="#build-system-integration-1">Build System Integration</a></h3>
 <p>ROC uses the same build system invocations as colcon:</p>
 <h4 id="cmake-packages"><a class="header" href="#cmake-packages">CMake Packages</a></h4>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -3822,7 +4723,7 @@ source install/setup.bash
 <h2 id="future-compatibility"><a class="header" href="#future-compatibility">Future Compatibility</a></h2>
 <h3 id="planned-features"><a class="header" href="#planned-features">Planned Features</a></h3>
 <p>ROC's roadmap includes additional colcon compatibility features:</p>
-<h4 id="advanced-options"><a class="header" href="#advanced-options">Advanced Options</a></h4>
+<h4 id="advanced-options-1"><a class="header" href="#advanced-options-1">Advanced Options</a></h4>
 <ul>
 <li><code>--event-handlers</code>: Custom build event processing</li>
 <li><code>--executor</code>: Different parallel execution strategies</li>
@@ -4295,7 +5196,7 @@ else
     echo "Exit code: $?"
 fi
 </code></pre>
-<h2 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h2>
+<h2 id="performance-optimization-1"><a class="header" href="#performance-optimization-1">Performance Optimization</a></h2>
 <h3 id="batch-operations"><a class="header" href="#batch-operations">Batch Operations</a></h3>
 <p>Optimize for scenarios with many topics:</p>
 <pre><code class="language-bash">#!/bin/bash
@@ -5214,6 +6115,111 @@ get_topic_stats() {
 <pre><code class="language-bash"># Proposed syntax (not yet implemented)
 roc topic list --format json
 roc topic info /chatter --format json --verbose
+</code></pre>
+<h2 id="idl-commands"><a class="header" href="#idl-commands">IDL Commands</a></h2>
+<h3 id="roc-idl-protobuf"><a class="header" href="#roc-idl-protobuf"><code>roc idl protobuf</code></a></h3>
+<p>Bidirectional conversion between Protobuf (.proto) and ROS 2 (.msg) files with automatic direction detection.</p>
+<p><strong>Syntax:</strong></p>
+<pre><code class="language-bash">roc idl protobuf [OPTIONS] &lt;INPUT_FILES&gt;...
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>&lt;INPUT_FILES&gt;...</code>: Input files to convert (.proto or .msg files)</li>
+</ul>
+<p><strong>Options:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Option</th><th>Short</th><th>Description</th><th>Default</th></tr></thead><tbody>
+<tr><td><code>--output &lt;DIR&gt;</code></td><td><code>-o</code></td><td>Output directory for generated files</td><td>Same directory as input</td></tr>
+<tr><td><code>--package &lt;NAME&gt;</code></td><td><code>-p</code></td><td>Package name for generated files</td><td>Derived from input</td></tr>
+<tr><td><code>--config &lt;FILE&gt;</code></td><td><code>-c</code></td><td>Configuration file for type mappings (YAML)</td><td>None</td></tr>
+<tr><td><code>--include &lt;DIRS&gt;...</code></td><td><code>-I</code></td><td>Include directories for protobuf imports</td><td>None</td></tr>
+<tr><td><code>--verbose</code></td><td><code>-v</code></td><td>Show verbose output</td><td>False</td></tr>
+<tr><td><code>--dry-run</code></td><td><code>-n</code></td><td>Show what would be generated without writing files</td><td>False</td></tr>
+</tbody></table>
+</div>
+<p><strong>Examples:</strong></p>
+<pre><code class="language-bash"># Convert .proto files to .msg files (automatic detection)
+roc idl protobuf robot.proto sensor_data.proto
+
+# Convert .msg files to .proto files (automatic detection)  
+roc idl protobuf RobotStatus.msg SensorData.msg
+
+# Specify output directory
+roc idl protobuf --output ./generated robot.proto
+
+# Dry run to preview conversion
+roc idl protobuf --dry-run --verbose robot.proto
+
+# Convert with include directories for imports
+roc idl protobuf -I ./proto_deps -I ./common robot.proto
+
+# Convert with custom package name
+roc idl protobuf --package my_robot_msgs robot.proto
+</code></pre>
+<p><strong>Protobuf to ROS2 (.proto → .msg):</strong></p>
+<pre><code class="language-bash"># Input: robot.proto
+roc idl protobuf robot.proto
+
+# Output: Robot.msg, RobotStatus.msg (based on message definitions)
+</code></pre>
+<p><strong>ROS2 to Protobuf (.msg → .proto):</strong></p>
+<pre><code class="language-bash"># Input: RobotStatus.msg
+roc idl protobuf RobotStatus.msg  
+
+# Output: robot_status.proto
+</code></pre>
+<p><strong>Advanced Usage:</strong></p>
+<pre><code class="language-bash"># Convert entire directory with verbose output
+roc idl protobuf --verbose src/proto/*.proto --output msg/
+
+# Mixed conversion with error handling
+roc idl protobuf file1.proto file2.proto || echo "Conversion failed"
+
+# Pipeline with other tools
+find . -name "*.proto" -exec roc idl protobuf {} --output ./ros_msgs \;
+</code></pre>
+<p><strong>Supported Protobuf Features:</strong></p>
+<ul>
+<li>Proto3 syntax</li>
+<li>Nested messages (automatically flattened)</li>
+<li>Enums (converted to constants)</li>
+<li>Repeated fields (arrays)</li>
+<li>Maps (converted to key-value arrays)</li>
+<li>Oneof fields (converted to separate optional fields)</li>
+<li>Comments (preserved when possible)</li>
+<li>Import statements and dependencies</li>
+</ul>
+<p><strong>Type Mappings:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Protobuf</th><th>ROS2</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>bool</code></td><td><code>bool</code></td><td>Direct mapping</td></tr>
+<tr><td><code>int32</code></td><td><code>int32</code></td><td>Direct mapping</td></tr>
+<tr><td><code>int64</code></td><td><code>int64</code></td><td>Direct mapping</td></tr>
+<tr><td><code>uint32</code></td><td><code>uint32</code></td><td>Direct mapping</td></tr>
+<tr><td><code>uint64</code></td><td><code>uint64</code></td><td>Direct mapping</td></tr>
+<tr><td><code>float</code></td><td><code>float32</code></td><td>Single precision</td></tr>
+<tr><td><code>double</code></td><td><code>float64</code></td><td>Double precision</td></tr>
+<tr><td><code>string</code></td><td><code>string</code></td><td>UTF-8 strings</td></tr>
+<tr><td><code>bytes</code></td><td><code>uint8[]</code></td><td>Byte arrays</td></tr>
+<tr><td><code>repeated T</code></td><td><code>T[]</code></td><td>Dynamic arrays</td></tr>
+<tr><td><code>map&lt;K,V&gt;</code></td><td><code>Entry[]</code></td><td>Key-value pairs</td></tr>
+</tbody></table>
+</div>
+<p><strong>Exit Codes:</strong></p>
+<ul>
+<li><code>0</code>: Success</li>
+<li><code>1</code>: Error (invalid syntax, file not found, permission issues, etc.)</li>
+</ul>
+<p><strong>Error Examples:</strong></p>
+<pre><code class="language-bash"># Mixed file types (not allowed)
+roc idl protobuf robot.proto RobotStatus.msg
+# Error: Cannot mix .proto and .msg files in the same conversion
+
+# Unsupported file extension
+roc idl protobuf data.json
+# Error: Unsupported file extension: .json
+
+# File not found
+roc idl protobuf nonexistent.proto
+# Error: Input file does not exist: nonexistent.proto
 </code></pre>
 <h2 id="troubleshooting-1"><a class="header" href="#troubleshooting-1">Troubleshooting</a></h2>
 <h3 id="common-issues"><a class="header" href="#common-issues">Common Issues</a></h3>
