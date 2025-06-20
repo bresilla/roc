@@ -12,6 +12,10 @@ pub use command::handle;
 
 use std::path::PathBuf;
 
+// TODO: Future migration - these types are very similar to crate::shared::package_discovery
+// Consider migrating to shared discovery system for consistency
+// pub use crate::shared::package_discovery::{Package as PackageMeta, BuildType};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuildType {
     AmentCmake,

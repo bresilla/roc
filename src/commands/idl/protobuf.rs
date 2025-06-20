@@ -3,6 +3,8 @@ use clap::ArgMatches;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::discovery::{discover_idl_projects, ProjectDiscoveryOptions};
+
 #[derive(Debug, Clone)]
 enum ConversionDirection {
     ProtoToMsg,
@@ -18,19 +20,29 @@ struct ProtobufConversionOptions {
     include_dirs: Vec<PathBuf>,
     verbose: bool,
     dry_run: bool,
-    direction: ConversionDirection,
+    direction: Option<ConversionDirection>, // None means auto-detect per project
+    // Discovery options
+    discovery_mode: bool,
+    search_root: PathBuf,
+    max_depth: usize,
 }
 
 impl ProtobufConversionOptions {
     fn from_matches(matches: &ArgMatches) -> Result<Self> {
         let input_files: Vec<PathBuf> = matches
             .get_many::<String>("proto_files")
-            .ok_or_else(|| anyhow!("Input files are required"))?
-            .map(PathBuf::from)
-            .collect();
+            .map(|values| values.map(PathBuf::from).collect())
+            .unwrap_or_default();
 
-        // Auto-detect conversion direction based on file extensions
-        let direction = detect_conversion_direction(&input_files)?;
+        // Enable discovery mode if no input files specified or explicitly requested
+        let discovery_mode = input_files.is_empty() || matches.get_flag("discover");
+
+        // Auto-detect conversion direction only if specific files are provided
+        let direction = if !input_files.is_empty() {
+            Some(detect_conversion_direction(&input_files)?)
+        } else {
+            None // Will be determined per project during discovery
+        };
 
         let output_dir = matches.get_one::<String>("output_dir")
             .filter(|s| *s != ".")  // If it's "." (default), treat as None for inplace
@@ -47,6 +59,17 @@ impl ProtobufConversionOptions {
         let verbose = matches.get_flag("verbose");
         let dry_run = matches.get_flag("dry_run");
 
+        // Discovery options
+        let search_root = matches
+            .get_one::<String>("search_root")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+        let max_depth: usize = matches
+            .get_one::<String>("max_depth")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(10);
+
         Ok(ProtobufConversionOptions {
             input_files,
             output_dir,
@@ -56,6 +79,9 @@ impl ProtobufConversionOptions {
             verbose,
             dry_run,
             direction,
+            discovery_mode,
+            search_root,
+            max_depth,
         })
     }
 }
@@ -99,12 +125,121 @@ pub fn handle(matches: ArgMatches) {
         }
     };
 
+    if options.discovery_mode {
+        if let Err(e) = handle_discovery_mode(&options) {
+            eprintln!("Error during discovery conversion: {}", e);
+            std::process::exit(1);
+        }
+    } else {
+        if let Err(e) = handle_direct_mode(&options) {
+            eprintln!("Error during conversion: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn handle_discovery_mode(options: &ProtobufConversionOptions) -> Result<()> {
     if options.verbose {
-        println!("🚀 Starting bidirectional Protobuf ↔ ROS 2 conversion...");
+        println!("🔍 Starting IDL project discovery mode...");
+        println!("   Search root: {}", options.search_root.display());
+        println!("   Max depth: {}", options.max_depth);
+        match &options.output_dir {
+            Some(dir) => println!("   Output directory: {}", dir.display()),
+            None => println!("   Output mode: inplace (same directory as input files)"),
+        }
+    }
+
+    let discovery_options = ProjectDiscoveryOptions {
+        search_root: options.search_root.clone(),
+        include_hidden: false,
+        max_depth: Some(options.max_depth),
+        verbose: options.verbose,
+    };
+
+    let projects = discover_idl_projects(&discovery_options)?;
+
+    if projects.is_empty() {
+        if options.search_root.display().to_string() == "." {
+            println!("⚠️  No ROS2 packages with IDL files found in the current directory.");
+            println!("   Try specifying a different search root with --search-root <path>");
+            println!("   or use 'roc idl protobuf <files>' to convert specific files.");
+        } else {
+            println!("⚠️  No ROS2 packages with IDL files found in {}.", options.search_root.display());
+        }
+        return Ok(());
+    }
+
+    // Process each project
+    for project in &projects {
+        if options.verbose {
+            println!("\n� Processing project: {}", project.package_path.display());
+        }
+
+        // Convert proto files to msg
+        if !project.proto_files.is_empty() {
+            let proto_options = ProtobufConversionOptions {
+                input_files: project.proto_files.clone(),
+                output_dir: options.output_dir.clone(),
+                package_name: Some(project.package_name.clone()),
+                config_file: options.config_file.clone(),
+                include_dirs: options.include_dirs.clone(),
+                verbose: options.verbose,
+                dry_run: options.dry_run,
+                direction: Some(ConversionDirection::ProtoToMsg),
+                discovery_mode: false,
+                search_root: options.search_root.clone(),
+                max_depth: options.max_depth,
+            };
+
+            if let Err(e) = convert_proto_to_msg(&proto_options) {
+                eprintln!("Error converting proto files in {}: {}", project.package_path.display(), e);
+                continue;
+            }
+        }
+
+        // Convert msg files to proto
+        if !project.msg_files.is_empty() {
+            let msg_options = ProtobufConversionOptions {
+                input_files: project.msg_files.clone(),
+                output_dir: options.output_dir.clone(),
+                package_name: Some(project.package_name.clone()),
+                config_file: options.config_file.clone(),
+                include_dirs: options.include_dirs.clone(),
+                verbose: options.verbose,
+                dry_run: options.dry_run,
+                direction: Some(ConversionDirection::MsgToProto),
+                discovery_mode: false,
+                search_root: options.search_root.clone(),
+                max_depth: options.max_depth,
+            };
+
+            if let Err(e) = convert_msg_to_proto(&msg_options) {
+                eprintln!("Error converting msg files in {}: {}", project.package_path.display(), e);
+                continue;
+            }
+        }
+    }
+
+    if options.verbose {
+        let total_proto = projects.iter().map(|p| p.proto_files.len()).sum::<usize>();
+        let total_msg = projects.iter().map(|p| p.msg_files.len()).sum::<usize>();
+        println!("\n✅ Discovery mode conversion completed!");
+        println!("   Processed {} projects", projects.len());
+        println!("   Converted {} proto files", total_proto);
+        println!("   Converted {} msg files", total_msg);
+    }
+
+    Ok(())
+}
+
+fn handle_direct_mode(options: &ProtobufConversionOptions) -> Result<()> {
+    if options.verbose {
+        println!("�🚀 Starting bidirectional Protobuf ↔ ROS 2 conversion...");
         println!("   Input files: {:?}", options.input_files);
         match options.direction {
-            ConversionDirection::ProtoToMsg => println!("   Direction: .proto → .msg"),
-            ConversionDirection::MsgToProto => println!("   Direction: .msg → .proto"),
+            Some(ConversionDirection::ProtoToMsg) => println!("   Direction: .proto → .msg"),
+            Some(ConversionDirection::MsgToProto) => println!("   Direction: .msg → .proto"),
+            None => println!("   Direction: auto-detect"),
         }
         match &options.output_dir {
             Some(dir) => println!("   Output directory: {}", dir.display()),
@@ -115,18 +250,20 @@ pub fn handle(matches: ArgMatches) {
     }
 
     let result = match options.direction {
-        ConversionDirection::ProtoToMsg => convert_proto_to_msg(&options),
-        ConversionDirection::MsgToProto => convert_msg_to_proto(&options),
+        Some(ConversionDirection::ProtoToMsg) => convert_proto_to_msg(options),
+        Some(ConversionDirection::MsgToProto) => convert_msg_to_proto(options),
+        None => Err(anyhow!("No conversion direction specified")),
     };
 
     if let Err(e) = result {
-        eprintln!("Error during conversion: {}", e);
-        std::process::exit(1);
+        return Err(e);
     }
 
     if options.verbose {
         println!("✅ Conversion completed successfully!");
     }
+
+    Ok(())
 }
 
 fn convert_proto_to_msg(options: &ProtobufConversionOptions) -> Result<()> {

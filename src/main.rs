@@ -3,6 +3,7 @@ mod commands;
 mod completions;
 mod utils;
 mod graph;
+mod shared;
 use std::env;
 
 fn main() {

@@ -2,7 +2,8 @@ use clap::ArgMatches;
 use colored::*;
 use std::path::PathBuf;
 use std::fs;
-use crate::commands::work::build::{package_discovery, BuildType};
+use anyhow::Result;
+use crate::shared::package_discovery::{discover_packages, DiscoveryConfig, BuildType};
 
 fn format_build_status(package_path: &PathBuf, build_base: &PathBuf, install_base: &PathBuf) -> String {
     let package_name = package_path.file_name().unwrap().to_string_lossy();
@@ -41,14 +42,29 @@ fn get_creation_time(package_path: &PathBuf) -> String {
     "Unknown".to_string()
 }
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_command(matches: ArgMatches) -> Result<()> {
     let workspace_root = std::env::current_dir()?;
-    let base_paths = vec![PathBuf::from("src")];
     let build_base = workspace_root.join("build");
     let install_base = workspace_root.join("install");
     
-    // Discover packages using the existing package discovery
-    let packages = package_discovery::discover_packages(&base_paths)?;
+    // Use the new shared discovery system - more flexible than just /src
+    let config = DiscoveryConfig {
+        base_paths: vec![workspace_root.clone()],
+        include_hidden: matches.get_flag("all"),
+        max_depth: Some(10), // Reasonable depth for workspace
+        exclude_patterns: vec![
+            "build".to_string(),
+            "install".to_string(), 
+            "log".to_string(),
+            ".git".to_string(),
+            ".vscode".to_string(),
+            "target".to_string(), // Rust build dir
+            "node_modules".to_string(),
+            "__pycache__".to_string(),
+        ],
+    };
+    
+    let packages = discover_packages(&config)?;
     
     if packages.is_empty() {
         println!("{}", "No ROS 2 packages found in the workspace.".yellow());

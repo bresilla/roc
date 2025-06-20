@@ -2,7 +2,8 @@ use clap::ArgMatches;
 use colored::*;
 use std::path::PathBuf;
 use std::fs;
-use crate::commands::work::build::{package_discovery, BuildType};
+use anyhow::Result;
+use crate::shared::package_discovery::{discover_packages, DiscoveryConfig, BuildType};
 use roxmltree::Document;
 
 fn format_build_type(build_type: &BuildType) -> String {
@@ -69,22 +70,37 @@ fn extract_urls(xml_content: &str) -> Vec<(String, String)> {
     }
 }
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_command(matches: ArgMatches) -> Result<()> {
     let package_name = matches.get_one::<String>("PACKAGE_NAME").unwrap();
     let show_xml = matches.get_flag("xml");
     
     let workspace_root = std::env::current_dir()?;
-    let base_paths = vec![PathBuf::from("src")];
     let build_base = workspace_root.join("build");
     let install_base = workspace_root.join("install");
     
-    // Discover packages using the existing package discovery
-    let packages = package_discovery::discover_packages(&base_paths)?;
+    // Use the new shared discovery system
+    let config = DiscoveryConfig {
+        base_paths: vec![workspace_root.clone()],
+        include_hidden: false,
+        max_depth: Some(10),
+        exclude_patterns: vec![
+            "build".to_string(),
+            "install".to_string(),
+            "log".to_string(),
+            ".git".to_string(),
+            ".vscode".to_string(),
+            "target".to_string(),
+            "node_modules".to_string(),
+            "__pycache__".to_string(),
+        ],
+    };
+    
+    let packages = discover_packages(&config)?;
     
     // Find the requested package
     let package = packages.iter()
         .find(|pkg| pkg.name == *package_name)
-        .ok_or_else(|| format!("Package '{}' not found in workspace", package_name))?;
+        .ok_or_else(|| anyhow::anyhow!("Package '{}' not found in workspace", package_name))?;
     
     let package_xml_path = package.path.join("package.xml");
     
