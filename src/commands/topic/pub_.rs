@@ -60,10 +60,30 @@ impl DynamicRclPublisher {
         
         let publisher = if let Some(type_support) = message_type_info.type_support {
             unsafe {
+                // Validate inputs before calling rcl_publisher_init
+                println!("🔍 Publisher creation debugging:");
+                println!("   Context valid: {}", context.is_valid());
+                println!("   Node pointer: {:p}", context.node());
+                println!("   Type support pointer: {:p}", type_support);
+                println!("   Topic name C-string: {:?}", topic_name_c);
+                println!("   Topic name content: '{}'", topic_name);
+                
+                // Validate context - node() returns a reference so it should be valid
+                // The issue might be in the context or node state, not null pointers
+                
+                // Validate type support is not null  
+                if type_support.is_null() {
+                    return Err(anyhow!("Type support pointer is null"));
+                }
+                
                 let mut pub_instance = rcl_get_zero_initialized_publisher();
                 let publisher_options = rcl_publisher_get_default_options();
                 
+                println!("   Publisher instance initialized: {:p}", &pub_instance);
+                println!("   Publisher options: {:p}", &publisher_options);
+                
                 // Create the RCL publisher with real type support
+                println!("🎯 About to call rcl_publisher_init...");
                 let ret = rcl_publisher_init(
                     &mut pub_instance,
                     context.node(),
@@ -76,7 +96,7 @@ impl DynamicRclPublisher {
                     return Err(anyhow!("Failed to create RCL publisher: return code {}", ret));
                 }
                 
-                println!("Successfully created RCL publisher with real type support!");
+                println!("✅ Successfully created RCL publisher with real type support!");
                 pub_instance
             }
         } else {
@@ -103,17 +123,14 @@ impl DynamicRclPublisher {
                 println!("Message content: {:?}", yaml_repr);
             }
             
-            // For now, skip actual publishing to avoid crashes while we debug the discovery issue
-            // The publisher is created and should be visible in the graph even without publishing
-            println!("Skipping actual message publishing to avoid serialization format issues");
-            
-            // TODO: Use RCL to publish the serialized message once we fix the message format
-            // unsafe {
-            //     let ret = rcl_publish(&self.publisher, msg.data.as_ptr() as *const _, std::ptr::null_mut());
-            //     if ret != 0 { // RCL_RET_OK is 0
-            //         return Err(anyhow!("Failed to publish message: return code {}", ret));
-            //     }
-            // }
+            // Publish the message using RCL with proper C struct layout
+            unsafe {
+                let ret = rcl_publish(&self.publisher, msg.data.as_ptr() as *const _, std::ptr::null_mut());
+                if ret != 0 { // RCL_RET_OK is 0
+                    return Err(anyhow!("Failed to publish message: return code {}", ret));
+                }
+                println!("✅ Successfully published message ({} bytes) with C struct layout", msg.data.len());
+            }
             
             Ok(())
         } else {

@@ -90,27 +90,18 @@ async fn monitor_topic_bandwidth(
     window_size: Duration,
     running: Arc<AtomicBool>,
 ) -> Result<()> {
-    // Create RCL context for direct API access
-    let create_context = || -> Result<RclGraphContext> {
-        RclGraphContext::new()
-            .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))
-    };
+    // Create RCL context for subscription
+    let graph_context = RclGraphContext::new()
+        .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
-    // Wait for topic to appear (better for /chatter)
-    let context = create_context()?;
-    if !context.wait_for_topic(topic_name, Duration::from_secs(3))? {
+    // Wait for topic to appear
+    if !graph_context.wait_for_topic(topic_name, Duration::from_secs(3))? {
         return Err(anyhow!("Topic '{}' not found after waiting", topic_name));
-    }
-
-    // Wait for publishers to be available (better reliability for /chatter)
-    if !context.wait_for_topic_with_publishers(topic_name, Duration::from_secs(5))? {
-        println!("WARNING: no publisher on [{}]", topic_name);
     }
 
     // Get topic type
     let topic_type = {
-        let context = create_context()?;
-        let topics_and_types = context.get_topic_names_and_types()
+        let topics_and_types = graph_context.get_topic_names_and_types()
             .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
 
         topics_and_types
@@ -120,62 +111,107 @@ async fn monitor_topic_bandwidth(
             .ok_or_else(|| anyhow!("Could not determine type for topic '{}'", topic_name))?
     };
 
+    // Wait for publishers to be available
+    if !graph_context.wait_for_topic_with_publishers(topic_name, Duration::from_secs(5))? {
+        println!("WARNING: no publisher on [{}]", topic_name);
+    }
+
+    // Create dynamic subscription for real bandwidth monitoring
+    let subscription = graph_context.create_subscription(topic_name, &topic_type)?;
+
     println!("Subscribed to [{}]", topic_name);
+    println!("Topic type: {}", topic_type);
     
     let bandwidth_calc = Arc::new(Mutex::new(BandwidthCalculator::new(window_size)));
     let bandwidth_calc_clone = Arc::clone(&bandwidth_calc);
 
-    let check_interval = Duration::from_millis(100);
-    let mut last_message_time = Instant::now();
-    let message_simulation_interval = Duration::from_millis(500); // 2 Hz for demo
+    let check_interval = Duration::from_millis(10); // High frequency polling for accurate bandwidth measurement
+    let mut stats_print_timer = Instant::now();
+    let stats_print_interval = Duration::from_millis(100); // Print stats every 100ms
 
-    // Main monitoring loop
+    // Main monitoring loop with real message reception
     while running.load(Ordering::Relaxed) {
         sleep(check_interval).await;
 
-        // Check if publishers are active
-        let current_publisher_count = {
-            let context = create_context()?;
-            context.count_publishers(topic_name).unwrap_or(0)
-        };
+        // Check for new messages
+        match subscription.take_message() {
+            Ok(Some(message_data)) => {
+                // Message received - record timestamp and size
+                let current_time = Instant::now();
+                let message_size = message_data.len();
 
-        if current_publisher_count == 0 {
-            println!("No publishers found for topic '{}'", topic_name);
-            sleep(Duration::from_secs(1)).await;
-            continue;
+                let mut calc = bandwidth_calc_clone.lock().unwrap();
+                calc.add_message(current_time, message_size);
+            }
+            Ok(None) => {
+                // No message available, continue polling
+            }
+            Err(_e) => {
+                // Error receiving message - continue but don't record
+            }
         }
 
-        // Simulate message detection and bandwidth calculation
-        let current_time = Instant::now();
-        if current_time.duration_since(last_message_time) >= message_simulation_interval {
-            // Estimate message size based on topic type
-            let estimated_message_size = match topic_type.as_str() {
-                "std_msgs/msg/String" => 50,
-                "geometry_msgs/msg/Twist" => 48,
-                "sensor_msgs/msg/Image" => 640 * 480 * 3, // VGA RGB
-                "sensor_msgs/msg/LaserScan" => 360 * 4,   // 360 points * 4 bytes
-                "std_msgs/msg/Header" => 32,
-                _ => 64, // Default estimate
-            };
-
-            let mut calc = bandwidth_calc_clone.lock().unwrap();
-            calc.add_message(current_time, estimated_message_size);
-
+        // Print statistics periodically
+        if stats_print_timer.elapsed() >= stats_print_interval {
+            let calc = bandwidth_calc_clone.lock().unwrap();
             let current_bw = calc.get_current_bandwidth();
             let average_bw = calc.get_average_bandwidth();
             let msg_count = calc.get_message_count();
 
-            // Format bandwidth output like ros2 topic bw
-            println!(
-                "average: {:.2} B/s\tmean: {:.2} B/s\tmin: {:.2} B/s\tmax: {:.2} B/s\twindow: {}",
-                current_bw,
-                average_bw,
-                if current_bw > 0.0 { current_bw * 0.8 } else { 0.0 }, // Simulate min
-                if current_bw > 0.0 { current_bw * 1.2 } else { 0.0 }, // Simulate max
-                msg_count.min(window_size.as_secs() as usize * 2) // Approximate messages in window
-            );
+            if msg_count > 0 {
+                // Calculate min/max/mean bandwidth from recent measurements
+                let bandwidth_samples: Vec<f64> = calc.message_sizes.iter()
+                    .zip(calc.message_sizes.iter().skip(1))
+                    .map(|((t1, s1), (t2, _s2))| {
+                        let time_diff = t2.duration_since(*t1).as_secs_f64();
+                        if time_diff > 0.0 {
+                            *s1 as f64 / time_diff
+                        } else {
+                            0.0
+                        }
+                    })
+                    .filter(|&bw| bw > 0.0)
+                    .collect();
 
-            last_message_time = current_time;
+                let (min_bw, max_bw) = if bandwidth_samples.len() > 0 {
+                    let min_bw = bandwidth_samples.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+                    let max_bw = bandwidth_samples.iter().fold(0.0f64, |a, &b| a.max(b));
+                    (min_bw, max_bw)
+                } else {
+                    (current_bw, current_bw)
+                };
+
+                // Format bandwidth output like ros2 topic bw
+                println!(
+                    "average: {:.2} B/s\tmean: {:.2} B/s\tmin: {:.2} B/s\tmax: {:.2} B/s\twindow: {}",
+                    current_bw,
+                    average_bw,
+                    min_bw,
+                    max_bw,
+                    calc.message_sizes.len().min(window_size.as_secs() as usize * 10)
+                );
+            }
+
+            stats_print_timer = Instant::now();
+        }
+
+        // Check if publishers are still active
+        let current_publisher_count = graph_context.count_publishers(topic_name).unwrap_or(0);
+        if current_publisher_count == 0 {
+            // Don't spam the warning - the bandwidth display already shows no messages
+            static mut LAST_NO_PUBLISHER_WARNING: Option<Instant> = None;
+            let now = Instant::now();
+            unsafe {
+                let should_warn = match LAST_NO_PUBLISHER_WARNING {
+                    Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
+                    None => true,
+                };
+                
+                if should_warn {
+                    println!("No publishers found for topic '{}'", topic_name);
+                    LAST_NO_PUBLISHER_WARNING = Some(now);
+                }
+            }
         }
     }
 

@@ -86,6 +86,9 @@ fn main() {
         // Subscription and Publisher functions for interception
         .allowlist_function("rcl_subscription_init")
         .allowlist_function("rcl_subscription_fini")
+        .allowlist_function("rcl_get_zero_initialized_subscription")
+        .allowlist_function("rcl_subscription_get_default_options")
+        .allowlist_function("rcl_subscription_is_valid")
         .allowlist_function("rcl_take")
         .allowlist_function("rcl_publisher_init")
         .allowlist_function("rcl_publisher_fini")

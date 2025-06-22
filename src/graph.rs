@@ -7,7 +7,7 @@
 pub use crate::shared::graph_context::RclGraphContext;
 pub use crate::shared::graph_types::{TopicInfo, TopicEndpointInfo, EndpointType};
 pub use crate::shared::dynamic_messages::{
-    DynamicMessageType, DynamicMessageRegistry, DynamicMessageIntrospection, MessageMemberInfo,
+    DynamicMessageRegistry, DynamicSubscriber,
     is_message_type_available, get_available_message_types
 };
 pub use crate::shared::dynamic_messages::yaml_parser::{YamlValue, parse_yaml_message, validate_message_structure};
@@ -153,4 +153,14 @@ impl RclGraphContext {
     ) -> Result<YamlValue> {
         deserialize_message(message_type, data)
     }
+
+    /// Create a dynamic subscription for any message type
+    pub fn create_subscription(
+        &self,
+        topic_name: &str,
+        message_type: &str,
+    ) -> Result<DynamicSubscriber> {
+        DynamicSubscriber::new(self, topic_name, message_type)
+    }
+
 }

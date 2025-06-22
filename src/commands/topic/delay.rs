@@ -386,49 +386,166 @@ fn parse_duration(duration_str: &str) -> Result<Duration> {
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
+    // For now, implement a basic delay analysis that measures message latency
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    
+    match rt.block_on(run_delay_analysis(matches, common_args)) {
+        Ok(()) => {
+            println!("\nDelay analysis stopped.");
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+async fn run_delay_analysis(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()> {
+    let topic_name = matches
+        .get_one::<String>("topic_name")
+        .ok_or_else(|| anyhow!("Topic name is required"))?;
+
+    println!("🚀 Starting basic delay analysis for topic: {}", topic_name);
+    println!("   This measures message processing latency within roc");
+    println!("   Press Ctrl+C to stop");
+
     // Setup signal handling for graceful shutdown
     let running = Arc::new(AtomicBool::new(true));
     let running_clone = running.clone();
 
-    ctrlc::set_handler(move || {
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for ctrl+c");
         running_clone.store(false, Ordering::Relaxed);
-    }).expect("Error setting Ctrl-C handler");
+    });
 
-    // Parse options
-    let options = match DelayOptions::from_matches(&matches, &common_args) {
-        Ok(opts) => opts,
-        Err(e) => {
-            eprintln!("Error parsing arguments: {}", e);
-            return;
-        }
-    };
+    // Create RCL context for subscription
+    let graph_context = RclGraphContext::new()
+        .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
-    println!("🚀 Starting RMW-level topic delay interceptor...");
-    println!("   Input topic: {}", options.topic_name);
-    println!("   Output topic: {}", options.output_topic.as_ref().unwrap_or(&format!("{}/delayed", options.topic_name)));
-    println!("   Delay: {:?}", options.delay_duration);
-
-    // Create and start the interceptor
-    let mut interceptor = match TopicDelayInterceptor::new(
-        options.topic_name.clone(),
-        options.output_topic,
-        options.delay_duration,
-        options.verbose,
-    ) {
-        Ok(interceptor) => interceptor,
-        Err(e) => {
-            eprintln!("Failed to create topic delay interceptor: {}", e);
-            return;
-        }
-    };
-
-    // Create async runtime and run the interceptor
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    
-    if let Err(e) = rt.block_on(interceptor.start_intercepting(running)) {
-        eprintln!("Error running topic delay interceptor: {}", e);
-        eprintln!("\n💡 Note: This is a prototype implementation.");
-        eprintln!("   Full RMW integration requires proper type support and node creation.");
-        eprintln!("   Current implementation shows the architecture for RMW-level interception.");
+    // Wait for topic to appear
+    if !graph_context.wait_for_topic(topic_name, Duration::from_secs(3))? {
+        return Err(anyhow!("Topic '{}' not found after waiting", topic_name));
     }
+
+    // Get topic type
+    let topic_type = {
+        let topics_and_types = graph_context
+            .get_topic_names_and_types()
+            .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
+
+        topics_and_types
+            .iter()
+            .find(|(name, _)| name == topic_name)
+            .map(|(_, type_name)| type_name.clone())
+            .ok_or_else(|| {
+                anyhow!(
+                    "Could not determine type for topic '{}'",
+                    topic_name
+                )
+            })?
+    };
+
+    // Wait for publishers to be available
+    if !graph_context.wait_for_topic_with_publishers(topic_name, Duration::from_secs(5))? {
+        println!("WARNING: no publisher on [{}]", topic_name);
+    }
+
+    // Create dynamic subscription for delay analysis
+    let subscription = graph_context.create_subscription(topic_name, &topic_type)?;
+    
+    println!("Subscribed to [{}] (type: {})", topic_name, topic_type);
+    
+    let mut message_count = 0;
+    let mut total_delay_us = 0;
+    let mut min_delay_us = u128::MAX;
+    let mut max_delay_us = 0;
+    
+    let check_interval = Duration::from_millis(10);
+    let mut stats_print_timer = Instant::now();
+    let stats_print_interval = Duration::from_secs(1); // Print stats every second
+
+    // Main delay analysis loop
+    while running.load(Ordering::Relaxed) {
+        tokio::time::sleep(check_interval).await;
+
+        // Check for new messages and measure processing delay
+        let receive_start = Instant::now();
+        match subscription.take_message() {
+            Ok(Some(message_data)) => {
+                let processing_delay = receive_start.elapsed().as_micros();
+                
+                message_count += 1;
+                total_delay_us += processing_delay;
+                min_delay_us = min_delay_us.min(processing_delay);
+                max_delay_us = max_delay_us.max(processing_delay);
+                
+                if message_count % 10 == 0 {
+                    println!(
+                        "Message #{}: {} bytes, processing delay: {} μs",
+                        message_count,
+                        message_data.len(),
+                        processing_delay
+                    );
+                }
+            }
+            Ok(None) => {
+                // No message available, continue polling
+            }
+            Err(e) => {
+                eprintln!("Error receiving message: {}", e);
+            }
+        }
+
+        // Print periodic statistics
+        if stats_print_timer.elapsed() >= stats_print_interval && message_count > 0 {
+            let avg_delay_us = total_delay_us / message_count;
+            
+            println!(
+                "📊 Delay Stats - Messages: {}, Avg: {} μs, Min: {} μs, Max: {} μs",
+                message_count,
+                avg_delay_us,
+                min_delay_us,
+                max_delay_us
+            );
+            
+            stats_print_timer = Instant::now();
+        }
+
+        // Check if publishers are still active
+        let current_publisher_count = graph_context.count_publishers(topic_name).unwrap_or(0);
+        if current_publisher_count == 0 {
+            static mut LAST_NO_PUBLISHER_WARNING: Option<Instant> = None;
+            let now = Instant::now();
+            unsafe {
+                let should_warn = match LAST_NO_PUBLISHER_WARNING {
+                    Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
+                    None => true,
+                };
+                
+                if should_warn {
+                    println!("WARNING: no publisher on [{}]", topic_name);
+                    LAST_NO_PUBLISHER_WARNING = Some(now);
+                }
+            }
+        }
+    }
+
+    // Final statistics
+    if message_count > 0 {
+        let avg_delay_us = total_delay_us / message_count;
+        println!(
+            "\n📋 Final Results for '{}':",
+            topic_name
+        );
+        println!("   Total messages: {}", message_count);
+        println!("   Average processing delay: {} μs", avg_delay_us);
+        println!("   Minimum processing delay: {} μs", min_delay_us);
+        println!("   Maximum processing delay: {} μs", max_delay_us);
+    } else {
+        println!("\n📋 No messages received for analysis");
+    }
+
+    Ok(())
 }

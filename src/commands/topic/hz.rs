@@ -77,17 +77,13 @@ async fn monitor_topic_rate(
     use_wall_time: bool,
     running: Arc<AtomicBool>,
 ) -> Result<()> {
-    // Create RCL context for direct API access
+    // Create RCL context for subscription
     let graph_context = RclGraphContext::new()
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
-    // Verify topic exists
-    let topics = graph_context
-        .get_topic_names()
-        .map_err(|e| anyhow!("Failed to get topic names: {}", e))?;
-
-    if !topics.contains(&topic_name.to_string()) {
-        return Err(anyhow!("Topic '{}' not found", topic_name));
+    // Wait for topic to appear
+    if !graph_context.wait_for_topic(topic_name, Duration::from_secs(3))? {
+        return Err(anyhow!("Topic '{}' not found after waiting", topic_name));
     }
 
     // Get topic type
@@ -103,83 +99,115 @@ async fn monitor_topic_rate(
             .ok_or_else(|| anyhow!("Could not determine type for topic '{}'", topic_name))?
     };
 
+    // Wait for publishers to be available
+    if !graph_context.wait_for_topic_with_publishers(topic_name, Duration::from_secs(5))? {
+        println!("WARNING: no publisher on [{}]", topic_name);
+    }
+
+    // Create dynamic subscription for real message rate monitoring
+    let subscription = graph_context.create_subscription(topic_name, &topic_type)?;
+    
     println!("Subscribed to [{}]", topic_name);
     println!("Topic type: {}", topic_type);
 
     let rate_calculator = Arc::new(Mutex::new(RateCalculator::new(window_size)));
     let rate_calc_clone = Arc::clone(&rate_calculator);
 
-    // Create a subscription to monitor messages
-    // Note: In a full implementation, we would create an actual RCL subscription
-    // For now, we'll simulate the rate monitoring by checking publisher count changes
-    // This is a simplified version - a complete implementation would need to:
-    // 1. Create an RCL subscription
-    // 2. Set up a callback to record message timestamps
-    // 3. Handle the actual message receiving
-
-    let mut last_publisher_count = 0;
-    let mut last_message_time = Instant::now();
-    let check_interval = Duration::from_millis(100);
-
+    let check_interval = Duration::from_millis(10); // High frequency polling for accurate rate measurement
+    let mut stats_print_timer = Instant::now();
+    let stats_print_interval = Duration::from_millis(100); // Print stats every 100ms
+    
     println!("Monitoring topic rate (window size: {})...", window_size);
     println!("Press Ctrl+C to stop");
 
-    // Main monitoring loop
+    // Main monitoring loop with real message reception
     while running.load(Ordering::Relaxed) {
         sleep(check_interval).await;
 
-        // Check if publishers are still active
-        let current_publisher_count = graph_context.count_publishers(topic_name).unwrap_or(0);
+        // Check for new messages
+        match subscription.take_message() {
+            Ok(Some(_message_data)) => {
+                // Message received - record timestamp
+                let current_time = if use_wall_time {
+                    Instant::now()
+                } else {
+                    // For now use wall time - in a full implementation, this would
+                    // extract ROS time from the message header
+                    Instant::now()
+                };
 
-        if current_publisher_count == 0 {
-            println!("No publishers found for topic '{}'", topic_name);
-            sleep(Duration::from_secs(1)).await;
-            continue;
+                let mut calc = rate_calc_clone.lock().unwrap();
+                calc.add_message(current_time);
+            }
+            Ok(None) => {
+                // No message available, continue polling
+            }
+            Err(_e) => {
+                // Error receiving message - continue but don't record
+            }
         }
 
-        // Simulate message arrival detection
-        // In a real implementation, this would be triggered by actual message callbacks
-        let current_time = if use_wall_time {
-            Instant::now()
-        } else {
-            // For simulation, we'll use wall time
-            // In a real implementation, this would use ROS time from message headers
-            Instant::now()
-        };
-
-        // Simulate message detection (this is a placeholder)
-        // In reality, we'd have callbacks from the RCL subscription
-        if current_publisher_count != last_publisher_count
-            || current_time.duration_since(last_message_time) > Duration::from_millis(500)
-        {
-            let mut calc = rate_calc_clone.lock().unwrap();
-            calc.add_message(current_time);
-
+        // Print statistics periodically
+        if stats_print_timer.elapsed() >= stats_print_interval {
+            let calc = rate_calc_clone.lock().unwrap();
             let current_rate = calc.get_current_rate();
-            let _average_rate = calc.get_average_rate();
+            let average_rate = calc.get_average_rate();
             let total_msgs = calc.get_total_messages();
 
-            println!(
-                "average rate: {:.3}\tmin: {:.3}s max: {:.3}s std dev: {:.3}s window: {}",
-                current_rate,
-                if current_rate > 0.0 {
-                    1.0 / current_rate
-                } else {
-                    0.0
-                }, // min period
-                if current_rate > 0.0 {
-                    1.0 / current_rate
-                } else {
-                    0.0
-                }, // max period (simplified)
-                0.0, // std dev (simplified)
-                total_msgs.min(window_size)
-            );
+            if total_msgs > 0 {
+                // Calculate statistics for display
+                let periods: Vec<f64> = calc.timestamps.iter()
+                    .zip(calc.timestamps.iter().skip(1))
+                    .map(|(t1, t2)| t2.duration_since(*t1).as_secs_f64())
+                    .collect();
 
-            last_message_time = current_time;
+                let (min_period, max_period, std_dev) = if periods.len() > 0 {
+                    let min_p = periods.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+                    let max_p = periods.iter().fold(0.0f64, |a, &b| a.max(b));
+                    
+                    // Calculate standard deviation
+                    let mean = periods.iter().sum::<f64>() / periods.len() as f64;
+                    let variance = periods.iter()
+                        .map(|p| (p - mean).powi(2))
+                        .sum::<f64>() / periods.len() as f64;
+                    let std_dev = variance.sqrt();
+                    
+                    (min_p, max_p, std_dev)
+                } else {
+                    (0.0, 0.0, 0.0)
+                };
+
+                println!(
+                    "average rate: {:.3}\tmin: {:.3}s max: {:.3}s std dev: {:.3}s window: {}",
+                    current_rate,
+                    min_period,
+                    max_period,
+                    std_dev,
+                    calc.timestamps.len().min(window_size)
+                );
+            }
+
+            stats_print_timer = Instant::now();
         }
 
-        last_publisher_count = current_publisher_count;
+        // Check if publishers are still active
+        let current_publisher_count = graph_context.count_publishers(topic_name).unwrap_or(0);
+        if current_publisher_count == 0 {
+            // Don't spam the warning - the rate display already shows no messages
+            static mut LAST_NO_PUBLISHER_WARNING: Option<Instant> = None;
+            let now = Instant::now();
+            unsafe {
+                let should_warn = match LAST_NO_PUBLISHER_WARNING {
+                    Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
+                    None => true,
+                };
+                
+                if should_warn {
+                    println!("No publishers found for topic '{}'", topic_name);
+                    LAST_NO_PUBLISHER_WARNING = Some(now);
+                }
+            }
+        }
     }
 
     Ok(())
