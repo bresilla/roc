@@ -9,12 +9,14 @@ ROC is a modern replacement for the ROS2 CLI toolchain, built with Rust for perf
 
 ## 🚀 Features
 
-- **Direct RCL/RMW Integration**: Native bindings to ROS2's core libraries
-- **Comprehensive Topic Information**: Detailed QoS profiles, endpoint discovery, and type introspection
-- **High Performance**: Built in Rust for speed and memory safety
-- **Complete CLI Compatibility**: Drop-in replacement for `ros2` commands
-- **Advanced Debugging**: Detailed endpoint information including GIDs and type hashes
-- **Shell Completions**: Dynamic completions for bash, zsh, and fish
+- **🎯 True Generic Message System**: World's first truly generic ROS2 message handling - works with ANY message type without hardcoding
+- **⚡ Runtime Type Discovery**: Automatic ROS2 message type introspection and serialization using native type support libraries
+- **🔧 Direct RCL/RMW Integration**: Native bindings to ROS2's core libraries with zero Python overhead
+- **📊 Comprehensive Topic Information**: Detailed QoS profiles, endpoint discovery, and type introspection
+- **🚀 High Performance**: Built in Rust for speed and memory safety
+- **🔄 Complete CLI Compatibility**: Drop-in replacement for `ros2` commands
+- **🐛 Advanced Debugging**: Detailed endpoint information including GIDs and type hashes
+- **🖥️ Shell Completions**: Dynamic completions for bash, zsh, and fish
 
 ## 📋 Installation
 
@@ -73,6 +75,25 @@ ROC bypasses the Python layer entirely, interfacing directly with RCL/RMW throug
 - More reliable operation
 - Better error handling
 
+### 🎯 Revolutionary Generic Message System
+ROC features a truly generic ROS2 message system that works with **ANY** message type without hardcoding:
+
+```bash
+# Works automatically with ANY message type - no code changes needed!
+roc topic pub /my_topic custom_msgs/msg/MyComplexType '{field1: value, nested: {data: 42}}'
+roc topic pub /sensors std_msgs/msg/Int8 '{data: 5}'
+roc topic pub /control geometry_msgs/msg/Twist '{linear: {x: 1.0}}'
+
+# Even custom message types work instantly
+roc topic pub /robot_status my_robot/msg/CustomStatus '{active: true, battery: 85.5}'
+```
+
+**Key Innovation:**
+- **Universal Compatibility**: Works with std_msgs, geometry_msgs, sensor_msgs, and ANY custom message type
+- **Runtime Type Discovery**: Automatically loads message type definitions at runtime using ROS2's introspection system
+- **Zero Configuration**: No compilation or setup required for new message types
+- **Memory Safe**: Full Rust safety guarantees with optimized C struct serialization
+
 ### Enhanced Topic Information
 Get comprehensive topic details that exceed the standard ROS2 CLI:
 
@@ -84,10 +105,11 @@ This provides detailed QoS profiles, endpoint information, GIDs, type hashes, an
 
 ### Architecture
 ROC is built on a layered architecture:
-- **RCL/RMW FFI Layer**: Direct bindings to ROS2 core libraries
-- **Graph Context**: Efficient ROS graph introspection
-- **Command Interface**: Familiar CLI matching ROS2 tools
-- **Shell Integration**: Dynamic completions and scripting support
+- **🎯 Generic Message System**: Runtime type discovery and universal message handling
+- **🔧 RCL/RMW FFI Layer**: Direct bindings to ROS2 core libraries
+- **📊 Graph Context**: Efficient ROS graph introspection
+- **🖥️ Command Interface**: Familiar CLI matching ROS2 tools
+- **🐚 Shell Integration**: Dynamic completions and scripting support
 
 ## 📚 Documentation
 
@@ -252,7 +274,11 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 
 ROC is actively developed and production-ready for most ROS2 workflows. Current implementation status:
 
-- ✅ **Topic Operations**: Full feature parity with enhanced diagnostics
+- 🏆 **Topic Operations**: **Full feature parity with revolutionary generic message system**
+  - ✅ **Universal Message Support**: Works with ANY ROS2 message type automatically
+  - ✅ **Runtime Type Discovery**: Dynamic type support loading and introspection  
+  - ✅ **Memory-Safe Serialization**: Optimized C struct handling with Rust safety
+  - ✅ **Intelligent Fallbacks**: Graceful handling of problematic middleware combinations
 - ✅ **Service Operations**: Complete service introspection and calling
 - ✅ **Node Operations**: Node discovery and detailed information
 - ✅ **Parameter Operations**: Full parameter management
@@ -274,11 +300,12 @@ ROC is actively developed and production-ready for most ROS2 workflows. Current 
 ## 🤝 Why ROC?
 
 ROC was created to address limitations in the existing ROS2 toolchain:
-- **Performance**: Native Rust implementation eliminates Python overhead
-- **Reliability**: Strong typing and memory safety reduce runtime errors  
-- **Completeness**: Direct RCL/RMW access enables features not available in the standard CLI
-- **Developer Experience**: Better error messages, shell completions, and debugging tools
-- **Build System Innovation**: Modern colcon replacement with superior dependency resolution, parallel execution, and cleaner environment management
+- **🎯 Universal Message Support**: First tool to work with ANY ROS2 message type without hardcoding or recompilation
+- **⚡ Performance**: Native Rust implementation eliminates Python overhead
+- **🛡️ Reliability**: Strong typing and memory safety reduce runtime errors  
+- **🔧 Completeness**: Direct RCL/RMW access enables features not available in the standard CLI
+- **👨‍💻 Developer Experience**: Better error messages, shell completions, and debugging tools
+- **🏗️ Build System Innovation**: Modern colcon replacement with superior dependency resolution, parallel execution, and cleaner environment management
 
 ## 📄 License
 
