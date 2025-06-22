@@ -1,0 +1,747 @@
+<!DOCTYPE HTML>
+<html lang="en" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Dynamic Message Type Loading - roc - ROS 2 CLI Tool</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">roc - ROS 2 CLI Tool</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="dynamic-message-type-loading"><a class="header" href="#dynamic-message-type-loading">Dynamic Message Type Loading</a></h1>
+<p>This chapter explains one of the most important and sophisticated features in <code>roc</code>: <strong>dynamic runtime loading of ROS2 message type support</strong>. This technique enables <code>roc</code> to work with any ROS2 message type without requiring compile-time knowledge or static linking against specific message packages.</p>
+<h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of Contents</a></h2>
+<ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#the-problem">The Problem</a></li>
+<li><a href="#the-solution-runtime-dynamic-loading">The Solution: Runtime Dynamic Loading</a></li>
+<li><a href="#how-dynamic-loading-works">How Dynamic Loading Works</a></li>
+<li><a href="#implementation-architecture">Implementation Architecture</a></li>
+<li><a href="#code-walkthrough">Code Walkthrough</a></li>
+<li><a href="#generic-type-support-resolution">Generic Type Support Resolution</a></li>
+<li><a href="#benefits-and-trade-offs">Benefits and Trade-offs</a></li>
+<li><a href="#future-enhancements">Future Enhancements</a></li>
+</ul>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Dynamic message type loading is a technique that allows <code>roc</code> to:</p>
+<ol>
+<li><strong>Load ROS2 message type support libraries at runtime</strong> (not compile time)</li>
+<li><strong>Resolve type support functions dynamically</strong> using symbol lookup</li>
+<li><strong>Create real RCL publishers/subscribers</strong> for any message type</li>
+<li><strong>Support custom message types</strong> without code changes</li>
+<li><strong>Work with any ROS2 package</strong> that provides proper typesupport libraries</li>
+</ol>
+<p>This is what enables commands like:</p>
+<pre><code class="language-bash"># Works with any installed ROS2 message type!
+roc topic pub /test geometry_msgs/msg/Twist '{linear: {x: 0.5}}'
+roc topic pub /custom custom_msgs/msg/MyMessage '{field: value}'
+</code></pre>
+<h2 id="the-problem"><a class="header" href="#the-problem">The Problem</a></h2>
+<p>Traditional ROS2 tools face a fundamental challenge:</p>
+<h3 id="static-linking-approach-traditional"><a class="header" href="#static-linking-approach-traditional">Static Linking Approach (Traditional)</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Traditional approach requires compile-time knowledge
+use geometry_msgs::msg::Twist;
+use std_msgs::msg::String;
+// ... must import every message type you want to use
+
+fn create_publisher() {
+    // Must know the exact type at compile time
+    let twist_publisher = node.create_publisher::&lt;Twist&gt;("topic", qos);
+    let string_publisher = node.create_publisher::&lt;String&gt;("topic", qos); 
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Problems with static linking:</strong></p>
+<ul>
+<li>❌ <strong>Limited to pre-compiled message types</strong></li>
+<li>❌ <strong>Huge binary size</strong> (includes all message libraries)</li>
+<li>❌ <strong>Cannot work with custom/unknown message types</strong></li>
+<li>❌ <strong>Requires recompilation</strong> for new message types</li>
+<li>❌ <strong>Complex dependency management</strong></li>
+</ul>
+<h3 id="the-ros2-type-support-challenge"><a class="header" href="#the-ros2-type-support-challenge">The ROS2 Type Support Challenge</a></h3>
+<p>ROS2's architecture requires <strong>type support pointers</strong> to create publishers:</p>
+<pre><code class="language-c">// This is what RCL requires internally
+rcl_ret_t rcl_publisher_init(
+  rcl_publisher_t * publisher,
+  const rcl_node_t * node,
+  const rosidl_message_type_support_t * type_support,  // ← This is the key!
+  const char * topic_name,
+  const rcl_publisher_options_t * options
+);
+</code></pre>
+<p>The <code>type_support</code> pointer contains:</p>
+<ul>
+<li>Message structure layout</li>
+<li>Serialization/deserialization functions</li>
+<li>Field metadata and types</li>
+<li>Memory management functions</li>
+</ul>
+<p><strong>Without valid type support, you cannot create RCL publishers, and topics won't appear in the ROS graph!</strong></p>
+<h2 id="the-solution-runtime-dynamic-loading"><a class="header" href="#the-solution-runtime-dynamic-loading">The Solution: Runtime Dynamic Loading</a></h2>
+<p><code>roc</code> solves this through <strong>dynamic library loading</strong> - a powerful systems programming technique:</p>
+<h3 id="key-insight-ros2-type-support-libraries"><a class="header" href="#key-insight-ros2-type-support-libraries">Key Insight: ROS2 Type Support Libraries</a></h3>
+<p>ROS2 installations contain pre-compiled type support libraries:</p>
+<pre><code class="language-bash">/opt/ros/jazzy/lib/
+├── libgeometry_msgs__rosidl_typesupport_c.so    # Geometry messages
+├── libstd_msgs__rosidl_typesupport_c.so         # Standard messages  
+├── libsensor_msgs__rosidl_typesupport_c.so      # Sensor messages
+├── libcustom_msgs__rosidl_typesupport_c.so      # Your custom messages
+└── ...
+</code></pre>
+<p>Each library exports <strong>type support functions</strong>:</p>
+<pre><code class="language-bash">$ nm -D libgeometry_msgs__rosidl_typesupport_c.so | grep Twist
+rosidl_typesupport_c__get_message_type_support_handle__geometry_msgs__msg__Twist
+</code></pre>
+<h3 id="dynamic-loading-strategy"><a class="header" href="#dynamic-loading-strategy">Dynamic Loading Strategy</a></h3>
+<p>Instead of static linking, <code>roc</code> uses <strong>runtime dynamic loading</strong>:</p>
+<ol>
+<li><strong>Construct library path</strong> from message type: <code>geometry_msgs/msg/Twist</code> → <code>/opt/ros/jazzy/lib/libgeometry_msgs__rosidl_typesupport_c.so</code></li>
+<li><strong>Load library dynamically</strong> using <code>dlopen()</code> (via <code>rcutils_load_shared_library</code>)</li>
+<li><strong>Resolve type support symbol</strong> using <code>dlsym()</code> (via <code>rcutils_get_symbol</code>)</li>
+<li><strong>Call the function</strong> to get the type support pointer</li>
+<li><strong>Create real RCL publishers</strong> with valid type support</li>
+</ol>
+<h2 id="how-dynamic-loading-works"><a class="header" href="#how-dynamic-loading-works">How Dynamic Loading Works</a></h2>
+<h3 id="step-by-step-process"><a class="header" href="#step-by-step-process">Step-by-Step Process</a></h3>
+<h4 id="1-message-type-parsing"><a class="header" href="#1-message-type-parsing">1. Message Type Parsing</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Input: "geometry_msgs/msg/Twist"
+let (package, message) = parse_message_type("geometry_msgs/msg/Twist")?;
+// package = "geometry_msgs", message = "Twist"
+<span class="boring">}</span></code></pre></pre>
+<h4 id="2-library-path-construction"><a class="header" href="#2-library-path-construction">2. Library Path Construction</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Construct library path using naming convention
+let library_path = format!(
+    "/opt/ros/jazzy/lib/lib{}__rosidl_typesupport_c.so", 
+    package
+);
+// Result: "/opt/ros/jazzy/lib/libgeometry_msgs__rosidl_typesupport_c.so"
+<span class="boring">}</span></code></pre></pre>
+<h4 id="3-symbol-name-construction"><a class="header" href="#3-symbol-name-construction">3. Symbol Name Construction</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Construct symbol name using ROS2 naming convention
+let symbol_name = format!(
+    "rosidl_typesupport_c__get_message_type_support_handle__{}__msg__{}",
+    package, message
+);
+// Result: "rosidl_typesupport_c__get_message_type_support_handle__geometry_msgs__msg__Twist"
+<span class="boring">}</span></code></pre></pre>
+<h4 id="4-dynamic-library-loading"><a class="header" href="#4-dynamic-library-loading">4. Dynamic Library Loading</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>unsafe {
+    // Initialize library handle
+    let mut shared_lib = rcutils_get_zero_initialized_shared_library();
+    
+    // Load the shared library
+    let ret = rcutils_load_shared_library(
+        &amp;mut shared_lib,
+        library_path_c.as_ptr(),
+        allocator,
+    );
+    
+    if ret != 0 {
+        return Err(anyhow!("Failed to load library"));
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="5-symbol-resolution"><a class="header" href="#5-symbol-resolution">5. Symbol Resolution</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>unsafe {
+    // Get the symbol from the loaded library
+    let symbol_ptr = rcutils_get_symbol(&amp;shared_lib, symbol_name_c.as_ptr());
+    
+    if symbol_ptr.is_null() {
+        return Err(anyhow!("Symbol not found"));
+    }
+    
+    // Cast to function pointer and call it
+    type TypeSupportGetterFn = unsafe extern "C" fn() -&gt; *const rosidl_message_type_support_t;
+    let type_support_fn: TypeSupportGetterFn = std::mem::transmute(symbol_ptr);
+    let type_support = type_support_fn();
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="6-rcl-publisher-creation"><a class="header" href="#6-rcl-publisher-creation">6. RCL Publisher Creation</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>unsafe {
+    // Now we can create a real RCL publisher!
+    let ret = rcl_publisher_init(
+        &amp;mut publisher,
+        node,
+        type_support,  // ← Valid type support from dynamic loading
+        topic_name_c.as_ptr(),
+        &amp;options,
+    );
+    
+    // Publisher is registered in ROS graph and appears in topic lists!
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="implementation-architecture"><a class="header" href="#implementation-architecture">Implementation Architecture</a></h2>
+<h3 id="core-components"><a class="header" href="#core-components">Core Components</a></h3>
+<h4 id="1-dynamicmessageregistry"><a class="header" href="#1-dynamicmessageregistry">1. <code>DynamicMessageRegistry</code></a></h4>
+<p><strong>File</strong>: <code>src/shared/dynamic_messages.rs</code></p>
+<p>Central registry for loading and caching message types:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DynamicMessageRegistry {
+    loaded_types: HashMap&lt;String, DynamicMessageType&gt;,
+}
+
+impl DynamicMessageRegistry {
+    pub fn load_message_type(&amp;mut self, type_name: &amp;str) -&gt; Result&lt;DynamicMessageType&gt; {
+        // 1. Parse message type
+        // 2. Load type support dynamically  
+        // 3. Cache result
+        // 4. Return type info with valid type support pointer
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="2-generic-type-support-loading"><a class="header" href="#2-generic-type-support-loading">2. Generic Type Support Loading</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn try_get_generic_type_support(
+    &amp;self,
+    package_name: &amp;str,
+    message_name: &amp;str,
+) -&gt; Result&lt;*const rosidl_message_type_support_t&gt; {
+    // Automatic library path construction
+    let library_path = format!("/opt/ros/jazzy/lib/lib{}__rosidl_typesupport_c.so", package_name);
+    
+    // Automatic symbol name construction  
+    let symbol_name = format!(
+        "rosidl_typesupport_c__get_message_type_support_handle__{}__msg__{}",
+        package_name, message_name
+    );
+    
+    // Dynamic loading
+    self.load_type_support_from_library(&amp;library_path, &amp;symbol_name)
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="3-bindgen-integration"><a class="header" href="#3-bindgen-integration">3. Bindgen Integration</a></h4>
+<p><strong>File</strong>: <code>rclrs/build.rs</code></p>
+<p>Exposes dynamic loading functions to Rust:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let bindings = bindgen::Builder::default()
+    .header("wrapper.h")
+    // Dynamic loading functions
+    .allowlist_function("rcutils_load_shared_library")
+    .allowlist_function("rcutils_get_symbol")  
+    .allowlist_function("rcutils_unload_shared_library")
+    .allowlist_function("rcutils_get_zero_initialized_shared_library")
+    // Type support types
+    .allowlist_type("rosidl_message_type_support_t")
+    .allowlist_type("rcutils_shared_library_t")
+    .generate()?;
+<span class="boring">}</span></code></pre></pre>
+<h3 id="data-flow"><a class="header" href="#data-flow">Data Flow</a></h3>
+<pre><code>User Command: roc topic pub /test geometry_msgs/msg/Twist '{linear: {x: 0.5}}'
+                                    ↓
+                    1. Parse message type: "geometry_msgs/msg/Twist"
+                                    ↓  
+                    2. Construct library path and symbol name
+                                    ↓
+                    3. Load: /opt/ros/jazzy/lib/libgeometry_msgs__rosidl_typesupport_c.so
+                                    ↓
+                    4. Resolve: rosidl_typesupport_c__get_message_type_support_handle__geometry_msgs__msg__Twist
+                                    ↓
+                    5. Call function → Get type_support pointer
+                                    ↓
+                    6. Create RCL publisher with valid type_support
+                                    ↓
+                    7. Topic appears in ROS graph! ✅
+</code></pre>
+<h2 id="code-walkthrough"><a class="header" href="#code-walkthrough">Code Walkthrough</a></h2>
+<h3 id="complete-type-support-loading-function"><a class="header" href="#complete-type-support-loading-function">Complete Type Support Loading Function</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn load_type_support_from_library(
+    &amp;self,
+    library_name: &amp;str,
+    symbol_name: &amp;str,
+) -&gt; Result&lt;*const rosidl_message_type_support_t&gt; {
+    use std::ffi::CString;
+    
+    unsafe {
+        // Step 1: Initialize shared library handle
+        let mut shared_lib = rcutils_get_zero_initialized_shared_library();
+        
+        // Step 2: Convert library name to C string
+        let lib_name_c = CString::new(library_name)
+            .map_err(|e| anyhow!("Invalid library name '{}': {}", library_name, e))?;
+        
+        // Step 3: Load the shared library
+        let allocator = rcutils_get_default_allocator();
+        let ret = rcutils_load_shared_library(
+            &amp;mut shared_lib,
+            lib_name_c.as_ptr(),
+            allocator,
+        );
+        
+        if ret != 0 { // RCUTILS_RET_OK is 0
+            return Err(anyhow!("Failed to load library '{}': return code {}", library_name, ret));
+        }
+        
+        // Step 4: Convert symbol name to C string
+        let symbol_name_c = CString::new(symbol_name)
+            .map_err(|e| anyhow!("Invalid symbol name '{}': {}", symbol_name, e))?;
+        
+        // Step 5: Get the symbol from the library
+        let symbol_ptr = rcutils_get_symbol(&amp;shared_lib, symbol_name_c.as_ptr());
+        
+        if symbol_ptr.is_null() {
+            rcutils_unload_shared_library(&amp;mut shared_lib);
+            return Err(anyhow!("Symbol '{}' not found in library '{}'", symbol_name, library_name));
+        }
+        
+        // Step 6: Cast the symbol to a function pointer and call it
+        type TypeSupportGetterFn = unsafe extern "C" fn() -&gt; *const rosidl_message_type_support_t;
+        let type_support_fn: TypeSupportGetterFn = std::mem::transmute(symbol_ptr);
+        let type_support = type_support_fn();
+        
+        // Step 7: Validate the result
+        if type_support.is_null() {
+            return Err(anyhow!("Type support function returned null pointer"));
+        }
+        
+        println!("Successfully loaded type support for symbol: {}", symbol_name);
+        Ok(type_support)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="publisher-creation-with-dynamic-type-support"><a class="header" href="#publisher-creation-with-dynamic-type-support">Publisher Creation with Dynamic Type Support</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn create_dynamic_publisher(
+    context: &amp;RclGraphContext,
+    topic_name: &amp;str,
+    message_type: &amp;str,
+) -&gt; Result&lt;rcl_publisher_t&gt; {
+    // Load type support dynamically
+    let mut registry = DynamicMessageRegistry::new();
+    let message_type_info = registry.load_message_type(message_type)?;
+    
+    let type_support = message_type_info.type_support
+        .ok_or_else(|| anyhow!("Could not load type support for {}", message_type))?;
+    
+    unsafe {
+        let mut publisher = rcl_get_zero_initialized_publisher();
+        let options = rcl_publisher_get_default_options();
+        let topic_name_c = CString::new(topic_name)?;
+        
+        // Create publisher with dynamically loaded type support!
+        let ret = rcl_publisher_init(
+            &amp;mut publisher,
+            context.node(),
+            type_support,  // ← This comes from dynamic loading
+            topic_name_c.as_ptr(),
+            &amp;options,
+        );
+        
+        if ret != 0 {
+            return Err(anyhow!("Failed to create publisher: {}", ret));
+        }
+        
+        Ok(publisher)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="generic-type-support-resolution"><a class="header" href="#generic-type-support-resolution">Generic Type Support Resolution</a></h2>
+<h3 id="fallback-hierarchy"><a class="header" href="#fallback-hierarchy">Fallback Hierarchy</a></h3>
+<p><code>roc</code> uses a smart fallback strategy:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn try_get_type_support(&amp;self, package_name: &amp;str, message_name: &amp;str) -&gt; Result&lt;TypeSupport&gt; {
+    let full_type = format!("{}/msg/{}", package_name, message_name);
+    
+    match full_type.as_str() {
+        // 1. Optimized paths for common types
+        "geometry_msgs/msg/Twist" =&gt; self.try_get_twist_type_support(),
+        "std_msgs/msg/String" =&gt; self.try_get_string_type_support(), 
+        "std_msgs/msg/Int32" =&gt; self.try_get_int32_type_support(),
+        "std_msgs/msg/Float64" =&gt; self.try_get_float64_type_support(),
+        
+        // 2. Generic fallback for ANY message type
+        _ =&gt; self.try_get_generic_type_support(package_name, message_name),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="automatic-library-discovery"><a class="header" href="#automatic-library-discovery">Automatic Library Discovery</a></h3>
+<p>The generic loader automatically constructs paths:</p>
+<div class="table-wrapper"><table><thead><tr><th>Message Type</th><th>Library Path</th><th>Symbol Name</th></tr></thead><tbody>
+<tr><td><code>geometry_msgs/msg/Twist</code></td><td><code>/opt/ros/jazzy/lib/libgeometry_msgs__rosidl_typesupport_c.so</code></td><td><code>rosidl_typesupport_c__get_message_type_support_handle__geometry_msgs__msg__Twist</code></td></tr>
+<tr><td><code>custom_msgs/msg/MyType</code></td><td><code>/opt/ros/jazzy/lib/libcustom_msgs__rosidl_typesupport_c.so</code></td><td><code>rosidl_typesupport_c__get_message_type_support_handle__custom_msgs__msg__MyType</code></td></tr>
+<tr><td><code>sensor_msgs/msg/Image</code></td><td><code>/opt/ros/jazzy/lib/libsensor_msgs__rosidl_typesupport_c.so</code></td><td><code>rosidl_typesupport_c__get_message_type_support_handle__sensor_msgs__msg__Image</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="testing-the-generic-loader"><a class="header" href="#testing-the-generic-loader">Testing the Generic Loader</a></h3>
+<pre><code class="language-bash"># These all work automatically:
+roc topic pub /test1 geometry_msgs/msg/Twist '{linear: {x: 1.0}}'          # Known type
+roc topic pub /test2 geometry_msgs/msg/Point '{x: 1.0, y: 2.0, z: 3.0}'    # Generic loading  
+roc topic pub /test3 sensor_msgs/msg/Image '{header: {frame_id: "camera"}}' # Generic loading
+roc topic pub /test4 custom_msgs/msg/MyType '{my_field: "value"}'           # Your custom types!
+</code></pre>
+<p>Output shows the dynamic loading in action:</p>
+<pre><code>Attempting generic type support loading:
+  Library: /opt/ros/jazzy/lib/libgeometry_msgs__rosidl_typesupport_c.so
+  Symbol: rosidl_typesupport_c__get_message_type_support_handle__geometry_msgs__msg__Point
+Successfully loaded type support for symbol: ...
+Successfully created RCL publisher with real type support!
+</code></pre>
+<h2 id="benefits-and-trade-offs"><a class="header" href="#benefits-and-trade-offs">Benefits and Trade-offs</a></h2>
+<h3 id="benefits-"><a class="header" href="#benefits-">Benefits ✅</a></h3>
+<ol>
+<li>
+<p><strong>Universal Message Support</strong></p>
+<ul>
+<li>Works with any ROS2 message type</li>
+<li>Supports custom packages automatically</li>
+<li>No compilation required for new types</li>
+</ul>
+</li>
+<li>
+<p><strong>Small Binary Size</strong></p>
+<ul>
+<li>No static linking of message libraries</li>
+<li>Only loads what's actually used</li>
+<li>Minimal memory footprint</li>
+</ul>
+</li>
+<li>
+<p><strong>Runtime Flexibility</strong></p>
+<ul>
+<li>Discover available message types at runtime</li>
+<li>Work with packages installed after compilation</li>
+<li>Perfect for generic tools like <code>roc</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Performance</strong></p>
+<ul>
+<li>Type support loaded once and cached</li>
+<li>No runtime overhead after initial load</li>
+<li>Real RCL integration (not simulation)</li>
+</ul>
+</li>
+<li>
+<p><strong>Maintainability</strong></p>
+<ul>
+<li>No manual type definitions required</li>
+<li>Automatic support for new ROS2 versions</li>
+<li>Self-discovering architecture</li>
+</ul>
+</li>
+</ol>
+<h3 id="trade-offs-"><a class="header" href="#trade-offs-">Trade-offs ⚖️</a></h3>
+<ol>
+<li>
+<p><strong>Runtime Dependencies</strong></p>
+<ul>
+<li>Requires ROS2 installation with typesupport libraries</li>
+<li>Fails gracefully if libraries are missing</li>
+<li>Error messages help diagnose missing packages</li>
+</ul>
+</li>
+<li>
+<p><strong>Platform Assumptions</strong></p>
+<ul>
+<li>Assumes standard ROS2 installation paths</li>
+<li>Library naming conventions must match</li>
+<li>Works with standard ROS2 distributions</li>
+</ul>
+</li>
+<li>
+<p><strong>Error Handling Complexity</strong></p>
+<ul>
+<li>Must handle dynamic loading failures</li>
+<li>Symbol resolution errors need clear messages</li>
+<li>Graceful degradation for partial installations</li>
+</ul>
+</li>
+</ol>
+<h2 id="future-enhancements"><a class="header" href="#future-enhancements">Future Enhancements</a></h2>
+<h3 id="1-introspection-based-generic-serialization"><a class="header" href="#1-introspection-based-generic-serialization">1. Introspection-Based Generic Serialization</a></h3>
+<p>The next evolution is <strong>fully generic serialization</strong> using ROS2's introspection API:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Future: No manual serialization needed!
+pub fn serialize_any_message(
+    yaml_value: &amp;YamlValue,
+    type_support: *const rosidl_message_type_support_t,
+) -&gt; Result&lt;Vec&lt;u8&gt;&gt; {
+    // 1. Get introspection data from type_support
+    let introspection = get_message_introspection(type_support)?;
+    
+    // 2. Walk the message structure automatically
+    let message_ptr = allocate_message_memory(introspection.size_of);
+    serialize_fields_recursively(yaml_value, introspection.members, message_ptr)?;
+    
+    // 3. Use RMW to serialize to CDR format
+    let serialized = rmw_serialize(message_ptr, type_support)?;
+    Ok(serialized)
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-automatic-package-discovery"><a class="header" href="#2-automatic-package-discovery">2. Automatic Package Discovery</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Future: Scan filesystem for available message types
+pub fn discover_available_message_types() -&gt; Vec&lt;String&gt; {
+    let lib_dir = "/opt/ros/jazzy/lib";
+    let pattern = "lib*__rosidl_typesupport_c.so";
+    
+    // Scan libraries and extract symbols
+    scan_libraries_for_message_types(lib_dir, pattern)
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-message-definition-introspection"><a class="header" href="#3-message-definition-introspection">3. Message Definition Introspection</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Future: Runtime message structure inspection
+pub fn get_message_definition(message_type: &amp;str) -&gt; Result&lt;MessageDefinition&gt; {
+    let type_support = load_type_support(message_type)?;
+    let introspection = get_introspection_data(type_support)?;
+    
+    // Return complete message structure info
+    Ok(MessageDefinition {
+        fields: extract_field_definitions(introspection),
+        dependencies: find_nested_types(introspection),
+        size: introspection.size_of,
+    })
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="4-performance-optimizations"><a class="header" href="#4-performance-optimizations">4. Performance Optimizations</a></h3>
+<ul>
+<li><strong>Library preloading</strong> for common types</li>
+<li><strong>Symbol caching</strong> across multiple calls</li>
+<li><strong>Memory pool</strong> for message allocation</li>
+<li><strong>Batch operations</strong> for multiple message types</li>
+</ul>
+<h2 id="conclusion"><a class="header" href="#conclusion">Conclusion</a></h2>
+<p>Dynamic message type loading is a sophisticated technique that gives <code>roc</code> <strong>universal ROS2 message support</strong> without the limitations of static linking. By leveraging:</p>
+<ul>
+<li><strong>Runtime dynamic library loading</strong> (<code>dlopen</code>/<code>dlsym</code>)</li>
+<li><strong>ROS2 type support architecture</strong></li>
+<li><strong>Automatic path and symbol construction</strong></li>
+<li><strong>Graceful fallback strategies</strong></li>
+</ul>
+<p><code>roc</code> can work with <strong>any ROS2 message type</strong> - including custom packages you create! This makes it a truly generic and powerful tool for ROS2 development.</p>
+<p>The implementation demonstrates advanced systems programming concepts while remaining maintainable and extensible. It's a great example of how understanding the underlying architecture (ROS2 type support system) enables building more flexible and powerful tools.</p>
+<p><strong>Key takeaway</strong>: Dynamic loading isn't just a neat trick - it's a fundamental technique that enables building truly generic and extensible systems that can adapt to runtime conditions and work with code that didn't exist at compile time.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../implementation/memory_management.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../idl/overview.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../implementation/memory_management.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../idl/overview.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
