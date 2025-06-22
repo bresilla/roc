@@ -9,6 +9,14 @@ fn main() {
     println!("cargo:rustc-link-lib=rcl");
     println!("cargo:rustc-link-lib=rmw");
     println!("cargo:rustc-link-lib=rcutils");
+    
+    // Additional libraries for dynamic type support
+    println!("cargo:rustc-link-lib=rosidl_dynamic_typesupport");
+    println!("cargo:rustc-link-lib=rosidl_typesupport_c");
+    println!("cargo:rustc-link-lib=rosidl_typesupport_cpp");
+    println!("cargo:rustc-link-lib=rosidl_typesupport_introspection_c");
+    println!("cargo:rustc-link-lib=rosidl_typesupport_introspection_cpp");
+    println!("cargo:rustc-link-lib=rcl_yaml_param_parser");
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=wrapper.h");
@@ -26,6 +34,10 @@ fn main() {
         .clang_arg("-I/opt/ros/jazzy/include/rosidl_runtime_c")
         .clang_arg("-I/opt/ros/jazzy/include/rosidl_typesupport_interface")
         .clang_arg("-I/opt/ros/jazzy/include/rosidl_dynamic_typesupport")
+        .clang_arg("-I/opt/ros/jazzy/include/rosidl_typesupport_c")
+        .clang_arg("-I/opt/ros/jazzy/include/rosidl_typesupport_cpp")
+        .clang_arg("-I/opt/ros/jazzy/include/rosidl_typesupport_introspection_c")
+        .clang_arg("-I/opt/ros/jazzy/include/rosidl_typesupport_introspection_cpp")
         .clang_arg("-I/opt/ros/jazzy/include/type_description_interfaces")
         .clang_arg("-I/opt/ros/jazzy/include/service_msgs")
         .clang_arg("-I/opt/ros/jazzy/include/builtin_interfaces")
@@ -122,11 +134,32 @@ fn main() {
         // Dynamic type support functions
         .allowlist_function("rosidl_get_typesupport_target")
         .allowlist_function("rosidl_typesupport_c__get_message_typesupport_handle_function")
-        .allowlist_function("rosidl_typesupport_cpp__get_message_typesupport_handle_function")
+        .allowlist_function("rosidl_get_message_type_support_handle")
         // Dynamic type support loading
         .allowlist_function("rcutils_get_symbol")
         .allowlist_function("rcutils_load_shared_library")
         .allowlist_function("rcutils_unload_shared_library")
+        // Message introspection functions
+        .allowlist_function("rosidl_typesupport_introspection_c__get_message_type_support_handle")
+        // RMW serialization functions
+        .allowlist_function("rmw_serialize")
+        .allowlist_function("rmw_deserialize")
+        .allowlist_function("rmw_get_serialized_message_size")
+        .allowlist_function("rmw_serialized_message_init")
+        .allowlist_function("rmw_serialized_message_fini")
+        .allowlist_function("rmw_serialized_message_resize")
+        .allowlist_function("rmw_publish_serialized_message")
+        .allowlist_function("rmw_take_serialized_message")
+        .allowlist_function("rmw_take_serialized_message_with_info")
+        // YAML parameter parsing functions
+        .allowlist_function("rcl_yaml_param_parser_load_file")
+        .allowlist_function("rcl_yaml_param_parser_parse_string")
+        .allowlist_function("rcutils_yaml_param_value_fini")
+        // Type description and hash functions
+        .allowlist_function("rosidl_runtime_c__type_description__create")
+        .allowlist_function("rosidl_runtime_c__type_description__destroy")
+        .allowlist_function("rosidl_runtime_c__type_hash__create")
+        .allowlist_function("rosidl_runtime_c__type_hash__destroy")
         // RMW basic types
         .allowlist_type("rmw_init_options_t")
         .allowlist_type("rmw_context_t")
@@ -135,6 +168,17 @@ fn main() {
         // Dynamic loading types
         .allowlist_type("rcutils_shared_library_t")
         .allowlist_type("rcutils_ret_t")
+        // Message introspection types
+        .allowlist_type("rosidl_typesupport_introspection_c__MessageMembers")
+        .allowlist_type("rosidl_typesupport_introspection_c__MessageMember")
+        // Serialized message type
+        .allowlist_type("rmw_serialized_message_t")
+        // Type description types
+        .allowlist_type("rosidl_runtime_c__type_description__TypeDescription")
+        .allowlist_type("rosidl_runtime_c__type_hash__TypeHash")
+        // YAML parameter types
+        .allowlist_type("rcutils_yaml_param_value_t")
+        .allowlist_type("rcutils_yaml_param_node_t")
         // Generate the bindings
         .generate()
         // Unwrap the Result and panic on failure

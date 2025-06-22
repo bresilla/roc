@@ -6,6 +6,11 @@
 // Re-export the main components from shared modules
 pub use crate::shared::graph_context::RclGraphContext;
 pub use crate::shared::graph_types::{TopicInfo, TopicEndpointInfo, EndpointType};
+pub use crate::shared::dynamic_messages::{
+    DynamicMessageType, DynamicMessageRegistry, DynamicMessageIntrospection, MessageMemberInfo,
+    is_message_type_available, get_available_message_types
+};
+pub use crate::shared::dynamic_messages::yaml_parser::{YamlValue, parse_yaml_message, validate_message_structure};
 
 // Re-export operation modules for direct access if needed
 pub use crate::shared::topic_operations;
@@ -75,5 +80,31 @@ impl RclGraphContext {
     #[allow(dead_code)]
     pub fn get_service_names_and_types(&self) -> Result<Vec<(String, String)>> {
         service_operations::get_service_names_and_types(self)
+    }
+
+    /// Create a new dynamic message registry
+    pub fn create_message_registry() -> DynamicMessageRegistry {
+        DynamicMessageRegistry::new()
+    }
+
+    /// Parse and validate a YAML message for a given message type
+    pub fn parse_and_validate_message(message_type: &str, yaml_content: &str) -> Result<YamlValue> {
+        // Parse the YAML content
+        let yaml_value = parse_yaml_message(yaml_content)?;
+        
+        // Validate the structure for known message types
+        validate_message_structure(message_type, &yaml_value)?;
+        
+        Ok(yaml_value)
+    }
+
+    /// Check if a message type is supported
+    pub fn is_message_type_supported(message_type: &str) -> bool {
+        is_message_type_available(message_type)
+    }
+
+    /// Get available message types for a package
+    pub fn get_package_message_types(package_name: &str) -> Vec<String> {
+        get_available_message_types(package_name)
     }
 }
