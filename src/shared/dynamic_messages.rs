@@ -126,6 +126,27 @@ impl DynamicMessageRegistry {
         Ok(result)
     }
 
+    /// Test dynamic type support loading (for debugging)
+    pub fn test_type_support_loading(&mut self) -> Result<()> {
+        println!("Testing dynamic type support loading...");
+        
+        match self.load_message_type("geometry_msgs/msg/Twist") {
+            Ok(msg_type) => {
+                if msg_type.type_support.is_some() {
+                    println!("✅ Successfully loaded type support for geometry_msgs/msg/Twist");
+                } else {
+                    println!("❌ Type support is None for geometry_msgs/msg/Twist");
+                }
+            }
+            Err(e) => {
+                println!("❌ Failed to load geometry_msgs/msg/Twist: {}", e);
+                return Err(e);
+            }
+        }
+        
+        Ok(())
+    }
+
     /// Try to get type support using available RCL mechanisms
     /// 
     /// This implements a step-by-step approach to find type support
@@ -152,10 +173,10 @@ impl DynamicMessageRegistry {
     /// Try to get type support for geometry_msgs/msg/Twist
     fn try_get_twist_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
         // Load the geometry_msgs typesupport library dynamically
-        let library_name = "libgeometry_msgs__rosidl_typesupport_c.so";
+        let library_path = "/opt/ros/jazzy/lib/libgeometry_msgs__rosidl_typesupport_c.so";
         let symbol_name = "rosidl_typesupport_c__get_message_type_support_handle__geometry_msgs__msg__Twist";
         
-        self.load_type_support_from_library(library_name, symbol_name)
+        self.load_type_support_from_library(library_path, symbol_name)
     }
 
     /// Try to get type support for std_msgs/msg/String
