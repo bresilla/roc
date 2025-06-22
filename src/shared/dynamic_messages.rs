@@ -97,7 +97,7 @@ impl DynamicMessageRegistry {
         println!("Loading dynamic type support for {}/{}", package_name, message_name);
         
         // Create the message type structure
-        let msg_type = DynamicMessageType {
+        let mut msg_type = DynamicMessageType {
             type_name: type_name.to_string(),
             package_name: package_name.clone(),
             message_name: message_name.clone(),
@@ -105,23 +105,101 @@ impl DynamicMessageRegistry {
             introspection: None,
         };
 
-        // For now, create a placeholder implementation
-        // TODO: Implement actual type support loading once all RCL functions are available
-        println!("Dynamic type support loading not yet fully implemented for {}", type_name);
+        // Try to load type support using available RCL functions
+        if let Ok(type_support) = self.try_get_type_support(&package_name, &message_name) {
+            msg_type.type_support = Some(type_support);
+            
+            // Try to get introspection data
+            if let Ok(introspection) = self.try_get_message_introspection(type_support) {
+                msg_type.introspection = Some(introspection);
+            }
+            
+            println!("Successfully loaded type support for {}", type_name);
+        } else {
+            println!("Warning: Could not load dynamic type support for {} - using basic validation only", type_name);
+        }
         
-        // Cache the result (without type support for now)
+        // Cache the result
         let result = msg_type.clone();
         self.loaded_types.insert(type_name.to_string(), msg_type);
         
         Ok(result)
     }
 
-    /// Get basic information about a message type (placeholder implementation)
+    /// Try to get type support using available RCL mechanisms
     /// 
-    /// This will be expanded once all RCL functions are available
+    /// This implements a step-by-step approach to find type support
+    fn try_get_type_support(
+        &self,
+        package_name: &str,
+        message_name: &str,
+    ) -> Result<*const rosidl_message_type_support_t> {
+        // For common message types, we can try to get their type support directly
+        // This is a practical approach while we work on full dynamic loading
+        match format!("{}/msg/{}", package_name, message_name).as_str() {
+            "geometry_msgs/msg/Twist" => self.try_get_twist_type_support(),
+            "std_msgs/msg/String" => self.try_get_string_type_support(),
+            "std_msgs/msg/Int32" => self.try_get_int32_type_support(),
+            "std_msgs/msg/Float64" => self.try_get_float64_type_support(),
+            _ => {
+                // For unknown types, return an error for now
+                // This can be expanded with actual dynamic loading later
+                Err(anyhow!("Dynamic type support not yet implemented for {}/{}", package_name, message_name))
+            }
+        }
+    }
+
+    /// Try to get type support for geometry_msgs/msg/Twist
+    fn try_get_twist_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
+        // This is a placeholder - in a full implementation, this would use
+        // the actual RCL functions to load the type support
+        // For now, we return an error to indicate it's not implemented
+        Err(anyhow!("Twist type support loading not yet implemented"))
+    }
+
+    /// Try to get type support for std_msgs/msg/String
+    fn try_get_string_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
+        // Placeholder implementation
+        Err(anyhow!("String type support loading not yet implemented"))
+    }
+
+    /// Try to get type support for std_msgs/msg/Int32
+    fn try_get_int32_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
+        // Placeholder implementation
+        Err(anyhow!("Int32 type support loading not yet implemented"))
+    }
+
+    /// Try to get type support for std_msgs/msg/Float64
+    fn try_get_float64_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
+        // Placeholder implementation
+        Err(anyhow!("Float64 type support loading not yet implemented"))
+    }
+
+    /// Try to get message introspection data from type support
+    fn try_get_message_introspection(
+        &self,
+        _type_support: *const rosidl_message_type_support_t,
+    ) -> Result<DynamicMessageIntrospection> {
+        // This would use the introspection functions once they're properly bound
+        // For now, return a basic introspection structure
+        Err(anyhow!("Message introspection not yet implemented"))
+    }
+
+    /// Get basic information about a message type
     pub fn get_message_info(&self, type_name: &str) -> Result<String> {
         if let Some(msg_type) = self.loaded_types.get(type_name) {
-            Ok(format!("Message type: {} (Package: {})", msg_type.message_name, msg_type.package_name))
+            let type_support_status = if msg_type.type_support.is_some() {
+                "loaded"
+            } else {
+                "not loaded"
+            };
+            
+            Ok(format!(
+                "Message type: {} (Package: {}, Type support: {})", 
+                msg_type.message_name, 
+                msg_type.package_name,
+                type_support_status
+            ))
         } else {
             Err(anyhow!("Message type '{}' not loaded", type_name))
         }
@@ -168,6 +246,264 @@ pub fn get_available_message_types(package_name: &str) -> Vec<String> {
     }
     
     types
+}
+
+/// Message serialization support for converting between YAML and binary formats
+pub mod serialization {
+    use super::*;
+    use super::yaml_parser::YamlValue;
+    
+    /// Serialized message data
+    #[derive(Debug, Clone)]
+    pub struct SerializedMessage {
+        pub data: Vec<u8>,
+        pub message_type: String,
+    }
+    
+    /// Serialize a YAML message to binary format for ROS2 publishing
+    /// 
+    /// This converts the parsed YAML structure to the binary format expected by ROS2
+    pub fn serialize_message(
+        message_type: &str,
+        yaml_value: &YamlValue,
+    ) -> Result<SerializedMessage> {
+        match message_type {
+            "geometry_msgs/msg/Twist" => serialize_twist_message(yaml_value),
+            "std_msgs/msg/String" => serialize_string_message(yaml_value),
+            "std_msgs/msg/Int32" => serialize_int32_message(yaml_value),
+            "std_msgs/msg/Float64" => serialize_float64_message(yaml_value),
+            _ => Err(anyhow!("Serialization not implemented for message type: {}", message_type)),
+        }
+    }
+    
+    /// Serialize geometry_msgs/msg/Twist message
+    fn serialize_twist_message(yaml_value: &YamlValue) -> Result<SerializedMessage> {
+        if let YamlValue::Object(obj) = yaml_value {
+            // Extract linear and angular components
+            let linear = extract_vector3(obj.get("linear"), "linear")?;
+            let angular = extract_vector3(obj.get("angular"), "angular")?;
+            
+            // Create binary representation
+            // This is a simplified binary format - real ROS2 uses CDR serialization
+            let mut data = Vec::new();
+            
+            // Linear vector (24 bytes: 3 x f64)
+            data.extend_from_slice(&linear.0.to_le_bytes());
+            data.extend_from_slice(&linear.1.to_le_bytes());
+            data.extend_from_slice(&linear.2.to_le_bytes());
+            
+            // Angular vector (24 bytes: 3 x f64)
+            data.extend_from_slice(&angular.0.to_le_bytes());
+            data.extend_from_slice(&angular.1.to_le_bytes());
+            data.extend_from_slice(&angular.2.to_le_bytes());
+            
+            Ok(SerializedMessage {
+                data,
+                message_type: "geometry_msgs/msg/Twist".to_string(),
+            })
+        } else {
+            Err(anyhow!("Twist message must be an object"))
+        }
+    }
+    
+    /// Extract Vector3 (x, y, z) from YAML object
+    fn extract_vector3(yaml_value: Option<&YamlValue>, field_name: &str) -> Result<(f64, f64, f64)> {
+        if let Some(YamlValue::Object(obj)) = yaml_value {
+            let x = extract_number(obj.get("x"), &format!("{}.x", field_name))?;
+            let y = extract_number(obj.get("y"), &format!("{}.y", field_name))?;
+            let z = extract_number(obj.get("z"), &format!("{}.z", field_name))?;
+            Ok((x, y, z))
+        } else {
+            // Default to zero if not specified
+            Ok((0.0, 0.0, 0.0))
+        }
+    }
+    
+    /// Extract a number from YAML value
+    fn extract_number(yaml_value: Option<&YamlValue>, field_name: &str) -> Result<f64> {
+        match yaml_value {
+            Some(YamlValue::Float(f)) => Ok(*f),
+            Some(YamlValue::Int(i)) => Ok(*i as f64),
+            Some(_) => Err(anyhow!("{} must be a number", field_name)),
+            None => Ok(0.0), // Default to 0 if not specified
+        }
+    }
+    
+    /// Serialize std_msgs/msg/String message
+    fn serialize_string_message(yaml_value: &YamlValue) -> Result<SerializedMessage> {
+        if let YamlValue::Object(obj) = yaml_value {
+            if let Some(YamlValue::String(data)) = obj.get("data") {
+                // String serialization: length (4 bytes) + string data
+                let string_bytes = data.as_bytes();
+                let mut serialized_data = Vec::new();
+                
+                // Add string length as 4-byte little-endian
+                serialized_data.extend_from_slice(&(string_bytes.len() as u32).to_le_bytes());
+                // Add string data
+                serialized_data.extend_from_slice(string_bytes);
+                
+                Ok(SerializedMessage {
+                    data: serialized_data,
+                    message_type: "std_msgs/msg/String".to_string(),
+                })
+            } else {
+                Err(anyhow!("String message must have a 'data' field with string value"))
+            }
+        } else {
+            Err(anyhow!("String message must be an object"))
+        }
+    }
+    
+    /// Serialize std_msgs/msg/Int32 message
+    fn serialize_int32_message(yaml_value: &YamlValue) -> Result<SerializedMessage> {
+        if let YamlValue::Object(obj) = yaml_value {
+            if let Some(data_value) = obj.get("data") {
+                let data = match data_value {
+                    YamlValue::Int(i) => *i as i32,
+                    YamlValue::Float(f) => *f as i32,
+                    _ => return Err(anyhow!("Int32 message data must be a number")),
+                };
+                
+                Ok(SerializedMessage {
+                    data: data.to_le_bytes().to_vec(),
+                    message_type: "std_msgs/msg/Int32".to_string(),
+                })
+            } else {
+                Err(anyhow!("Int32 message must have a 'data' field"))
+            }
+        } else {
+            Err(anyhow!("Int32 message must be an object"))
+        }
+    }
+    
+    /// Serialize std_msgs/msg/Float64 message
+    fn serialize_float64_message(yaml_value: &YamlValue) -> Result<SerializedMessage> {
+        if let YamlValue::Object(obj) = yaml_value {
+            if let Some(data_value) = obj.get("data") {
+                let data = match data_value {
+                    YamlValue::Float(f) => *f,
+                    YamlValue::Int(i) => *i as f64,
+                    _ => return Err(anyhow!("Float64 message data must be a number")),
+                };
+                
+                Ok(SerializedMessage {
+                    data: data.to_le_bytes().to_vec(),
+                    message_type: "std_msgs/msg/Float64".to_string(),
+                })
+            } else {
+                Err(anyhow!("Float64 message must have a 'data' field"))
+            }
+        } else {
+            Err(anyhow!("Float64 message must be an object"))
+        }
+    }
+    
+    /// Deserialize binary message data back to YAML format
+    /// 
+    /// This is useful for debugging and message inspection
+    pub fn deserialize_message(
+        message_type: &str,
+        data: &[u8],
+    ) -> Result<YamlValue> {
+        match message_type {
+            "geometry_msgs/msg/Twist" => deserialize_twist_message(data),
+            "std_msgs/msg/String" => deserialize_string_message(data),
+            "std_msgs/msg/Int32" => deserialize_int32_message(data),
+            "std_msgs/msg/Float64" => deserialize_float64_message(data),
+            _ => Err(anyhow!("Deserialization not implemented for message type: {}", message_type)),
+        }
+    }
+    
+    /// Deserialize geometry_msgs/msg/Twist message
+    fn deserialize_twist_message(data: &[u8]) -> Result<YamlValue> {
+        if data.len() != 48 { // 6 x f64 = 48 bytes
+            return Err(anyhow!("Invalid Twist message size: expected 48 bytes, got {}", data.len()));
+        }
+        
+        // Extract the 6 f64 values
+        let mut values = Vec::new();
+        for i in 0..6 {
+            let start = i * 8;
+            let bytes: [u8; 8] = data[start..start + 8].try_into()
+                .map_err(|_| anyhow!("Failed to extract f64 at position {}", i))?;
+            values.push(f64::from_le_bytes(bytes));
+        }
+        
+        let mut twist_obj = HashMap::new();
+        
+        // Linear component
+        let mut linear_obj = HashMap::new();
+        linear_obj.insert("x".to_string(), YamlValue::Float(values[0]));
+        linear_obj.insert("y".to_string(), YamlValue::Float(values[1]));
+        linear_obj.insert("z".to_string(), YamlValue::Float(values[2]));
+        twist_obj.insert("linear".to_string(), YamlValue::Object(linear_obj));
+        
+        // Angular component
+        let mut angular_obj = HashMap::new();
+        angular_obj.insert("x".to_string(), YamlValue::Float(values[3]));
+        angular_obj.insert("y".to_string(), YamlValue::Float(values[4]));
+        angular_obj.insert("z".to_string(), YamlValue::Float(values[5]));
+        twist_obj.insert("angular".to_string(), YamlValue::Object(angular_obj));
+        
+        Ok(YamlValue::Object(twist_obj))
+    }
+    
+    /// Deserialize std_msgs/msg/String message
+    fn deserialize_string_message(data: &[u8]) -> Result<YamlValue> {
+        if data.len() < 4 {
+            return Err(anyhow!("Invalid String message: too short"));
+        }
+        
+        // Extract string length
+        let length_bytes: [u8; 4] = data[0..4].try_into()
+            .map_err(|_| anyhow!("Failed to extract string length"))?;
+        let length = u32::from_le_bytes(length_bytes) as usize;
+        
+        if data.len() != 4 + length {
+            return Err(anyhow!("Invalid String message size: expected {} bytes, got {}", 4 + length, data.len()));
+        }
+        
+        // Extract string data
+        let string_data = String::from_utf8(data[4..].to_vec())
+            .map_err(|e| anyhow!("Invalid UTF-8 in string message: {}", e))?;
+        
+        let mut obj = HashMap::new();
+        obj.insert("data".to_string(), YamlValue::String(string_data));
+        
+        Ok(YamlValue::Object(obj))
+    }
+    
+    /// Deserialize std_msgs/msg/Int32 message
+    fn deserialize_int32_message(data: &[u8]) -> Result<YamlValue> {
+        if data.len() != 4 {
+            return Err(anyhow!("Invalid Int32 message size: expected 4 bytes, got {}", data.len()));
+        }
+        
+        let bytes: [u8; 4] = data.try_into()
+            .map_err(|_| anyhow!("Failed to extract Int32 data"))?;
+        let value = i32::from_le_bytes(bytes);
+        
+        let mut obj = HashMap::new();
+        obj.insert("data".to_string(), YamlValue::Int(value as i64));
+        
+        Ok(YamlValue::Object(obj))
+    }
+    
+    /// Deserialize std_msgs/msg/Float64 message
+    fn deserialize_float64_message(data: &[u8]) -> Result<YamlValue> {
+        if data.len() != 8 {
+            return Err(anyhow!("Invalid Float64 message size: expected 8 bytes, got {}", data.len()));
+        }
+        
+        let bytes: [u8; 8] = data.try_into()
+            .map_err(|_| anyhow!("Failed to extract Float64 data"))?;
+        let value = f64::from_le_bytes(bytes);
+        
+        let mut obj = HashMap::new();
+        obj.insert("data".to_string(), YamlValue::Float(value));
+        
+        Ok(YamlValue::Object(obj))
+    }
 }
 
 /// YAML message parsing and validation

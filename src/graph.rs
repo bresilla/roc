@@ -11,6 +11,7 @@ pub use crate::shared::dynamic_messages::{
     is_message_type_available, get_available_message_types
 };
 pub use crate::shared::dynamic_messages::yaml_parser::{YamlValue, parse_yaml_message, validate_message_structure};
+pub use crate::shared::dynamic_messages::serialization::{SerializedMessage, serialize_message, deserialize_message};
 
 // Re-export operation modules for direct access if needed
 pub use crate::shared::topic_operations;
@@ -106,5 +107,25 @@ impl RclGraphContext {
     /// Get available message types for a package
     pub fn get_package_message_types(package_name: &str) -> Vec<String> {
         get_available_message_types(package_name)
+    }
+
+    /// Parse, validate, and serialize a YAML message for publishing
+    pub fn prepare_message_for_publishing(
+        message_type: &str, 
+        yaml_content: &str
+    ) -> Result<SerializedMessage> {
+        // Parse and validate the YAML content
+        let yaml_value = Self::parse_and_validate_message(message_type, yaml_content)?;
+        
+        // Serialize to binary format
+        serialize_message(message_type, &yaml_value)
+    }
+
+    /// Deserialize binary message data for inspection
+    pub fn inspect_serialized_message(
+        message_type: &str,
+        data: &[u8]
+    ) -> Result<YamlValue> {
+        deserialize_message(message_type, data)
     }
 }
