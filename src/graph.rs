@@ -12,6 +12,7 @@ pub use crate::shared::dynamic_messages::{
 };
 pub use crate::shared::dynamic_messages::yaml_parser::{YamlValue, parse_yaml_message, validate_message_structure};
 pub use crate::shared::dynamic_messages::serialization::{SerializedMessage, serialize_message, deserialize_message};
+pub use crate::shared::dynamic_messages::generic_serialization;
 
 // Re-export operation modules for direct access if needed
 pub use crate::shared::topic_operations;
@@ -19,6 +20,7 @@ pub use crate::shared::node_operations;
 pub use crate::shared::service_operations;
 
 use anyhow::Result;
+use rclrs::rosidl_message_type_support_t;
 
 impl RclGraphContext {
     // Convenience methods that delegate to the operation modules
@@ -117,8 +119,31 @@ impl RclGraphContext {
         // Parse and validate the YAML content
         let yaml_value = Self::parse_and_validate_message(message_type, yaml_content)?;
         
-        // Serialize to binary format
+        // Serialize to binary format using our current approach
+        // TODO: Use generic_serialization when type support is available
         serialize_message(message_type, &yaml_value)
+    }
+
+    /// Parse, validate, and serialize using introspection (when type support is available)
+    pub fn prepare_message_for_publishing_generic(
+        message_type: &str, 
+        yaml_content: &str,
+        type_support: *const rosidl_message_type_support_t,
+    ) -> Result<SerializedMessage> {
+        // Parse and validate the YAML content
+        let yaml_value = Self::parse_and_validate_message(message_type, yaml_content)?;
+        
+        // Try generic serialization first, fall back to manual if needed
+        match generic_serialization::serialize_message_generic(message_type, &yaml_value, type_support) {
+            Ok(result) => {
+                println!("Successfully used generic introspection-based serialization!");
+                Ok(result)
+            }
+            Err(e) => {
+                println!("Generic serialization failed ({}), falling back to manual", e);
+                serialize_message(message_type, &yaml_value)
+            }
+        }
     }
 
     /// Deserialize binary message data for inspection

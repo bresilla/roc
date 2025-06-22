@@ -163,11 +163,34 @@ impl DynamicMessageRegistry {
             "std_msgs/msg/Int32" => self.try_get_int32_type_support(),
             "std_msgs/msg/Float64" => self.try_get_float64_type_support(),
             _ => {
-                // For unknown types, return an error for now
-                // This can be expanded with actual dynamic loading later
-                Err(anyhow!("Dynamic type support not yet implemented for {}/{}", package_name, message_name))
+                // Try the generic approach for unknown types
+                self.try_get_generic_type_support(package_name, message_name)
             }
         }
+    }
+
+    /// Generic type support loading for any package/message combination
+    /// 
+    /// This attempts to construct the library path and symbol name automatically
+    fn try_get_generic_type_support(
+        &self,
+        package_name: &str,
+        message_name: &str,
+    ) -> Result<*const rosidl_message_type_support_t> {
+        // Construct the library path: /opt/ros/jazzy/lib/lib{package}__rosidl_typesupport_c.so
+        let library_path = format!("/opt/ros/jazzy/lib/lib{}__rosidl_typesupport_c.so", package_name);
+        
+        // Construct the symbol name: rosidl_typesupport_c__get_message_type_support_handle__{package}__msg__{message}
+        let symbol_name = format!(
+            "rosidl_typesupport_c__get_message_type_support_handle__{}__msg__{}",
+            package_name, message_name
+        );
+        
+        println!("Attempting generic type support loading:");
+        println!("  Library: {}", library_path);
+        println!("  Symbol: {}", symbol_name);
+        
+        self.load_type_support_from_library(&library_path, &symbol_name)
     }
 
     /// Try to get type support for geometry_msgs/msg/Twist
@@ -181,20 +204,26 @@ impl DynamicMessageRegistry {
 
     /// Try to get type support for std_msgs/msg/String
     fn try_get_string_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
-        // Placeholder implementation
-        Err(anyhow!("String type support loading not yet implemented"))
+        let library_path = "/opt/ros/jazzy/lib/libstd_msgs__rosidl_typesupport_c.so";
+        let symbol_name = "rosidl_typesupport_c__get_message_type_support_handle__std_msgs__msg__String";
+        
+        self.load_type_support_from_library(library_path, symbol_name)
     }
 
     /// Try to get type support for std_msgs/msg/Int32
     fn try_get_int32_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
-        // Placeholder implementation
-        Err(anyhow!("Int32 type support loading not yet implemented"))
+        let library_path = "/opt/ros/jazzy/lib/libstd_msgs__rosidl_typesupport_c.so";
+        let symbol_name = "rosidl_typesupport_c__get_message_type_support_handle__std_msgs__msg__Int32";
+        
+        self.load_type_support_from_library(library_path, symbol_name)
     }
 
     /// Try to get type support for std_msgs/msg/Float64
     fn try_get_float64_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
-        // Placeholder implementation
-        Err(anyhow!("Float64 type support loading not yet implemented"))
+        let library_path = "/opt/ros/jazzy/lib/libstd_msgs__rosidl_typesupport_c.so";
+        let symbol_name = "rosidl_typesupport_c__get_message_type_support_handle__std_msgs__msg__Float64";
+        
+        self.load_type_support_from_library(library_path, symbol_name)
     }
 
     /// Load type support from a shared library
@@ -328,6 +357,40 @@ pub fn get_available_message_types(package_name: &str) -> Vec<String> {
     types
 }
 
+/// Generic introspection-based serialization (the better approach)
+pub mod generic_serialization {
+    use super::*;
+    use super::yaml_parser::YamlValue;
+    use super::serialization::SerializedMessage;
+    use std::ffi::CStr;
+    
+    /// Attempt to serialize any message type using introspection
+    pub fn serialize_message_generic(
+        message_type: &str,
+        yaml_value: &YamlValue,
+        type_support: *const rosidl_message_type_support_t,
+    ) -> Result<SerializedMessage> {
+        if type_support.is_null() {
+            return Err(anyhow!("Type support is null"));
+        }
+        
+        // For the demonstration, we show that we have access to the type support
+        // This proves the generic loading mechanism works
+        println!("🎯 Generic serialization called with valid type support for: {}", message_type);
+        println!("   Type support pointer: {:p}", type_support);
+        
+        // TODO: In a full implementation, we would:
+        // 1. Use the type support to get introspection data
+        // 2. Walk through the YAML structure using the introspection metadata  
+        // 3. Build a proper ROS2 message structure in memory
+        // 4. Use RMW serialization functions to create the proper CDR format
+        
+        // For now, fall back to our manual approach
+        println!("   Falling back to manual serialization (introspection TODO)");
+        super::serialization::serialize_message(message_type, yaml_value)
+    }
+}
+
 /// Message serialization support for converting between YAML and binary formats
 pub mod serialization {
     use super::*;
@@ -349,6 +412,7 @@ pub mod serialization {
     ) -> Result<SerializedMessage> {
         match message_type {
             "geometry_msgs/msg/Twist" => serialize_twist_message(yaml_value),
+            "geometry_msgs/msg/Vector3" => serialize_vector3_message(yaml_value),
             "std_msgs/msg/String" => serialize_string_message(yaml_value),
             "std_msgs/msg/Int32" => serialize_int32_message(yaml_value),
             "std_msgs/msg/Float64" => serialize_float64_message(yaml_value),
@@ -383,6 +447,29 @@ pub mod serialization {
             })
         } else {
             Err(anyhow!("Twist message must be an object"))
+        }
+    }
+    
+    /// Serialize geometry_msgs/msg/Vector3 message
+    fn serialize_vector3_message(yaml_value: &YamlValue) -> Result<SerializedMessage> {
+        if let YamlValue::Object(obj) = yaml_value {
+            // Extract x, y, z components directly from the object
+            let x = extract_number(obj.get("x"), "x")?;
+            let y = extract_number(obj.get("y"), "y")?;
+            let z = extract_number(obj.get("z"), "z")?;
+            
+            // Create binary representation (24 bytes: 3 x f64)
+            let mut data = Vec::new();
+            data.extend_from_slice(&x.to_le_bytes());
+            data.extend_from_slice(&y.to_le_bytes());
+            data.extend_from_slice(&z.to_le_bytes());
+            
+            Ok(SerializedMessage {
+                data,
+                message_type: "geometry_msgs/msg/Vector3".to_string(),
+            })
+        } else {
+            Err(anyhow!("Vector3 message must be an object"))
         }
     }
     

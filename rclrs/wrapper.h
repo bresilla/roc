@@ -20,6 +20,7 @@
 #include "rosidl_typesupport_c/identifier.h"
 #include "rosidl_typesupport_introspection_c/message_introspection.h"
 #include "rosidl_typesupport_introspection_c/identifier.h"
+#include "rosidl_typesupport_introspection_c/field_types.h"
 
 // Message serialization headers
 #include "rmw/rmw/serialized_message.h"

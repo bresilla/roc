@@ -143,6 +143,12 @@ fn main() {
         .allowlist_function("rcutils_has_symbol")
         // Message introspection functions
         .allowlist_function("rosidl_typesupport_introspection_c__get_message_type_support_handle")
+        .allowlist_function("rosidl_get_typesupport_handle")
+        // RMW serialization functions for any message type
+        .allowlist_function("rmw_get_zero_initialized_serialized_message")
+        .allowlist_function("rmw_serialized_message_init")
+        .allowlist_function("rmw_serialized_message_fini")
+        .allowlist_function("rmw_serialized_message_resize")
         // RMW serialization functions
         .allowlist_function("rmw_serialize")
         .allowlist_function("rmw_deserialize")
@@ -173,6 +179,8 @@ fn main() {
         // Message introspection types
         .allowlist_type("rosidl_typesupport_introspection_c__MessageMembers")
         .allowlist_type("rosidl_typesupport_introspection_c__MessageMember")
+        // Introspection field type constants
+        .allowlist_var("rosidl_typesupport_introspection_c__ROS_TYPE_.*")
         // Serialized message type
         .allowlist_type("rmw_serialized_message_t")
         // Type description types

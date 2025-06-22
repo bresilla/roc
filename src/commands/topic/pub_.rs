@@ -17,10 +17,20 @@ struct DynamicRclPublisher {
     serialized_message: Option<SerializedMessage>,
 }
 
-/// Prepare message data using dynamic message infrastructure
+/// Prepare message data using dynamic message infrastructure (with optional type support)
 fn prepare_message_data(message_type: &str, yaml_content: &str) -> Result<SerializedMessage> {
     // Use our dynamic message infrastructure to parse and serialize the message
     RclGraphContext::prepare_message_for_publishing(message_type, yaml_content)
+}
+
+/// Prepare message data using generic approach when type support is available
+fn prepare_message_data_generic(
+    message_type: &str, 
+    yaml_content: &str, 
+    type_support: *const rclrs::rosidl_message_type_support_t
+) -> Result<SerializedMessage> {
+    // Use the generic approach with introspection
+    RclGraphContext::prepare_message_for_publishing_generic(message_type, yaml_content, type_support)
 }
 
 impl DynamicRclPublisher {
@@ -30,17 +40,23 @@ impl DynamicRclPublisher {
             return Err(anyhow!("RCL context is not valid"));
         }
 
-        // Prepare the message data using our dynamic infrastructure
-        let serialized_message = prepare_message_data(message_type, yaml_content)?;
+        // Get the type support for this message type
+        let mut registry = RclGraphContext::create_message_registry();
+        let message_type_info = registry.load_message_type(message_type)?;
+        
+        // Prepare the message data using either generic or fallback approach
+        let serialized_message = if let Some(type_support) = message_type_info.type_support {
+            println!("Using generic serialization approach with type support!");
+            prepare_message_data_generic(message_type, yaml_content, type_support)?
+        } else {
+            println!("Type support not available, using fallback approach");
+            prepare_message_data(message_type, yaml_content)?
+        };
         
         println!("Prepared {} byte message for type: {}", serialized_message.data.len(), message_type);
 
         // Create a real RCL publisher to make the topic visible in the graph
         let topic_name_c = CString::new(topic_name).map_err(|e| anyhow!("Invalid topic name: {}", e))?;
-        
-        // Get the type support for this message type
-        let mut registry = RclGraphContext::create_message_registry();
-        let message_type_info = registry.load_message_type(message_type)?;
         
         let publisher = if let Some(type_support) = message_type_info.type_support {
             unsafe {
