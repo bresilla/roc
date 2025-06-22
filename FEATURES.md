@@ -15,7 +15,7 @@ ROC is a Rust-based ROS2 CLI replacement that aims to provide better performance
 
 | Command | Status | Implementation | Notes |
 |---------|--------|----------------|-------|
-| `roc topic` | ✅ | Native | Full implementation with RCL Graph APIs |
+| `roc topic` | 🔄 | Partial | Graph discovery ✅, real message handling ❌ |
 | `roc work` | ✅ | Native | Complete colcon replacement build system |
 | `roc idl` | ✅ | Native | IDL and protobuf message discovery |
 | `roc action` | ❌ | Fallback | Falls back to `ros2 action` |
@@ -35,27 +35,47 @@ ROC is a Rust-based ROS2 CLI replacement that aims to provide better performance
 
 ## Detailed Feature Breakdown
 
-### 1. Topic Commands (`roc topic`) ✅ FULLY IMPLEMENTED
+### 1. Topic Commands (`roc topic`) 🔄 PARTIALLY IMPLEMENTED
 
 Uses native RCL Graph APIs for direct DDS discovery without daemon dependency.
 
 | Subcommand | Status | Implementation Details |
 |------------|--------|----------------------|
 | `list` | ✅ | Native RCL API implementation with filtering and type display |
-| `echo` | ✅ | Native implementation |
-| `hz` | ✅ | Native implementation |
-| `pub` | ✅ | Native publishing implementation |
+| `echo` | ⚠️ | **MOCK**: Simulates message reception, doesn't actually subscribe |
+| `hz` | ⚠️ | **MOCK**: Simulates rate monitoring, doesn't measure real message rates |
+| `pub` | ⚠️ | **PARTIAL**: Creates RCL publisher but lacks dynamic type support for message serialization |
 | `info` | ✅ | Native topic introspection |
 | `kind` | ✅ | Native type information |
-| `bw` | ✅ | Native bandwidth monitoring |
+| `bw` | ⚠️ | **MOCK**: Simulates bandwidth calculations, doesn't measure real data |
 | `find` | ✅ | Native topic discovery |
-| `delay` | ✅ | Native delay analysis implementation |
+| `delay` | ❌ | **PLACEHOLDER**: Returns error, not implemented |
 
 **Key Features:**
 - Direct DDS discovery (daemon-free by design)
 - Support for `--show-types`, `--count-topics`, `--include-hidden-topics`
 - Compatible with all standard `ros2 topic` options
 - Performance optimized with Rust implementation
+
+**⚠️ Current Limitations:**
+
+**Topic Publishing (`pub`):**
+- ✅ Creates actual RCL publisher (topic becomes visible in graph)
+- ❌ Lacks dynamic type support system for arbitrary message types
+- ❌ Cannot parse YAML message content and serialize to ROS format
+- **Required**: Dynamic type support loading, message introspection, YAML→binary serialization
+- **Workaround**: Use `ros2 topic pub` for actual message publishing
+
+**Topic Monitoring (`echo`, `hz`, `bw`):**
+- ❌ Simulate data instead of creating real RCL subscriptions
+- ❌ Cannot receive or process actual ROS messages
+- **Required**: RCL subscription creation, message deserialization, callback handling
+- **Workaround**: Use `ros2 topic echo/hz/bw` for real monitoring
+
+**Missing Common Arguments:**
+- ❌ `--use-sim-time` flag (not implemented)
+- ❌ `--spin-time` discovery timing (not implemented)
+- ❌ Full QoS configuration in all commands
 
 ### 2. Workspace Commands (`roc work`) ✅ FULLY IMPLEMENTED
 
