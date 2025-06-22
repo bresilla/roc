@@ -16,6 +16,7 @@
 - [QoS Profile Handling](./implementation/qos_profiles.md)
 - [Endpoint Discovery](./implementation/endpoint_discovery.md)
 - [Memory Management](./implementation/memory_management.md)
+- [Dynamic Message Type Loading](./implementation/dynamic_type_loading.md)
 
 # Interface Definition Language (IDL)
 
