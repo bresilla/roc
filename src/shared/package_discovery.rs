@@ -91,10 +91,11 @@ pub fn discover_packages(config: &DiscoveryConfig) -> Result<Vec<Package>> {
 }
 
 fn discover_packages_in_path(path: &Path, packages: &mut Vec<Package>, config: &DiscoveryConfig) -> Result<()> {
-    // Use the proven working approach from the work commands
+    // Use walkdir with proper filtering to avoid excluded directories entirely
     for entry in walkdir::WalkDir::new(path)
         .max_depth(config.max_depth.unwrap_or(100)) // Reasonable default
         .into_iter()
+        .filter_entry(|e| !should_exclude_path(e.path(), &config.exclude_patterns))
         .filter_map(|e| e.ok()) 
     {
         let entry_path = entry.path();
@@ -109,18 +110,27 @@ fn discover_packages_in_path(path: &Path, packages: &mut Vec<Package>, config: &
             continue;
         }
         
-        // Skip if this is an excluded directory (enhanced feature)
-        if should_exclude_path(entry_path, &config.exclude_patterns) {
-            continue;
-        }
-        
         // Look for package.xml - this is the key check that must work
         let package_xml = entry_path.join("package.xml");
         if package_xml.is_file() {
             match parse_package_xml(&package_xml) {
                 Ok(package) => {
                     if config.include_hidden || !is_hidden_package(&package) {
-                        packages.push(package);
+                        // Check for duplicates by name and prefer source packages
+                        if let Some(existing_idx) = packages.iter().position(|p| p.name == package.name) {
+                            // If we found a duplicate, prefer the source package over installed package
+                            let existing_package = &packages[existing_idx];
+                            let current_is_source = is_source_package(&package);
+                            let existing_is_source = is_source_package(existing_package);
+                            
+                            // Replace if this is a source package and existing is not
+                            if current_is_source && !existing_is_source {
+                                packages[existing_idx] = package;
+                            }
+                            // If both are source or both are installed, keep the first one found
+                        } else {
+                            packages.push(package);
+                        }
                     }
                 }
                 Err(e) => {
@@ -134,18 +144,31 @@ fn discover_packages_in_path(path: &Path, packages: &mut Vec<Package>, config: &
 }
 
 fn should_exclude_path(path: &Path, exclude_patterns: &[String]) -> bool {
+    // Check if any component of the path matches exclusion patterns
+    for component in path.components() {
+        if let Some(component_str) = component.as_os_str().to_str() {
+            for pattern in exclude_patterns {
+                if component_str == pattern {
+                    return true;
+                }
+                // Support glob-like patterns in the future
+                if pattern.contains('*') || pattern.contains('?') {
+                    // TODO: Implement glob pattern matching
+                    continue;
+                }
+            }
+        }
+    }
+    
+    // Also check the final filename/directory name
     if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
         for pattern in exclude_patterns {
             if file_name == pattern {
                 return true;
             }
-            // Support glob-like patterns in the future
-            if pattern.contains('*') || pattern.contains('?') {
-                // TODO: Implement glob pattern matching
-                continue;
-            }
         }
     }
+    
     false
 }
 
@@ -156,6 +179,31 @@ fn is_hidden_package(package: &Package) -> bool {
     package.path.iter().any(|component| {
         component.to_str().map_or(false, |s| s.starts_with('.'))
     })
+}
+
+fn is_source_package(package: &Package) -> bool {
+    // A source package is one that's likely in a source directory (src/)
+    // rather than an install directory (install/, build/, etc.)
+    let path_str = package.path.to_string_lossy().to_lowercase();
+    
+    // Prefer packages in src/ directories
+    if path_str.contains("/src/") || path_str.contains("\\src\\") {
+        return true;
+    }
+    
+    // Avoid packages in install/, build/, log/ directories
+    if path_str.contains("/install/") || path_str.contains("\\install\\") ||
+       path_str.contains("/build/") || path_str.contains("\\build\\") ||
+       path_str.contains("/log/") || path_str.contains("\\log\\") {
+        return false;
+    }
+    
+    // For packages not in specific directories, prefer ones with source indicators
+    package.path.join("CMakeLists.txt").exists() || 
+    package.path.join("setup.py").exists() ||
+    package.path.join("setup.cfg").exists() ||
+    package.path.join("src").exists() ||
+    package.path.join("include").exists()
 }
 
 fn parse_package_xml(package_xml_path: &Path) -> Result<Package> {

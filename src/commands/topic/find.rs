@@ -12,7 +12,7 @@ use std::time::Duration;
 // 3. Supporting count and hidden topic options
 // 4. Matching ros2 topic find behavior exactly
 
-fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
+fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()> {
     let message_type = matches
         .get_one::<String>("topic_type")
         .ok_or_else(|| anyhow!("Message type is required"))?;

@@ -367,7 +367,7 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
     let mut current_enum_values: Vec<String> = Vec::new();
     let mut bracket_count = 0;
     let mut oneof_fields: Vec<(String, Vec<String>)> = Vec::new();
-    let mut current_oneof: Option<String> = None;
+    let mut current_oneof: Option<String>;
 
     // First pass: collect all nested type definitions
     for line in proto_content.lines() {
@@ -434,7 +434,7 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
         // Parse message definitions (including nested ones)
         if line.starts_with("message ") {
             if let Some(msg_name) = extract_message_name(line) {
-                let full_msg_name = if message_stack.is_empty() {
+                let _full_msg_name = if message_stack.is_empty() {
                     msg_name.clone()
                 } else {
                     format!("{}{}", message_stack.join(""), msg_name)
@@ -486,7 +486,7 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
 
         // End of message definition
         if close_brackets > 0 && !message_stack.is_empty() {
-            let current_msg_name = message_stack.last().unwrap().clone();
+            let _current_msg_name = message_stack.last().unwrap().clone();
             let full_msg_name = message_stack.join("");
             
             // Generate oneof helper messages first
@@ -526,6 +526,7 @@ fn extract_message_name(line: &str) -> Option<String> {
     }
 }
 
+#[allow(dead_code)]
 fn parse_field_to_ros2_with_context(line: &str, message_context: &[String]) -> Option<String> {
     // Enhanced field parsing with support for nested message context
     let line = line.trim();
@@ -620,6 +621,7 @@ fn parse_field_to_ros2_with_context(line: &str, message_context: &[String]) -> O
     Some(field_definition)
 }
 
+#[allow(dead_code)]
 fn resolve_type_with_context(proto_type: &str, message_context: &[String]) -> String {
     // Enhanced type resolution with proper nested message handling
     
@@ -672,7 +674,7 @@ fn resolve_type_with_context(proto_type: &str, message_context: &[String]) -> St
     }
 }
 
-fn parse_field_to_ros2_with_nested_context(line: &str, message_context: &[String], nested_types: &std::collections::HashSet<String>) -> Option<String> {
+fn parse_field_to_ros2_with_nested_context(line: &str, message_context: &[String], _nested_types: &std::collections::HashSet<String>) -> Option<String> {
     // Enhanced field parsing with support for nested message context and knowledge of defined nested types
     let line = line.trim();
     
@@ -901,6 +903,7 @@ fn extract_oneof_name(line: &str) -> Option<String> {
     }
 }
 
+#[allow(dead_code)]
 fn parse_enum_value(line: &str) -> Option<String> {
     let line = line.trim();
     
@@ -930,6 +933,7 @@ fn capitalize_first(s: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn generate_enum_message_content(enum_values: &[String]) -> String {
     if enum_values.is_empty() {
         "# Empty enum\nint32 value\n".to_string()

@@ -104,5 +104,6 @@ pub struct IdlProject {
     pub package_path: PathBuf,
     pub proto_files: Vec<PathBuf>,
     pub msg_files: Vec<PathBuf>,
+    #[allow(dead_code)]
     pub package: Package,
 }

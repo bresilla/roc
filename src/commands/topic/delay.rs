@@ -287,6 +287,7 @@ impl TopicDelayInterceptor {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn create_rmw_subscription(&self, topic_type: &str) -> Result<*mut rmw_subscription_t> {
         // This is a simplified placeholder - in a real implementation we'd need to:
         // 1. Create RMW node
@@ -300,6 +301,7 @@ impl TopicDelayInterceptor {
         ))
     }
 
+    #[allow(dead_code)]
     fn create_rmw_publisher(&self, topic_type: &str) -> Result<*mut rmw_publisher_t> {
         // Similar to subscription - need proper RMW implementation
         Err(anyhow!(
@@ -308,12 +310,14 @@ impl TopicDelayInterceptor {
         ))
     }
 
+    #[allow(dead_code)]
     fn setup_message_callback(&self, _subscription: &*mut rmw_subscription_t) -> Result<()> {
         // Placeholder for setting up RMW callback
         // Would use: rmw_subscription_set_on_new_message_callback
         Err(anyhow!("RMW callback setup not yet implemented"))
     }
 
+    #[allow(dead_code)]
     fn publish_delayed_message(&self, _publisher: &*mut rmw_publisher_t, _data: &[u8]) -> Result<()> {
         // Placeholder for publishing via RMW
         // Would use: rmw_publish
@@ -322,6 +326,7 @@ impl TopicDelayInterceptor {
 }
 
 // Message callback function (called by RMW when new messages arrive)
+#[allow(dead_code)]
 extern "C" fn on_message_received(user_data: *const std::ffi::c_void, _number_of_events: usize) {
     if user_data.is_null() {
         return;

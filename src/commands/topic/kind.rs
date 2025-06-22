@@ -11,7 +11,7 @@ use std::time::Duration;
 // 2. Simple topic name to type lookup
 // 3. Clean output matching ros2 topic type behavior
 
-fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
+fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()> {
     let topic_name = matches
         .get_one::<String>("topic_name")
         .ok_or_else(|| anyhow!("Topic name is required"))?;
