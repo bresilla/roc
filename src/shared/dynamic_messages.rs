@@ -151,10 +151,11 @@ impl DynamicMessageRegistry {
 
     /// Try to get type support for geometry_msgs/msg/Twist
     fn try_get_twist_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
-        // This is a placeholder - in a full implementation, this would use
-        // the actual RCL functions to load the type support
-        // For now, we return an error to indicate it's not implemented
-        Err(anyhow!("Twist type support loading not yet implemented"))
+        // Load the geometry_msgs typesupport library dynamically
+        let library_name = "libgeometry_msgs__rosidl_typesupport_c.so";
+        let symbol_name = "rosidl_typesupport_c__get_message_type_support_handle__geometry_msgs__msg__Twist";
+        
+        self.load_type_support_from_library(library_name, symbol_name)
     }
 
     /// Try to get type support for std_msgs/msg/String
@@ -173,6 +174,64 @@ impl DynamicMessageRegistry {
     fn try_get_float64_type_support(&self) -> Result<*const rosidl_message_type_support_t> {
         // Placeholder implementation
         Err(anyhow!("Float64 type support loading not yet implemented"))
+    }
+
+    /// Load type support from a shared library
+    fn load_type_support_from_library(
+        &self,
+        library_name: &str,
+        symbol_name: &str,
+    ) -> Result<*const rosidl_message_type_support_t> {
+        use std::ffi::CString;
+        
+        unsafe {
+            // Initialize a shared library handle
+            let mut shared_lib = rcutils_get_zero_initialized_shared_library();
+            
+            // Convert library name to C string
+            let lib_name_c = CString::new(library_name)
+                .map_err(|e| anyhow!("Invalid library name '{}': {}", library_name, e))?;
+            
+            // Load the shared library
+            let allocator = rcutils_get_default_allocator();
+            let ret = rcutils_load_shared_library(
+                &mut shared_lib,
+                lib_name_c.as_ptr(),
+                allocator,
+            );
+            
+            if ret != 0 { // RCUTILS_RET_OK is 0
+                return Err(anyhow!("Failed to load library '{}': return code {}", library_name, ret));
+            }
+            
+            // Convert symbol name to C string
+            let symbol_name_c = CString::new(symbol_name)
+                .map_err(|e| anyhow!("Invalid symbol name '{}': {}", symbol_name, e))?;
+            
+            // Get the symbol from the library
+            let symbol_ptr = rcutils_get_symbol(&shared_lib, symbol_name_c.as_ptr());
+            
+            if symbol_ptr.is_null() {
+                rcutils_unload_shared_library(&mut shared_lib);
+                return Err(anyhow!("Symbol '{}' not found in library '{}'", symbol_name, library_name));
+            }
+            
+            // Cast the symbol to a function pointer and call it
+            type TypeSupportGetterFn = unsafe extern "C" fn() -> *const rosidl_message_type_support_t;
+            let type_support_fn: TypeSupportGetterFn = std::mem::transmute(symbol_ptr);
+            let type_support = type_support_fn();
+            
+            // Note: We intentionally don't unload the library here, as the type support
+            // pointer would become invalid. In a production system, we'd need to track
+            // loaded libraries and unload them during cleanup.
+            
+            if type_support.is_null() {
+                return Err(anyhow!("Type support function returned null pointer"));
+            }
+            
+            println!("Successfully loaded type support for symbol: {}", symbol_name);
+            Ok(type_support)
+        }
     }
 
     /// Try to get message introspection data from type support

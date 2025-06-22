@@ -36,19 +36,35 @@ impl DynamicRclPublisher {
         println!("Prepared {} byte message for type: {}", serialized_message.data.len(), message_type);
 
         // Create a real RCL publisher to make the topic visible in the graph
-        // We'll use a placeholder type support for now to register the topic
         let topic_name_c = CString::new(topic_name).map_err(|e| anyhow!("Invalid topic name: {}", e))?;
         
-        let publisher = unsafe {
-            let mut pub_instance = rcl_get_zero_initialized_publisher();
-            let publisher_options = rcl_publisher_get_default_options();
-            
-            // We need a type support to create the publisher
-            // For now, we'll skip this and create a minimal publisher registration
-            // This is a limitation - we need actual type support for full functionality
-            
-            // Just return the initialized publisher for now
-            pub_instance
+        // Get the type support for this message type
+        let mut registry = RclGraphContext::create_message_registry();
+        let message_type_info = registry.load_message_type(message_type)?;
+        
+        let publisher = if let Some(type_support) = message_type_info.type_support {
+            unsafe {
+                let mut pub_instance = rcl_get_zero_initialized_publisher();
+                let publisher_options = rcl_publisher_get_default_options();
+                
+                // Create the RCL publisher with real type support
+                let ret = rcl_publisher_init(
+                    &mut pub_instance,
+                    context.node(),
+                    type_support,
+                    topic_name_c.as_ptr(),
+                    &publisher_options,
+                );
+                
+                if ret != 0 { // RCL_RET_OK is 0
+                    return Err(anyhow!("Failed to create RCL publisher: return code {}", ret));
+                }
+                
+                println!("Successfully created RCL publisher with real type support!");
+                pub_instance
+            }
+        } else {
+            return Err(anyhow!("Could not load type support for message type: {}", message_type));
         };
         
         println!("Created dynamic publisher for topic: {} (type: {})", topic_name, message_type);
@@ -71,8 +87,14 @@ impl DynamicRclPublisher {
                 println!("Message content: {:?}", yaml_repr);
             }
             
-            // TODO: Implement actual RCL publishing once type support is fully working
-            // For now, we simulate successful publishing
+            // Use RCL to publish the serialized message
+            unsafe {
+                let ret = rcl_publish(&self.publisher, msg.data.as_ptr() as *const _, std::ptr::null_mut());
+                if ret != 0 { // RCL_RET_OK is 0
+                    return Err(anyhow!("Failed to publish message: return code {}", ret));
+                }
+            }
+            
             Ok(())
         } else {
             Err(anyhow!("No message data prepared for publishing"))

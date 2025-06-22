@@ -139,6 +139,8 @@ fn main() {
         .allowlist_function("rcutils_get_symbol")
         .allowlist_function("rcutils_load_shared_library")
         .allowlist_function("rcutils_unload_shared_library")
+        .allowlist_function("rcutils_get_zero_initialized_shared_library")
+        .allowlist_function("rcutils_has_symbol")
         // Message introspection functions
         .allowlist_function("rosidl_typesupport_introspection_c__get_message_type_support_handle")
         // RMW serialization functions

@@ -32,6 +32,9 @@
 #include "rcl_yaml_param_parser/parser.h"
 #include "rcutils/rcutils/types/string_array.h"
 
+// Dynamic library loading headers
+#include "rcutils/rcutils/shared_library.h"
+
 // Basic RMW headers
 #include "rmw/rmw/allocators.h"
 #include "rmw/rmw/event_callback_type.h"
