@@ -18,6 +18,14 @@ pub struct RclGraphContext {
 }
 
 impl RclGraphContext {
+    /// Reset RCL error state to avoid error state overwriting warnings
+    /// Note: This is a placeholder - the actual function may not be available in bindings
+    pub fn reset_error_state() {
+        // TODO: Implement proper error state reset when bindings are available
+        // The RCL errors are primarily caused by context reuse, so we focus on
+        // single context usage instead
+    }
+
     /// Create a new RCL context for graph operations
     /// Note: This implementation always performs direct DDS discovery (equivalent to --no-daemon)
     pub fn new() -> Result<Self> {
@@ -47,6 +55,7 @@ impl RclGraphContext {
             
             let ret = rcl_init_options_init(&mut init_options, allocator);
             if ret != 0 {
+                Self::reset_error_state();
                 return Err(anyhow!("Failed to initialize RCL init options: {}", ret));
             }
 
@@ -63,6 +72,7 @@ impl RclGraphContext {
             let mut context = rcl_get_zero_initialized_context();
             let ret = rcl_init(0, ptr::null_mut(), &init_options, &mut context);
             if ret != 0 {
+                Self::reset_error_state();
                 return Err(anyhow!("Failed to initialize RCL: {}", ret));
             }
 
@@ -80,6 +90,7 @@ impl RclGraphContext {
                 &node_options,
             );
             if ret != 0 {
+                Self::reset_error_state();
                 rcl_shutdown(&mut context);
                 return Err(anyhow!("Failed to initialize node: {}", ret));
             }

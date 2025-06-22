@@ -25,6 +25,7 @@ pub fn get_service_names(context: &RclGraphContext) -> Result<Vec<String>> {
         );
         
         if ret != 0 {
+            crate::shared::graph_context::RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get service names: {}", ret));
         }
         
@@ -70,6 +71,7 @@ pub fn get_service_names_and_types(context: &RclGraphContext) -> Result<Vec<(Str
         );
         
         if ret != 0 {
+            crate::shared::graph_context::RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get service names and types: {}", ret));
         }
         

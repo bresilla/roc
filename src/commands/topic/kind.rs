@@ -3,6 +3,7 @@ use crate::graph::RclGraphContext;
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use std::time::Duration;
+use colored::*;
 
 // Topic Type (Kind) Implementation
 // 
@@ -11,7 +12,7 @@ use std::time::Duration;
 // 2. Simple topic name to type lookup
 // 3. Clean output matching ros2 topic type behavior
 
-fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()> {
+fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
     let topic_name = matches
         .get_one::<String>("topic_name")
         .ok_or_else(|| anyhow!("Topic name is required"))?;
@@ -42,7 +43,13 @@ fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()>
     };
 
     // Simple output - just the type name (like ros2 topic type)
-    println!("{}", topic_type);
+    if common_args.ros_style {
+        // Original ROS2 CLI style
+        println!("{}", topic_type);
+    } else {
+        // Enhanced colored output
+        println!("{}", topic_type.bright_cyan());
+    }
 
     Ok(())
 }

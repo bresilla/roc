@@ -29,6 +29,7 @@ pub fn get_topic_names(context: &RclGraphContext) -> Result<Vec<String>> {
         );
         
         if ret != 0 {
+            RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get topic names: {}", ret));
         }
         
@@ -74,6 +75,7 @@ pub fn get_topics_with_types(context: &RclGraphContext) -> Result<Vec<TopicInfo>
         );
         
         if ret != 0 {
+            RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get topic names and types: {}", ret));
         }
         
@@ -142,6 +144,7 @@ pub fn get_topic_names_and_types(context: &RclGraphContext) -> Result<Vec<(Strin
         );
         
         if ret != 0 {
+            RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get topic names and types: {}", ret));
         }
         
@@ -197,6 +200,7 @@ pub fn count_publishers(context: &RclGraphContext, topic_name: &str) -> Result<u
         );
         
         if ret != 0 {
+            RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to count publishers for topic '{}': {}", topic_name, ret));
         }
         
@@ -221,6 +225,7 @@ pub fn count_subscribers(context: &RclGraphContext, topic_name: &str) -> Result<
         );
         
         if ret != 0 {
+            RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to count subscribers for topic '{}': {}", topic_name, ret));
         }
         
@@ -239,8 +244,10 @@ pub fn get_publishers_info(context: &RclGraphContext, topic_name: &str) -> Resul
     unsafe {
         let mut allocator = rcutils_get_default_allocator();
         
-        // Initialize the array - we need to use the RMW function since that's what RCL uses
+        // Initialize the array properly
         let mut publishers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+        publishers_info.size = 0;
+        publishers_info.info_array = std::ptr::null_mut();
         
         let ret = rcl_get_publishers_info_by_topic(
             context.node(),
@@ -251,6 +258,7 @@ pub fn get_publishers_info(context: &RclGraphContext, topic_name: &str) -> Resul
         );
         
         if ret != 0 {
+            RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get publishers info for topic '{}': {}", topic_name, ret));
         }
         
@@ -301,8 +309,7 @@ pub fn get_publishers_info(context: &RclGraphContext, topic_name: &str) -> Resul
             });
         }
         
-        // We should clean up the array
-        let mut allocator = rcutils_get_default_allocator();
+        // Clean up the array
         rmw_topic_endpoint_info_array_fini(&mut publishers_info, &mut allocator);
         
         Ok(result)
@@ -320,8 +327,10 @@ pub fn get_subscribers_info(context: &RclGraphContext, topic_name: &str) -> Resu
     unsafe {
         let mut allocator = rcutils_get_default_allocator();
         
-        // Initialize the array
+        // Initialize the array properly
         let mut subscribers_info: rcl_topic_endpoint_info_array_t = std::mem::zeroed();
+        subscribers_info.size = 0;
+        subscribers_info.info_array = std::ptr::null_mut();
         
         let ret = rcl_get_subscriptions_info_by_topic(
             context.node(),
@@ -332,6 +341,7 @@ pub fn get_subscribers_info(context: &RclGraphContext, topic_name: &str) -> Resu
         );
         
         if ret != 0 {
+            RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get subscribers info for topic '{}': {}", topic_name, ret));
         }
         
@@ -383,7 +393,6 @@ pub fn get_subscribers_info(context: &RclGraphContext, topic_name: &str) -> Resu
         }
 
         // Clean up the array
-        let mut allocator = rcutils_get_default_allocator();
         rmw_topic_endpoint_info_array_fini(&mut subscribers_info, &mut allocator);
         
         Ok(result)

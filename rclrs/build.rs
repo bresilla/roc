@@ -77,6 +77,9 @@ fn main() {
         .allowlist_function("rcl_take")
         .allowlist_function("rcl_publisher_init")
         .allowlist_function("rcl_publisher_fini")
+        .allowlist_function("rcl_publisher_is_valid")
+        .allowlist_function("rcl_publisher_get_default_options")
+        .allowlist_function("rcl_get_zero_initialized_publisher")
         .allowlist_function("rcl_publish")
         // RMW-level functions for direct access
         .allowlist_function("rmw_create_subscription")
@@ -115,11 +118,23 @@ fn main() {
         .allowlist_type("rmw_event_callback_t")
         // Message type support
         .allowlist_type("rosidl_message_type_support_t")
+        .allowlist_type("rosidl_typesupport_interface__MessageTypeSupport")
+        // Dynamic type support functions
+        .allowlist_function("rosidl_get_typesupport_target")
+        .allowlist_function("rosidl_typesupport_c__get_message_typesupport_handle_function")
+        .allowlist_function("rosidl_typesupport_cpp__get_message_typesupport_handle_function")
+        // Dynamic type support loading
+        .allowlist_function("rcutils_get_symbol")
+        .allowlist_function("rcutils_load_shared_library")
+        .allowlist_function("rcutils_unload_shared_library")
         // RMW basic types
         .allowlist_type("rmw_init_options_t")
         .allowlist_type("rmw_context_t")
         .allowlist_type("rmw_allocator_t")
         .allowlist_type("rmw_ret_t")
+        // Dynamic loading types
+        .allowlist_type("rcutils_shared_library_t")
+        .allowlist_type("rcutils_ret_t")
         // Generate the bindings
         .generate()
         // Unwrap the Result and panic on failure

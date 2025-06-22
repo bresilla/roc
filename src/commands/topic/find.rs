@@ -3,6 +3,7 @@ use crate::graph::RclGraphContext;
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use std::time::Duration;
+use colored::*;
 
 // Topic Find Implementation
 // 
@@ -12,7 +13,7 @@ use std::time::Duration;
 // 3. Supporting count and hidden topic options
 // 4. Matching ros2 topic find behavior exactly
 
-fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()> {
+fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
     let message_type = matches
         .get_one::<String>("topic_type")
         .ok_or_else(|| anyhow!("Message type is required"))?;
@@ -55,8 +56,21 @@ fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()>
     matching_topics.sort();
 
     // Print matching topics (one per line, like ros2 topic find)
-    for topic in matching_topics {
-        println!("{}", topic);
+    if common_args.ros_style {
+        // Original ROS2 CLI style
+        for topic in matching_topics {
+            println!("{}", topic);
+        }
+    } else {
+        // Enhanced colored output
+        if !matching_topics.is_empty() {
+            println!("{} {}", "Topics with type".bright_yellow().bold(), message_type.bright_cyan());
+            for topic in matching_topics {
+                println!("  {}", topic.bright_white());
+            }
+        } else {
+            println!("{} {}", "No topics found with type".yellow(), message_type.bright_cyan());
+        }
     }
 
     Ok(())

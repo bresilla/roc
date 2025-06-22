@@ -2,6 +2,7 @@ use clap::ArgMatches;
 use crate::graph::RclGraphContext;
 use crate::arguments::topic::CommonTopicArgs;
 use anyhow::Result;
+use colored::*;
 
 fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
     // Create RCL graph context for direct API access
@@ -51,26 +52,59 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         
         // Display topics with types
         for topic in &filtered_topics {
-            if topic.types.is_empty() {
-                println!("{} [unknown type]", topic.name);
-            } else if topic.types.len() == 1 {
-                println!("{} [{}]", topic.name, topic.types[0]);
+            if common_args.ros_style {
+                // Original ROS2 CLI style
+                if topic.types.is_empty() {
+                    println!("{} [unknown type]", topic.name);
+                } else if topic.types.len() == 1 {
+                    println!("{} [{}]", topic.name, topic.types[0]);
+                } else {
+                    // Multiple types (rare but possible)
+                    println!("{} [{}]", topic.name, topic.types.join(", "));
+                }
             } else {
-                // Multiple types (rare but possible)
-                println!("{} [{}]", topic.name, topic.types.join(", "));
+                // Enhanced colored output
+                if topic.types.is_empty() {
+                    println!("{} {}", topic.name.bright_cyan(), "[unknown type]".red());
+                } else if topic.types.len() == 1 {
+                    println!("{} {}", topic.name.bright_cyan(), format!("[{}]", topic.types[0]).green());
+                } else {
+                    // Multiple types (rare but possible)
+                    println!("{} {}", topic.name.bright_cyan(), format!("[{}]", topic.types.join(", ")).green());
+                }
             }
         }
         
         if filtered_topics.is_empty() {
-            eprintln!("No topics found.");
+            if common_args.ros_style {
+                eprintln!("No topics found.");
+            } else {
+                eprintln!("{}", "No topics found.".yellow());
+            }
         }
         
         return Ok(());
     }
 
     // Simple topic list (default behavior)
-    for topic in &filtered_topics {
-        println!("{}", topic);
+    if common_args.ros_style {
+        // Original ROS2 CLI style
+        for topic in &filtered_topics {
+            println!("{}", topic);
+        }
+    } else {
+        // Enhanced colored output with count header
+        if !filtered_topics.is_empty() {
+            println!("{}", "Available Topics:".bright_yellow().bold());
+            for topic in &filtered_topics {
+                println!("  {}", topic.bright_cyan());
+            }
+            println!();
+            println!("{} {} topics found", 
+                "Total:".bright_green(), 
+                filtered_topics.len().to_string().bright_white().bold()
+            );
+        }
     }
 
     // Handle other flags (for future implementation)
@@ -92,7 +126,11 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     // Show helpful message if no topics found
     if filtered_topics.is_empty() {
         let daemon_status = RclGraphContext::get_daemon_status();
-        eprintln!("No topics found. [{}]", daemon_status);
+        if common_args.ros_style {
+            eprintln!("No topics found. [{}]", daemon_status);
+        } else {
+            eprintln!("{} {}", "No topics found.".yellow(), format!("[{}]", daemon_status).bright_black());
+        }
     }
 
     Ok(())

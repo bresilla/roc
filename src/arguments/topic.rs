@@ -6,6 +6,7 @@ pub struct CommonTopicArgs {
     pub spin_time: Option<String>,
     pub use_sim_time: bool,
     pub no_daemon: bool,
+    pub ros_style: bool,
 }
 
 impl CommonTopicArgs {
@@ -15,6 +16,7 @@ impl CommonTopicArgs {
             spin_time: parent_matches.get_one::<String>("spin_time").cloned(),
             use_sim_time: parent_matches.get_flag("use_sim_time"),
             no_daemon: parent_matches.get_flag("no_daemon"),
+            ros_style: parent_matches.get_flag("ros"),
         }
     }
 }
@@ -48,6 +50,12 @@ pub fn cmd() -> Command {
             .long("no-daemon")
             .aliases(&["no_daemon"])
             .help("Don't spawn or use a running daemon")
+            .action(ArgAction::SetTrue)
+        )
+        .arg(
+            Arg::new("ros")
+            .long("ros")
+            .help("Use original ROS2 CLI output format and style")
             .action(ArgAction::SetTrue)
         )
         .subcommand(

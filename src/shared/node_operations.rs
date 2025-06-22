@@ -23,6 +23,7 @@ pub fn get_node_names(context: &RclGraphContext) -> Result<Vec<String>> {
         );
         
         if ret != 0 {
+            crate::shared::graph_context::RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get node names: {}", ret));
         }
         
@@ -68,6 +69,7 @@ pub fn get_node_names_with_namespaces(context: &RclGraphContext) -> Result<Vec<(
         );
         
         if ret != 0 {
+            crate::shared::graph_context::RclGraphContext::reset_error_state();
             return Err(anyhow!("Failed to get node names: {}", ret));
         }
         
