@@ -7,6 +7,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
+use serde_yaml::{Mapping, Value as YamlValue};
+
+use rclrs::{
+    ArrayValue, BoundedSequenceValue, DynamicMessageView, SequenceValue, SimpleValue, Value,
+};
+
 #[derive(Debug, Clone)]
 struct EchoOptions {
     topic_name: String,
@@ -59,107 +65,379 @@ impl EchoOptions {
     }
 }
 
-/// Check if a message type is problematic for native subscription
-fn is_problematic_message_type(message_type: &str) -> bool {
-    // These message types are known to cause segfaults in RMW CycloneDDS due to string handling bugs
-    matches!(message_type, 
-        "std_msgs/msg/String" | 
-        "geometry_msgs/msg/Twist" |
-        // Add other known problematic types here
-        "sensor_msgs/msg/CompressedImage" |
-        "sensor_msgs/msg/Image"
-    )
+fn truncate_string_if_needed(s: &str, opts: &EchoOptions) -> String {
+    if opts.full_length {
+        return s.to_string();
+    }
+    let max = opts.truncate_length;
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let prefix: String = s.chars().take(max).collect();
+    format!("{}...", prefix)
 }
 
-async fn fallback_to_ros2_echo(options: &EchoOptions, running: Arc<AtomicBool>) -> Result<()> {
-    use std::process::Stdio;
-    use tokio::io::{AsyncBufReadExt, BufReader};
-    use tokio::process::Command as AsyncCommand;
+fn maybe_truncate_sequence(mut seq: Vec<YamlValue>, opts: &EchoOptions) -> Vec<YamlValue> {
+    if opts.full_length {
+        return seq;
+    }
+    let max = opts.truncate_length;
+    if seq.len() <= max {
+        return seq;
+    }
+    seq.truncate(max);
+    seq.push(YamlValue::String("...".to_string()));
+    seq
+}
 
-    // Build ros2 topic echo command with all the same arguments
-    let mut args = vec!["topic".to_string(), "echo".to_string(), options.topic_name.clone()];
-    
-    if let Some(field) = &options.field {
-        args.push("--field".to_string());
-        args.push(field.clone());
-    }
-    if options.full_length {
-        args.push("--full-length".to_string());
-    }
-    if options.truncate_length != 128 {
-        args.push("--truncate-length".to_string());
-        args.push(options.truncate_length.to_string());
-    }
-    if options.no_arr {
-        args.push("--no-arr".to_string());
-    }
-    if options.no_str {
-        args.push("--no-str".to_string());
-    }
-    if options.flow_style {
-        args.push("--flow-style".to_string());
-    }
-    if options.no_lost_messages {
-        args.push("--no-lost-messages".to_string());
-    }
-    if options.raw {
-        args.push("--raw".to_string());
-    }
-    if options.once {
-        args.push("--once".to_string());
-    }
-    if options.csv {
-        args.push("--csv".to_string());
-    }
-
-    // Execute ros2 topic echo with streaming output
-    let mut child = AsyncCommand::new("ros2")
-        .args(&args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| anyhow!("Failed to execute ros2 topic echo: {}", e))?;
-
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
-
-    let stdout_reader = BufReader::new(stdout);
-    let stderr_reader = BufReader::new(stderr);
-
-    let mut stdout_lines = stdout_reader.lines();
-    let mut stderr_lines = stderr_reader.lines();
-
-    // Stream output in real-time
-    loop {
-        if !running.load(Ordering::Relaxed) {
-            child.kill().await.ok();
-            break;
+fn simple_to_yaml(v: &SimpleValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
+    Ok(match v {
+        SimpleValue::Float(x) => YamlValue::from(**x),
+        SimpleValue::Double(x) => YamlValue::from(**x),
+        SimpleValue::LongDouble(_ptr) => {
+            YamlValue::String("<long double>".to_string())
         }
+        SimpleValue::Char(x) => YamlValue::from(**x),
+        SimpleValue::WChar(x) => YamlValue::from(**x),
+        SimpleValue::Boolean(b) => YamlValue::from(**b),
+        SimpleValue::Octet(x) => YamlValue::from(**x),
+        SimpleValue::Uint8(x) => YamlValue::from(**x),
+        SimpleValue::Int8(x) => YamlValue::from(**x),
+        SimpleValue::Uint16(x) => YamlValue::from(**x),
+        SimpleValue::Int16(x) => YamlValue::from(**x),
+        SimpleValue::Uint32(x) => YamlValue::from(**x),
+        SimpleValue::Int32(x) => YamlValue::from(**x),
+        SimpleValue::Uint64(x) => YamlValue::from(**x),
+        SimpleValue::Int64(x) => YamlValue::from(**x),
+        SimpleValue::String(s) => {
+            if opts.no_str {
+                YamlValue::String("<string suppressed>".to_string())
+            } else {
+                YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts))
+            }
+        }
+        SimpleValue::BoundedString(s) => {
+            if opts.no_str {
+                YamlValue::String("<string suppressed>".to_string())
+            } else {
+                YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts))
+            }
+        }
+        SimpleValue::WString(s) => {
+            if opts.no_str {
+                YamlValue::String("<wstring suppressed>".to_string())
+            } else {
+                YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts))
+            }
+        }
+        SimpleValue::BoundedWString(s) => {
+            if opts.no_str {
+                YamlValue::String("<wstring suppressed>".to_string())
+            } else {
+                YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts))
+            }
+        }
+        SimpleValue::Message(m) => message_view_to_yaml(m, opts)?,
+    })
+}
 
-        tokio::select! {
-            Ok(Some(line)) = stdout_lines.next_line() => {
-                println!("{}", line);
+fn array_to_yaml(v: &ArrayValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
+    if opts.no_arr {
+        return Ok(YamlValue::String("<array suppressed>".to_string()));
+    }
+
+    let seq: Vec<YamlValue> = match v {
+        ArrayValue::FloatArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::DoubleArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::LongDoubleArray(_ptr, len) => vec![YamlValue::String(format!("<long double[{len}]>"))],
+        ArrayValue::CharArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::WCharArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::BooleanArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::OctetArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::Uint8Array(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::Int8Array(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::Uint16Array(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::Int16Array(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::Uint32Array(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::Int32Array(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::Uint64Array(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::Int64Array(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
+        ArrayValue::StringArray(a) => {
+            if opts.no_str {
+                vec![YamlValue::String("<string array suppressed>".to_string())]
+            } else {
+                a.iter()
+                    .map(|s| YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts)))
+                    .collect()
             }
-            Ok(Some(line)) = stderr_lines.next_line() => {
-                eprintln!("{}", line);
+        }
+        ArrayValue::BoundedStringArray(a) => {
+            if opts.no_str {
+                vec![YamlValue::String("<string array suppressed>".to_string())]
+            } else {
+                a.iter()
+                    .map(|s| YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts)))
+                    .collect()
             }
-            result = child.wait() => {
-                match result {
-                    Ok(status) => {
-                        if !status.success() {
-                            return Err(anyhow!("ros2 topic echo exited with status: {}", status));
-                        }
-                    }
-                    Err(e) => {
-                        return Err(anyhow!("Error waiting for ros2 topic echo: {}", e));
-                    }
+        }
+        ArrayValue::WStringArray(a) => {
+            if opts.no_str {
+                vec![YamlValue::String("<wstring array suppressed>".to_string())]
+            } else {
+                a.iter()
+                    .map(|s| YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        ArrayValue::BoundedWStringArray(a) => {
+            if opts.no_str {
+                vec![YamlValue::String("<wstring array suppressed>".to_string())]
+            } else {
+                a.iter()
+                    .map(|s| YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        ArrayValue::MessageArray(a) => a
+            .iter()
+            .map(|m| message_view_to_yaml(m, opts))
+            .collect::<Result<Vec<_>>>()?,
+    };
+
+    Ok(YamlValue::Sequence(maybe_truncate_sequence(seq, opts)))
+}
+
+fn sequence_to_yaml(v: &SequenceValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
+    if opts.no_arr {
+        return Ok(YamlValue::String("<sequence suppressed>".to_string()));
+    }
+
+    let seq: Vec<YamlValue> = match v {
+        SequenceValue::FloatSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::DoubleSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::LongDoubleSequence(_ptr) => vec![YamlValue::String("<long double sequence>".to_string())],
+        SequenceValue::CharSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::WCharSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::BooleanSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::OctetSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::Uint8Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::Int8Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::Uint16Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::Int16Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::Uint32Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::Int32Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::Uint64Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::Int64Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        SequenceValue::StringSequence(s) => {
+            if opts.no_str {
+                vec![YamlValue::String("<string sequence suppressed>".to_string())]
+            } else {
+                s.iter()
+                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        SequenceValue::BoundedStringSequence(s) => {
+            if opts.no_str {
+                vec![YamlValue::String("<string sequence suppressed>".to_string())]
+            } else {
+                s.iter()
+                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        SequenceValue::WStringSequence(s) => {
+            if opts.no_str {
+                vec![YamlValue::String("<wstring sequence suppressed>".to_string())]
+            } else {
+                s.iter()
+                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        SequenceValue::BoundedWStringSequence(s) => {
+            if opts.no_str {
+                vec![YamlValue::String("<wstring sequence suppressed>".to_string())]
+            } else {
+                s.iter()
+                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        SequenceValue::MessageSequence(s) => s
+            .iter()
+            .map(|m| message_view_to_yaml(m, opts))
+            .collect::<Result<Vec<_>>>()?,
+    };
+
+    Ok(YamlValue::Sequence(maybe_truncate_sequence(seq, opts)))
+}
+
+fn bounded_sequence_to_yaml(v: &BoundedSequenceValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
+    // Treat the same as unbounded sequence for printing.
+    if opts.no_arr {
+        return Ok(YamlValue::String("<bounded sequence suppressed>".to_string()));
+    }
+    let seq: Vec<YamlValue> = match v {
+        BoundedSequenceValue::FloatBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::DoubleBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::LongDoubleBoundedSequence(_ptr, ub) => {
+            vec![YamlValue::String(format!("<long double bounded sequence (max {ub})>"))]
+        }
+        BoundedSequenceValue::CharBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::WCharBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::BooleanBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::OctetBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::Uint8BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::Int8BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::Uint16BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::Int16BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::Uint32BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::Int32BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::Uint64BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::Int64BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::StringBoundedSequence(s) => {
+            if opts.no_str {
+                vec![YamlValue::String("<string sequence suppressed>".to_string())]
+            } else {
+                s.iter()
+                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        BoundedSequenceValue::BoundedStringBoundedSequence(s) => {
+            if opts.no_str {
+                vec![YamlValue::String("<string sequence suppressed>".to_string())]
+            } else {
+                s.iter()
+                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        BoundedSequenceValue::WStringBoundedSequence(s) => {
+            if opts.no_str {
+                vec![YamlValue::String("<wstring sequence suppressed>".to_string())]
+            } else {
+                s.iter()
+                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        BoundedSequenceValue::BoundedWStringBoundedSequence(s) => {
+            if opts.no_str {
+                vec![YamlValue::String("<wstring sequence suppressed>".to_string())]
+            } else {
+                s.iter()
+                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .collect()
+            }
+        }
+        BoundedSequenceValue::MessageBoundedSequence(s) => s
+            .iter()
+            .map(|m| message_view_to_yaml(m, opts))
+            .collect::<Result<Vec<_>>>()?,
+    };
+
+    Ok(YamlValue::Sequence(maybe_truncate_sequence(seq, opts)))
+}
+
+fn value_to_yaml(v: &Value<'_>, opts: &EchoOptions) -> Result<YamlValue> {
+    match v {
+        Value::Simple(s) => simple_to_yaml(s, opts),
+        Value::Array(a) => array_to_yaml(a, opts),
+        Value::Sequence(s) => sequence_to_yaml(s, opts),
+        Value::BoundedSequence(s) => bounded_sequence_to_yaml(s, opts),
+    }
+}
+
+fn message_view_to_yaml(view: &DynamicMessageView<'_>, opts: &EchoOptions) -> Result<YamlValue> {
+    let mut map = Mapping::new();
+    for (name, v) in view.iter() {
+        map.insert(YamlValue::String(name.to_string()), value_to_yaml(&v, opts)?);
+    }
+    Ok(YamlValue::Mapping(map))
+}
+
+fn parse_field_selector(selector: &str) -> Vec<FieldSelectorPart> {
+    // Supports paths like: "pose.position.x" and indexes like "poses[0].position".
+    // This is intentionally minimal.
+    let mut out = Vec::new();
+    for part in selector.split('.') {
+        let mut rest = part;
+        loop {
+            if let Some(idx_start) = rest.find('[') {
+                let name = &rest[..idx_start];
+                if !name.is_empty() {
+                    out.push(FieldSelectorPart::Field(name.to_string()));
                 }
+                if let Some(idx_end) = rest[idx_start..].find(']') {
+                    let inside = &rest[idx_start + 1..idx_start + idx_end];
+                    if let Ok(i) = inside.parse::<usize>() {
+                        out.push(FieldSelectorPart::Index(i));
+                    }
+                    rest = &rest[idx_start + idx_end + 1..];
+                    if rest.is_empty() {
+                        break;
+                    }
+                } else {
+                    // Malformed, treat as a field and stop.
+                    out.push(FieldSelectorPart::Field(rest.to_string()));
+                    break;
+                }
+            } else {
+                out.push(FieldSelectorPart::Field(rest.to_string()));
                 break;
             }
         }
     }
+    out
+}
 
-    Ok(())
+#[derive(Debug, Clone)]
+enum FieldSelectorPart {
+    Field(String),
+    Index(usize),
+}
+
+fn select_field<'a>(
+    mut current: Value<'a>,
+    selector: &[FieldSelectorPart],
+) -> Option<Value<'a>> {
+    for part in selector {
+        match part {
+            FieldSelectorPart::Field(name) => {
+                let Value::Simple(SimpleValue::Message(m)) = current else {
+                    return None;
+                };
+                current = m.get(name)?;
+            }
+            FieldSelectorPart::Index(i) => {
+                // rclrs dynamic "container" value types do not currently allow building a
+                // new `Value<'a>` borrowing from the same message view in a sound way, because
+                // indexing returns references tied to a short-lived borrow of the container.
+                //
+                // Keep the parser accepting "[idx]" for future compatibility, but treat it as
+                // unsupported at runtime for now.
+                let _ = i;
+                return None;
+            }
+        }
+    }
+    Some(current)
+}
+
+fn format_value_for_csv(v: &YamlValue) -> String {
+    match v {
+        YamlValue::Null => "".to_string(),
+        YamlValue::Bool(b) => b.to_string(),
+        YamlValue::Number(n) => n.to_string(),
+        YamlValue::String(s) => s.replace('"', "\"\""),
+        _ => {
+            // Fallback: dump YAML on one line.
+            let s = serde_yaml::to_string(v).unwrap_or_else(|_| "".to_string());
+            s.replace('\n', " ").trim().to_string().replace('"', "\"\"")
+        }
+    }
 }
 
 async fn echo_topic_messages(
@@ -194,10 +472,11 @@ async fn echo_topic_messages(
             })?
     };
 
-    // Check if this message type is problematic for native subscription
-    if is_problematic_message_type(&topic_type) {
-        // Fall back to ros2 topic echo for problematic message types
-        return fallback_to_ros2_echo(&options, running).await;
+    if options.flow_style {
+        eprintln!("Note: --flow-style is not fully supported yet; using default YAML formatting");
+    }
+    if options.raw {
+        eprintln!("Note: --raw is not supported for native echo; using formatted output");
     }
 
     // Wait for publishers to be available
@@ -215,27 +494,48 @@ async fn echo_topic_messages(
     let mut message_count = 0;
     let check_interval = Duration::from_millis(50); // 20 Hz polling
 
+    let selector = options.field.as_deref().map(parse_field_selector);
+    let mut last_no_publisher_warning: Option<std::time::Instant> = None;
+
     // Main message reception loop
     while running.load(Ordering::Relaxed) {
         sleep(check_interval).await;
 
         // Check for new messages
         match subscription.take_message() {
-            Ok(Some(message_data)) => {
+            Ok(Some(received)) => {
                 message_count += 1;
                 
-                // Try to deserialize the message data for display
-                let displayed_message = match RclGraphContext::inspect_serialized_message(&topic_type, &message_data) {
-                    Ok(yaml_value) => {
-                        format_message_for_display(&yaml_value, &options)
+                let view = received.message.view();
+
+                let output = if let Some(ref selector) = selector {
+                    let Some(v) = view.get(&selector.iter().find_map(|p| {
+                        if let FieldSelectorPart::Field(name) = p { Some(name.as_str()) } else { None }
+                    }).unwrap_or("")) else {
+                        return Err(anyhow!("Field '{}' not found", options.field.clone().unwrap_or_default()));
+                    };
+
+                    // If the selector starts with an index, or has deeper parts, do a full traversal.
+                    let selected = if selector.len() == 1 {
+                        Some(v)
+                    } else {
+                        select_field(v, &selector[1..])
+                    };
+                    let Some(selected) = selected else {
+                        return Err(anyhow!("Field '{}' not found", options.field.clone().unwrap_or_default()));
+                    };
+                    let yaml_v = value_to_yaml(&selected, &options)?;
+                    if options.csv {
+                        format_value_for_csv(&yaml_v)
+                    } else {
+                        serde_yaml::to_string(&yaml_v)?.trim_end().to_string()
                     }
-                    Err(_) => {
-                        // Fallback to raw data display
-                        if options.raw {
-                            format!("Raw data: {} bytes", message_data.len())
-                        } else {
-                            format!("Message #{} ({} bytes)", message_count, message_data.len())
-                        }
+                } else {
+                    let yaml_v = message_view_to_yaml(&view, &options)?;
+                    if options.csv {
+                        format_value_for_csv(&yaml_v)
+                    } else {
+                        serde_yaml::to_string(&yaml_v)?.trim_end().to_string()
                     }
                 };
 
@@ -252,11 +552,11 @@ async fn echo_topic_messages(
                         "{},{},\"{}\"",
                         current_time.as_secs(),
                         message_count,
-                        displayed_message.replace("\"", "\"\"") // Escape quotes for CSV
+                        output.replace('"', "\"\"") // Escape quotes for CSV
                     );
                 } else {
                     // YAML format (default)
-                    println!("{}", displayed_message);
+                    println!("{}", output);
                     if !options.csv {
                         println!("---");
                     }
@@ -276,21 +576,20 @@ async fn echo_topic_messages(
         }
 
         // Check if publishers are still active
-        let current_publisher_count = graph_context.count_publishers(&options.topic_name).unwrap_or(0);
+        let current_publisher_count = graph_context
+            .count_publishers(&options.topic_name)
+            .unwrap_or(0);
         if current_publisher_count == 0 && !options.no_lost_messages {
             // Only show this message if we haven't received any messages recently
-            static mut LAST_NO_PUBLISHER_WARNING: Option<std::time::Instant> = None;
             let now = std::time::Instant::now();
-            unsafe {
-                let should_warn = match LAST_NO_PUBLISHER_WARNING {
-                    Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
-                    None => true,
-                };
-                
-                if should_warn {
-                    eprintln!("WARNING: no publisher on [{}]", options.topic_name);
-                    LAST_NO_PUBLISHER_WARNING = Some(now);
-                }
+            let should_warn = match last_no_publisher_warning {
+                Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
+                None => true,
+            };
+
+            if should_warn {
+                eprintln!("WARNING: no publisher on [{}]", options.topic_name);
+                last_no_publisher_warning = Some(now);
             }
         }
     }
@@ -298,87 +597,8 @@ async fn echo_topic_messages(
     Ok(())
 }
 
-/// Format a YAML message for display based on echo options
-fn format_message_for_display(yaml_value: &crate::graph::YamlValue, options: &EchoOptions) -> String {
-    use crate::graph::YamlValue;
-    
-    // Simple message formatting - can be enhanced based on specific field extraction
-    if let Some(field) = &options.field {
-        // Extract specific field if requested
-        match yaml_value {
-            YamlValue::Object(map) => {
-                if let Some(field_value) = map.get(field) {
-                    format_yaml_value(field_value, options)
-                } else {
-                    format!("Field '{}' not found", field)
-                }
-            }
-            _ => format!("Cannot extract field '{}' from non-object message", field)
-        }
-    } else {
-        // Display entire message
-        format_yaml_value(yaml_value, options)
-    }
-}
-
-/// Format a YAML value for display with truncation and styling options
-fn format_yaml_value(value: &crate::graph::YamlValue, options: &EchoOptions) -> String {
-    use crate::graph::YamlValue;
-    
-    let formatted = match value {
-        YamlValue::String(s) => {
-            let display_str = if options.full_length {
-                s.clone()
-            } else if s.len() > options.truncate_length {
-                format!("{}...", &s[..options.truncate_length])
-            } else {
-                s.clone()
-            };
-            
-            if options.no_str {
-                display_str
-            } else {
-                format!("\"{}\"", display_str)
-            }
-        }
-        YamlValue::Int(n) => n.to_string(),
-        YamlValue::Float(n) => n.to_string(),
-        YamlValue::Bool(b) => b.to_string(),
-        YamlValue::Object(map) => {
-            if options.flow_style {
-                // Flow style (single line)
-                let entries: Vec<String> = map.iter()
-                    .map(|(k, v)| format!("{}: {}", k, format_yaml_value(v, options)))
-                    .collect();
-                format!("{{{}}}", entries.join(", "))
-            } else {
-                // Block style (multi-line)
-                let entries: Vec<String> = map.iter()
-                    .map(|(k, v)| format!("{}: {}", k, format_yaml_value(v, options)))
-                    .collect();
-                entries.join("\n")
-            }
-        }
-        YamlValue::Array(arr) => {
-            if options.no_arr {
-                "[array data]".to_string()
-            } else if options.flow_style {
-                let items: Vec<String> = arr.iter()
-                    .map(|v| format_yaml_value(v, options))
-                    .collect();
-                format!("[{}]", items.join(", "))
-            } else {
-                let items: Vec<String> = arr.iter()
-                    .enumerate()
-                    .map(|(i, v)| format!("- [{}]: {}", i, format_yaml_value(v, options)))
-                    .collect();
-                items.join("\n")
-            }
-        }
-    };
-    
-    formatted
-}
+// NOTE: Formatting here is "ros2-cli-like" but not a byte-for-byte match.
+// We intentionally keep it fully native (no `ros2 topic echo` subprocess).
 
 async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
     let options = EchoOptions::from_matches(&matches)?;

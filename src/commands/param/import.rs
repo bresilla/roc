@@ -1,64 +1,239 @@
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
+use serde_yaml::Value;
+use std::fs;
 
+use crate::arguments::param::CommonParamArgs;
+use crate::shared::param_operations::ParamClientContext;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 param load".to_owned();
+use rclrs::vendor::rcl_interfaces::msg::{Parameter, ParameterType, ParameterValue};
 
-    let node_name = matches.get_one::<String>("node_name").unwrap();
-    command.push_str(" ");
-    command.push_str(&node_name.to_string());
-
-    let param_name = matches.get_one::<String>("param_name").unwrap();
-    command.push_str(" ");
-    command.push_str(&param_name.to_string());
-
-    if matches.get_one::<String>("spin_time") != None {
-        let spin_time_value = matches.get_one::<String>("spin_time").unwrap();
-        command.push_str(" --spin-time ");
-        command.push_str(&spin_time_value.to_string());
-    }
-
-    if matches.get_flag("include_hidden_nodes") {
-        command.push_str(" --include-hidden-nodes");
-    }
-    if matches.get_flag("use_sim_time") {
-        command.push_str(" --use-sim-time");
-    }
-    if matches.get_flag("no_daemon") {
-        command.push_str(" --no-daemon");
-    }
-    if matches.get_flag("no_use_wildcard") {
-        command.push_str(" --no-use-wildcard");
-    }
-    
-    println!("running: {}", command);
-
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
+fn yaml_value_to_parameter_value(v: &Value) -> Result<ParameterValue> {
+    let mut out = ParameterValue::default();
+    match v {
+        Value::Bool(b) => {
+            out.type_ = ParameterType::PARAMETER_BOOL;
+            out.bool_value = *b;
         }
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                out.type_ = ParameterType::PARAMETER_INTEGER;
+                out.integer_value = i;
+            } else if let Some(f) = n.as_f64() {
+                out.type_ = ParameterType::PARAMETER_DOUBLE;
+                out.double_value = f;
+            } else {
+                return Err(anyhow!("Unsupported numeric value '{n}'"));
+            }
+        }
+        Value::String(s) => {
+            out.type_ = ParameterType::PARAMETER_STRING;
+            out.string_value = s.clone();
+        }
+        Value::Sequence(seq) => {
+            if seq.is_empty() {
+                out.type_ = ParameterType::PARAMETER_STRING_ARRAY;
+                out.string_array_value = Vec::new();
+                return Ok(out);
+            }
 
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
+            // Try bool array
+            if seq.iter().all(|x| matches!(x, Value::Bool(_))) {
+                out.type_ = ParameterType::PARAMETER_BOOL_ARRAY;
+                out.bool_array_value = seq
+                    .iter()
+                    .map(|x| match x {
+                        Value::Bool(b) => Ok(*b),
+                        _ => Err(anyhow!("unexpected")),
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                return Ok(out);
+            }
+
+            // Try integer array
+            if seq.iter().all(|x| matches!(x, Value::Number(_)))
+                && seq.iter().all(|x| x.as_i64().is_some())
+            {
+                out.type_ = ParameterType::PARAMETER_INTEGER_ARRAY;
+                out.integer_array_value = seq
+                    .iter()
+                    .map(|x| x.as_i64().ok_or_else(|| anyhow!("expected integer")))
+                    .collect::<Result<Vec<_>>>()?;
+                return Ok(out);
+            }
+
+            // Try double array
+            if seq.iter().all(|x| matches!(x, Value::Number(_))) {
+                let mut doubles = Vec::with_capacity(seq.len());
+                for x in seq {
+                    let Some(f) = x.as_f64() else {
+                        return Err(anyhow!("expected float"));
+                    };
+                    doubles.push(f);
+                }
+                out.type_ = ParameterType::PARAMETER_DOUBLE_ARRAY;
+                out.double_array_value = doubles;
+                return Ok(out);
+            }
+
+            // Try string array
+            if seq.iter().all(|x| matches!(x, Value::String(_))) {
+                out.type_ = ParameterType::PARAMETER_STRING_ARRAY;
+                out.string_array_value = seq
+                    .iter()
+                    .map(|x| match x {
+                        Value::String(s) => Ok(s.clone()),
+                        _ => Err(anyhow!("unexpected")),
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                return Ok(out);
+            }
+
+            return Err(anyhow!(
+                "Unsupported YAML sequence element types for parameter value"
+            ));
+        }
+        Value::Null => {
+            out.type_ = ParameterType::PARAMETER_NOT_SET;
+        }
+        Value::Mapping(_) => {
+            return Err(anyhow!(
+                "Unsupported mapping value for parameter; expected scalar or sequence"
+            ));
+        }
+        Value::Tagged(t) => {
+            return Err(anyhow!("Unsupported tagged YAML value: {:?}", t.tag));
+        }
+    }
+    Ok(out)
+}
+
+fn collect_params_from_yaml_mapping(
+    mapping: &serde_yaml::Mapping,
+    prefix: &str,
+    out: &mut Vec<Parameter>,
+) -> Result<()> {
+    for (k, v) in mapping {
+        let Some(key) = k.as_str() else {
+            return Err(anyhow!("YAML mapping key must be a string"));
+        };
+
+        let full_key = if prefix.is_empty() {
+            key.to_string()
+        } else {
+            format!("{prefix}.{key}")
+        };
+
+        match v {
+            Value::Mapping(m) => {
+                collect_params_from_yaml_mapping(m, &full_key, out)?;
+            }
+            _ => {
+                let pv = yaml_value_to_parameter_value(v)?;
+                out.push(Parameter {
+                    name: full_key,
+                    value: pv,
+                });
+            }
+        }
     }
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
+    let node_name = matches
+        .get_one::<String>("node_name")
+        .ok_or_else(|| anyhow!("node_name is required"))?;
+    let param_file = matches
+        .get_one::<String>("param_name")
+        .ok_or_else(|| anyhow!("param_name (parameter file) is required"))?;
+
+    if matches.get_flag("include_hidden_nodes") {
+        eprintln!("Note: --include-hidden-nodes is not yet supported in native mode");
+    }
+    if common_args.use_sim_time {
+        eprintln!("Note: --use-sim-time is not yet supported in native mode");
+    }
+    if common_args.no_daemon {
+        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+    }
+    if let Some(spin_time_value) = common_args.spin_time {
+        eprintln!(
+            "Note: --spin-time {} is not yet supported in native mode",
+            spin_time_value
+        );
+    }
+    if matches.get_flag("no_use_wildcard") {
+        eprintln!("Note: --no-use-wildcard is not yet supported in native mode");
+    }
+
+    let node_fqn = ParamClientContext::node_fqn(node_name);
+    let mut ctx = ParamClientContext::new()?;
+
+    let content = fs::read_to_string(param_file)
+        .map_err(|e| anyhow!("Failed to read parameter file '{}': {}", param_file, e))?;
+    let yaml: Value = serde_yaml::from_str(&content)
+        .map_err(|e| anyhow!("Failed to parse YAML '{}': {}", param_file, e))?;
+
+    let root = yaml
+        .as_mapping()
+        .ok_or_else(|| anyhow!("Top-level YAML must be a mapping"))?;
+
+    // This is a simplified loader that supports two common layouts:
+    // 1) '<node_fqn>': { ros__parameters: { ... } }
+    // 2) '/**': { ros__parameters: { ... } }  (wildcard is accepted but not selectively disabled)
+    let mut param_sets: Vec<Parameter> = Vec::new();
+    for (node_key, node_val) in root {
+        let Some(node_key_str) = node_key.as_str() else {
+            continue;
+        };
+
+        if node_key_str != node_fqn && node_key_str != "/**" {
+            continue;
+        }
+
+        let node_map = node_val
+            .as_mapping()
+            .ok_or_else(|| anyhow!("Node entry '{node_key_str}' must be a mapping"))?;
+        let ros_params_val = node_map
+            .get(&Value::String("ros__parameters".to_string()))
+            .ok_or_else(|| anyhow!("Missing 'ros__parameters' under '{node_key_str}'"))?;
+        let ros_params_map = ros_params_val
+            .as_mapping()
+            .ok_or_else(|| anyhow!("'ros__parameters' must be a mapping"))?;
+
+        collect_params_from_yaml_mapping(ros_params_map, "", &mut param_sets)?;
+    }
+
+    if param_sets.is_empty() {
+        return Err(anyhow!(
+            "No parameters found for node '{}' in file '{}'",
+            node_fqn,
+            param_file
+        ));
+    }
+
+    let response = ctx.set_parameters(&node_fqn, param_sets)?;
+    let mut failures = Vec::new();
+    for (idx, r) in response.results.iter().enumerate() {
+        if !r.successful {
+            failures.push(format!("{}: {}", idx, r.reason));
+        }
+    }
+    if !failures.is_empty() {
+        return Err(anyhow!(
+            "Failed to set some parameters: {}",
+            failures.join(", ")
+        ));
+    }
+
+    println!("Loaded parameters into {} from {}", node_fqn, param_file);
+    Ok(())
+}
+
+pub fn handle(matches: ArgMatches, common_args: CommonParamArgs) {
+    if let Err(e) = run_command(matches, common_args) {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

@@ -2,7 +2,7 @@ use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use rclrs::*;
+// Kept in its own module; we don't use raw rcl/rmw symbols.
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -287,56 +287,6 @@ impl TopicDelayInterceptor {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn create_rmw_subscription(&self, topic_type: &str) -> Result<*mut rmw_subscription_t> {
-        // This is a simplified placeholder - in a real implementation we'd need to:
-        // 1. Create RMW node
-        // 2. Get type support for the topic type
-        // 3. Create RMW subscription with proper options
-        
-        // For now, return an error indicating this needs proper RMW implementation
-        Err(anyhow!(
-            "RMW subscription creation not yet implemented. Need to create proper RMW node and type support for topic type: {}",
-            topic_type
-        ))
-    }
-
-    #[allow(dead_code)]
-    fn create_rmw_publisher(&self, topic_type: &str) -> Result<*mut rmw_publisher_t> {
-        // Similar to subscription - need proper RMW implementation
-        Err(anyhow!(
-            "RMW publisher creation not yet implemented. Need to create proper RMW node and type support for topic type: {}",
-            topic_type
-        ))
-    }
-
-    #[allow(dead_code)]
-    fn setup_message_callback(&self, _subscription: &*mut rmw_subscription_t) -> Result<()> {
-        // Placeholder for setting up RMW callback
-        // Would use: rmw_subscription_set_on_new_message_callback
-        Err(anyhow!("RMW callback setup not yet implemented"))
-    }
-
-    #[allow(dead_code)]
-    fn publish_delayed_message(&self, _publisher: &*mut rmw_publisher_t, _data: &[u8]) -> Result<()> {
-        // Placeholder for publishing via RMW
-        // Would use: rmw_publish
-        Err(anyhow!("RMW publish not yet implemented"))
-    }
-}
-
-// Message callback function (called by RMW when new messages arrive)
-#[allow(dead_code)]
-extern "C" fn on_message_received(user_data: *const std::ffi::c_void, _number_of_events: usize) {
-    if user_data.is_null() {
-        return;
-    }
-
-    // In a real implementation, we would:
-    // 1. Cast user_data back to our interceptor
-    // 2. Take the message using rmw_take
-    // 3. Add it to the delay buffer with timestamp
-    // This is a placeholder showing the structure
 }
 
 fn parse_duration(duration_str: &str) -> Result<Duration> {
@@ -473,7 +423,7 @@ async fn run_delay_analysis(matches: ArgMatches, _common_args: CommonTopicArgs) 
         // Check for new messages and measure processing delay
         let receive_start = Instant::now();
         match subscription.take_message() {
-            Ok(Some(message_data)) => {
+            Ok(Some(received)) => {
                 let processing_delay = receive_start.elapsed().as_micros();
                 
                 message_count += 1;
@@ -485,7 +435,7 @@ async fn run_delay_analysis(matches: ArgMatches, _common_args: CommonTopicArgs) 
                     println!(
                         "Message #{}: {} bytes, processing delay: {} μs",
                         message_count,
-                        message_data.len(),
+                        format!("{:?}", received.message.view()).len(),
                         processing_delay
                     );
                 }

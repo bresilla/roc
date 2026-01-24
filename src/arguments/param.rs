@@ -1,4 +1,23 @@
-use clap::{Command, Arg, ArgAction};
+use clap::{Arg, ArgAction, ArgMatches, Command};
+
+/// Common param arguments that are extracted from the parent param command
+#[derive(Debug, Clone)]
+pub struct CommonParamArgs {
+    pub spin_time: Option<String>,
+    pub use_sim_time: bool,
+    pub no_daemon: bool,
+}
+
+impl CommonParamArgs {
+    /// Extract common param arguments from the parent param command matches
+    pub fn from_matches(parent_matches: &ArgMatches) -> Self {
+        Self {
+            spin_time: parent_matches.get_one::<String>("spin_time").cloned(),
+            use_sim_time: parent_matches.get_flag("use_sim_time"),
+            no_daemon: parent_matches.get_flag("no_daemon"),
+        }
+    }
+}
 
 pub fn cmd() -> Command {
     Command::new("param")
@@ -6,6 +25,31 @@ pub fn cmd() -> Command {
         .aliases(&["p", "par"])
         .subcommand_required(true)
         .arg_required_else_help(true)
+        // Common flags that ONLY exist at the top level
+        .arg(
+            Arg::new("spin_time")
+            .long("spin-time")
+            .aliases(&["spin_time", "spin"])
+            .value_name("SPIN_TIME")
+            .num_args(1)
+            .help("Spin time for discovery (if daemon not in use)")
+            .action(ArgAction::Append)
+        )
+        .arg(
+            Arg::new("use_sim_time")
+            .short('s')
+            .long("use-sim-time")
+            .aliases(&["use_sim_time", "use_simtime", "sim"])
+            .help("Enable ROS simulation time")
+            .action(ArgAction::SetTrue)
+        )
+        .arg(
+            Arg::new("no_daemon")
+            .long("no-daemon")
+            .aliases(&["no_daemon"])
+            .help("Don't spawn or use a running daemon")
+            .action(ArgAction::SetTrue)
+        )
         .subcommand(
             Command::new("get")
             .about("Get a parameter value")
@@ -33,42 +77,18 @@ pub fn cmd() -> Command {
                 .action(ArgAction::SetTrue)
             )
             .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
-            .arg(
                 Arg::new("hide_type")
                 .long("hide-type")
                 .aliases(&["hide_type"])
                 .help("Hide the type information")
                 .action(ArgAction::SetTrue)
-            )       
+            )
         )
         .subcommand(
             Command::new("list")
             .about("Output a list of available parameters")
             .aliases(["l", "ls"])
-            .arg_required_else_help(true)        
+            .arg_required_else_help(true)
             .arg(
                 Arg::new("node_name")
                 .help("Name of the ROS node to get parameters from (e.g. '/talker')")
@@ -82,30 +102,6 @@ pub fn cmd() -> Command {
                 .visible_aliases(&["all"])
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
             )
             .arg(
                 Arg::new("param_prefixes")
@@ -129,8 +125,7 @@ pub fn cmd() -> Command {
                 .aliases(&["regex"])
                 .value_name("REGEX")
                 .help("Only list parameters matching the provided regex")
-            )    
-
+            )
         )
         .subcommand(
             Command::new("set")
@@ -165,36 +160,12 @@ pub fn cmd() -> Command {
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
             )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
         )
         .subcommand(
             Command::new("export")
             .about("Dump all parameters to a file")
             .aliases(["e", "dump"])
-            .arg_required_else_help(true)   
+            .arg_required_else_help(true)
             .arg(
                 Arg::new("node_name")
                 .help("Name of the ROS node to get parameter from (e.g. '/talker')")
@@ -218,30 +189,6 @@ pub fn cmd() -> Command {
                 .visible_aliases(&["all"])
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
             )
         )
         .subcommand(
@@ -270,30 +217,6 @@ pub fn cmd() -> Command {
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
             )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
         )
         .subcommand(
             Command::new("describe")
@@ -320,30 +243,6 @@ pub fn cmd() -> Command {
                 .visible_aliases(&["all"])
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
             )
         )
         .subcommand(
@@ -378,30 +277,6 @@ pub fn cmd() -> Command {
                 .visible_aliases(&["all"])
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
             )
         )
 }

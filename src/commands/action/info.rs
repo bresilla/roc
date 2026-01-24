@@ -2,8 +2,10 @@ use clap::ArgMatches;
 use std::process::Stdio;
 use tokio::process::Command;
 use tokio::io::AsyncReadExt;
+use crate::arguments::action::CommonActionArgs;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+
+async fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<(), Box<dyn std::error::Error>> {
     let mut command = "ros2 action info".to_owned();
 
     let action_name = matches.get_one::<String>("action_name").unwrap();
@@ -39,7 +41,7 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
+pub fn handle(matches: ArgMatches, common_args: CommonActionArgs){
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+    let _ = rt.block_on(run_command(matches, common_args));
 }

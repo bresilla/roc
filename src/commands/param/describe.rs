@@ -1,61 +1,81 @@
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
 
+use crate::arguments::param::CommonParamArgs;
+use crate::shared::param_operations::{parameter_type_to_string, ParamClientContext};
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 param describe".to_owned();
-
-    let node_name = matches.get_one::<String>("node_name").unwrap();
-    command.push_str(" ");
-    command.push_str(&node_name.to_string());
-
-    let param_name = matches.get_one::<String>("param_name").unwrap();
-    command.push_str(" ");
-    command.push_str(&param_name.to_string());
-
-    if matches.get_one::<String>("spin_time") != None {
-        let spin_time_value = matches.get_one::<String>("spin_time").unwrap();
-        command.push_str(" --spin-time ");
-        command.push_str(&spin_time_value.to_string());
-    }
+fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
+    let node_name = matches
+        .get_one::<String>("node_name")
+        .ok_or_else(|| anyhow!("node_name is required"))?;
+    let param_name = matches
+        .get_one::<String>("param_name")
+        .ok_or_else(|| anyhow!("param_name is required"))?;
 
     if matches.get_flag("include_hidden_nodes") {
-        command.push_str(" --include-hidden-nodes");
+        eprintln!("Note: --include-hidden-nodes is not yet supported in native mode");
     }
-    if matches.get_flag("use_sim_time") {
-        command.push_str(" --use-sim-time");
+    if common_args.use_sim_time {
+        eprintln!("Note: --use-sim-time is not yet supported in native mode");
     }
-    if matches.get_flag("no_daemon") {
-        command.push_str(" --no-daemon");
+    if common_args.no_daemon {
+        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
-    
-    println!("running: {}", command);
+    if let Some(spin_time_value) = common_args.spin_time {
+        eprintln!(
+            "Note: --spin-time {} is not yet supported in native mode",
+            spin_time_value
+        );
+    }
 
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
+    let node_fqn = ParamClientContext::node_fqn(node_name);
+    let mut ctx = ParamClientContext::new()?;
 
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
+    let response = ctx.describe_parameters(&node_fqn, vec![param_name.to_string()])?;
+    let descriptor = response
+        .descriptors
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("No descriptor returned for parameter '{}'", param_name))?;
 
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
+    // Keep the output close to ros2 CLI but minimal.
+    println!("Parameter name: {}", descriptor.name);
+    println!("  Type: {}", parameter_type_to_string(descriptor.type_));
+    if !descriptor.description.is_empty() {
+        println!("  Description: {}", descriptor.description);
+    }
+    println!("  Read only: {}", descriptor.read_only);
+    println!("  Dynamic typing: {}", descriptor.dynamic_typing);
+    if !descriptor.additional_constraints.is_empty() {
+        println!(
+            "  Additional constraints: {}",
+            descriptor.additional_constraints
+        );
+    }
+
+    if !descriptor.integer_range.is_empty() {
+        for r in descriptor.integer_range.iter() {
+            println!(
+                "  Integer range: from {} to {} (step {})",
+                r.from_value, r.to_value, r.step
+            );
         }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
     }
+    if !descriptor.floating_point_range.is_empty() {
+        for r in descriptor.floating_point_range.iter() {
+            println!(
+                "  Floating point range: from {} to {} (step {})",
+                r.from_value, r.to_value, r.step
+            );
+        }
+    }
+
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+pub fn handle(matches: ArgMatches, common_args: CommonParamArgs) {
+    if let Err(e) = run_command(matches, common_args) {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

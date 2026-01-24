@@ -126,7 +126,7 @@ async fn monitor_topic_rate(
 
         // Check for new messages
         match subscription.take_message() {
-            Ok(Some(_message_data)) => {
+            Ok(Some(_received)) => {
                 // Message received - record timestamp
                 let current_time = if use_wall_time {
                     Instant::now()

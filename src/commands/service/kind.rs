@@ -1,50 +1,57 @@
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 service type".to_owned();
+use crate::arguments::service::CommonServiceArgs;
+use crate::graph::RclGraphContext;
 
-    let service_name = matches.get_one::<String>("service_name").unwrap();
-    command.push_str(" ");
-    command.push_str(&service_name.to_string());
+fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()> {
+    let service_name = matches
+        .get_one::<String>("service_name")
+        .ok_or_else(|| anyhow!("service_name is required"))?;
 
-    if matches.get_one::<String>("spin_time") != None {
-        let spin_time_value = matches.get_one::<String>("spin_time").unwrap();
-        command.push_str(" --spin-time ");
-        command.push_str(&spin_time_value.to_string());
+    if common_args.use_sim_time {
+        eprintln!("Note: --use-sim-time is not applicable to graph queries");
     }
-    if matches.get_flag("use_sim_time") {
-        command.push_str(" --use-sim-time");
+    if common_args.no_daemon {
+        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
-    if matches.get_flag("no_daemon") {
-        command.push_str(" --no-daemon");
+    if let Some(spin_time_value) = common_args.spin_time {
+        eprintln!(
+            "Note: --spin-time {} is not yet supported in native mode",
+            spin_time_value
+        );
     }
 
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
+    let context = RclGraphContext::new()
+        .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
+    let pairs = context
+        .get_service_names_and_types()
+        .map_err(|e| anyhow!("Failed to query services: {}", e))?;
 
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
+    let mut types = Vec::new();
+    for (name, ty) in pairs {
+        if name == *service_name {
+            types.push(ty);
         }
+    }
 
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
+    if types.is_empty() {
+        return Err(anyhow!("Service '{}' not found", service_name));
+    }
+
+    types.sort();
+    types.dedup();
+
+    // Match ros2 CLI: print each type on its own line (usually only one).
+    for ty in types {
+        println!("{}", ty);
     }
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+pub fn handle(matches: ArgMatches, common_args: CommonServiceArgs) {
+    if let Err(e) = run_command(matches, common_args) {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

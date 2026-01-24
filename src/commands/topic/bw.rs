@@ -135,10 +135,10 @@ async fn monitor_topic_bandwidth(
 
         // Check for new messages
         match subscription.take_message() {
-            Ok(Some(message_data)) => {
+            Ok(Some(received)) => {
                 // Message received - record timestamp and size
                 let current_time = Instant::now();
-                let message_size = message_data.len();
+                let message_size = format!("{:?}", received.message.view()).len();
 
                 let mut calc = bandwidth_calc_clone.lock().unwrap();
                 calc.add_message(current_time, message_size);

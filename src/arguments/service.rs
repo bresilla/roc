@@ -1,4 +1,23 @@
-use clap::{Command, Arg, ArgAction};
+use clap::{Arg, ArgAction, ArgMatches, Command};
+
+/// Common service arguments that are extracted from the parent service command
+#[derive(Debug, Clone)]
+pub struct CommonServiceArgs {
+    pub spin_time: Option<String>,
+    pub use_sim_time: bool,
+    pub no_daemon: bool,
+}
+
+impl CommonServiceArgs {
+    /// Extract common service arguments from the parent service command matches
+    pub fn from_matches(parent_matches: &ArgMatches) -> Self {
+        Self {
+            spin_time: parent_matches.get_one::<String>("spin_time").cloned(),
+            use_sim_time: parent_matches.get_flag("use_sim_time"),
+            no_daemon: parent_matches.get_flag("no_daemon"),
+        }
+    }
+}
 
 pub fn cmd() -> Command {
     Command::new("service")
@@ -6,6 +25,31 @@ pub fn cmd() -> Command {
         .aliases(&["s", "ser"])
         .subcommand_required(true)
         .arg_required_else_help(true)
+        // Common flags that ONLY exist at the top level
+        .arg(
+            Arg::new("spin_time")
+            .long("spin-time")
+            .aliases(&["spin_time", "spin"])
+            .value_name("SPIN_TIME")
+            .num_args(1)
+            .help("Spin time for discovery (if daemon not in use)")
+            .action(ArgAction::Append)
+        )
+        .arg(
+            Arg::new("use_sim_time")
+            .short('s')
+            .long("use-sim-time")
+            .aliases(&["use_sim_time", "use_simtime", "sim"])
+            .help("Enable ROS simulation time")
+            .action(ArgAction::SetTrue)
+        )
+        .arg(
+            Arg::new("no_daemon")
+            .long("no-daemon")
+            .aliases(&["no_daemon"])
+            .help("Don't spawn or use a running daemon")
+            .action(ArgAction::SetTrue)
+        )
         .subcommand(
             Command::new("call")
             .about("Call a service")
@@ -76,7 +120,7 @@ pub fn cmd() -> Command {
                 .short('t')
                 .long("show-types")
                 .aliases(&["show_types", "types"])
-                .help("Additionally show the topic type")
+                .help("Additionally show the service type")
                 .action(ArgAction::SetTrue)
                 .conflicts_with("count_services")
             )
@@ -98,30 +142,6 @@ pub fn cmd() -> Command {
                 .help("Consider hidden services as well")
                 .action(ArgAction::SetTrue)
             )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
         )
         .subcommand(
             Command::new("kind")
@@ -133,30 +153,6 @@ pub fn cmd() -> Command {
                 .help("Name of the ROS service to get type (e.g. '/add_two_ints')")
                 .required(true)
                 .value_name("SERVICE_NAME")
-            )
-            .arg(
-                Arg::new("spin_time")
-                .long("spin-time")
-                .aliases(&["spin_time", "spin"])
-                .value_name("SPIN_TIME")
-                .num_args(1)
-                .help("Spin time for discovery (if daemon not in use)")
-                .action(ArgAction::Append)
-            )
-            .arg(
-                Arg::new("use_sim_time")
-                .short('s')
-                .long("use-sim-time")
-                .aliases(&["use_sim_time", "use_simtime", "sim"])
-                .help("Enable ROS simulation time")
-                .action(ArgAction::SetTrue)
-            )
-            .arg(
-                Arg::new("no_daemon")
-                .long("no-daemon")
-                .aliases(&["no_daemon"])
-                .help("Don't spawn or use a running daemon")
-                .action(ArgAction::SetTrue)
             )
         )
 }

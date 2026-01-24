@@ -1,52 +1,57 @@
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 node list".to_owned();
+use crate::arguments::node::CommonNodeArgs;
+use crate::graph::RclGraphContext;
 
-    if matches.get_one::<String>("spin_time") != None {
-        let spin_time_value = matches.get_one::<String>("spin_time").unwrap();
-        command.push_str(" --spin-time ");
-        command.push_str(&spin_time_value.to_string());
-    }
-    if matches.get_flag("use_sim_time") {
-        command.push_str(" --use-sim-time");
-    }
-    if matches.get_flag("no_daemon") {
-        command.push_str(" --no-daemon");
-    }
-    if matches.get_flag("count_nodes") {
-        command.push_str(" --count-nodes");
-    }
+fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
+    // NOTE: rclrs does not currently provide the same filtering as `ros2 node list`
+    // for hidden nodes, so for now we always return what the graph exposes.
     if matches.get_flag("include_hidden_nodes") {
-        command.push_str(" --all");
+        eprintln!("Note: --include-hidden-nodes is not yet supported in native mode");
     }
 
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
+    if common_args.use_sim_time {
+        eprintln!("Note: --use-sim-time is not applicable to graph queries");
+    }
+    if common_args.no_daemon {
+        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+    }
+    if let Some(spin_time_value) = common_args.spin_time {
+        eprintln!(
+            "Note: --spin-time {} is not yet supported in native mode",
+            spin_time_value
+        );
+    }
 
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
+    let context = RclGraphContext::new()
+        .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
+    let nodes = context
+        .get_node_names_with_namespaces()
+        .map_err(|e| anyhow!("Failed to query nodes: {}", e))?;
 
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
+    if matches.get_flag("count_nodes") {
+        println!("{}", nodes.len());
+        return Ok(());
+    }
+
+    // Print full node names, one per line.
+    for (name, namespace) in nodes {
+        if namespace == "/" {
+            println!("/{}", name);
+        } else if namespace.ends_with('/') {
+            println!("{}{}", namespace, name);
+        } else {
+            println!("{}/{}", namespace, name);
         }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
     }
+
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+pub fn handle(matches: ArgMatches, common_args: CommonNodeArgs) {
+    if let Err(e) = run_command(matches, common_args) {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }
