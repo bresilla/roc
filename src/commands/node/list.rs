@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use colored::*;
 
 use crate::arguments::node::CommonNodeArgs;
 use crate::graph::RclGraphContext;
@@ -30,21 +31,48 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
         .get_node_names_with_namespaces()
         .map_err(|e| anyhow!("Failed to query nodes: {}", e))?;
 
+    let mut full_names: Vec<String> = Vec::new();
+    for (name, namespace) in nodes {
+        if namespace == "/" {
+            full_names.push(format!("/{}", name));
+        } else if namespace.ends_with('/') {
+            full_names.push(format!("{}{}", namespace, name));
+        } else {
+            full_names.push(format!("{}/{}", namespace, name));
+        }
+    }
+    full_names.sort();
+
     if matches.get_flag("count_nodes") {
-        println!("{}", nodes.len());
+        println!(
+            "{} {}",
+            "Total:".bright_green(),
+            full_names.len().to_string().bright_white().bold()
+        );
         return Ok(());
     }
 
-    // Print full node names, one per line.
-    for (name, namespace) in nodes {
-        if namespace == "/" {
-            println!("/{}", name);
-        } else if namespace.ends_with('/') {
-            println!("{}{}", namespace, name);
-        } else {
-            println!("{}/{}", namespace, name);
-        }
+    if full_names.is_empty() {
+        eprintln!(
+            "{} {}",
+            "No nodes found.".yellow(),
+            format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
+        );
+        return Ok(());
     }
+
+    let total = full_names.len();
+
+    println!("{}", "Available Nodes:".bright_yellow().bold());
+    for n in &full_names {
+        println!("  {}", n.bright_cyan());
+    }
+    println!();
+    println!(
+        "{} {} nodes found",
+        "Total:".bright_green(),
+        total.to_string().bright_white().bold()
+    );
 
     Ok(())
 }

@@ -1,44 +1,44 @@
+use anyhow::Result;
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 interface packages".to_owned();
+use crate::graph::interface_operations;
+use colored::*;
 
-    if matches.get_flag("messages") {
-        command.push_str(" --only-msgs");
+fn run_command(matches: ArgMatches) -> Result<()> {
+    let only_msgs = matches.get_flag("messages");
+    let only_srvs = matches.get_flag("services");
+    let only_actions = matches.get_flag("actions");
+
+    let items =
+        interface_operations::list_packages_with_interfaces(only_msgs, only_srvs, only_actions)?;
+    if items.is_empty() {
+        eprintln!("{}", "No interface packages found.".yellow());
+        return Ok(());
     }
-    if matches.get_flag("services") {
-        command.push_str(" --only-srvs");
+
+    println!("{}", "Interface Packages:".bright_yellow().bold());
+    for p in items.iter() {
+        println!("  {}", p.bright_cyan());
     }
-    if matches.get_flag("actions") {
-        command.push_str(" --only-actions");
-    }
+    println!();
+    println!(
+        "{} {} packages found",
+        "Total:".bright_green(),
+        items.len().to_string().bright_white().bold()
+    );
 
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
-    }
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+pub fn handle(matches: ArgMatches) {
+    if let Err(e) = run_command(matches) {
+        // Allow piping to `head` etc.
+        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
+            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
+                return;
+            }
+        }
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

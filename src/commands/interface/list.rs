@@ -1,44 +1,42 @@
+use anyhow::Result;
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
+use colored::*;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 interface list".to_owned();
+use crate::graph::interface_operations;
 
-    if matches.get_flag("messages") {
-        command.push_str(" --only-msgs");
-    }
-    if matches.get_flag("services") {
-        command.push_str(" --only-srvs");
-    }
-    if matches.get_flag("actions") {
-        command.push_str(" --only-actions");
+fn run_command(matches: ArgMatches) -> Result<()> {
+    let only_msgs = matches.get_flag("messages");
+    let only_srvs = matches.get_flag("services");
+    let only_actions = matches.get_flag("actions");
+
+    let items = interface_operations::list_interfaces(only_msgs, only_srvs, only_actions)?;
+    if items.is_empty() {
+        eprintln!("{}", "No interfaces found.".yellow());
+        return Ok(());
     }
 
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
+    println!("{}", "Available Interfaces:".bright_yellow().bold());
+    for t in items.iter() {
+        println!("  {}", t.bright_cyan());
     }
+    println!();
+    println!(
+        "{} {} interfaces found",
+        "Total:".bright_green(),
+        items.len().to_string().bright_white().bold()
+    );
+
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+pub fn handle(matches: ArgMatches) {
+    if let Err(e) = run_command(matches) {
+        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
+            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
+                return;
+            }
+        }
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

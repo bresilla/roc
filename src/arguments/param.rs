@@ -88,7 +88,6 @@ pub fn cmd() -> Command {
             Command::new("list")
             .about("Output a list of available parameters")
             .aliases(["l", "ls"])
-            .arg_required_else_help(true)
             .arg(
                 Arg::new("node_name")
                 .help("Name of the ROS node to get parameters from (e.g. '/talker')")

@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use colored::*;
 
 use crate::arguments::param::CommonParamArgs;
 use crate::shared::param_operations::{
@@ -51,15 +52,57 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
 
     if matches.get_flag("param_type") {
         let types_response = ctx.get_parameter_types(&node_fqn, names.clone())?;
-        for (name, ty) in names.into_iter().zip(types_response.types.into_iter()) {
-            println!("{} ({})", name, parameter_type_to_string(ty));
+        if names.is_empty() {
+            eprintln!(
+                "{} {}",
+                "No parameters found.".yellow(),
+                format!("[{}]", node_fqn).bright_black()
+            );
+            return Ok(());
         }
+        println!(
+            "{} {}",
+            "Parameters:".bright_yellow().bold(),
+            format!("[{}]", node_fqn).bright_black()
+        );
+        for (name, ty) in names.iter().cloned().zip(types_response.types.into_iter()) {
+            println!(
+                "  {} {}",
+                name.bright_cyan(),
+                format!("({})", parameter_type_to_string(ty)).bright_black()
+            );
+        }
+        println!();
+        println!(
+            "{} {} params found",
+            "Total:".bright_green(),
+            names.len().to_string().bright_white().bold()
+        );
         return Ok(());
     }
 
-    for name in names {
-        println!("{}", name);
+    if names.is_empty() {
+        eprintln!(
+            "{} {}",
+            "No parameters found.".yellow(),
+            format!("[{}]", node_fqn).bright_black()
+        );
+        return Ok(());
     }
+    println!(
+        "{} {}",
+        "Parameters:".bright_yellow().bold(),
+        format!("[{}]", node_fqn).bright_black()
+    );
+    for name in names.iter() {
+        println!("  {}", name.bright_cyan());
+    }
+    println!();
+    println!(
+        "{} {} params found",
+        "Total:".bright_green(),
+        names.len().to_string().bright_white().bold()
+    );
 
     Ok(())
 }

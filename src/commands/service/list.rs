@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use colored::*;
 
 use crate::arguments::service::CommonServiceArgs;
 use crate::graph::RclGraphContext;
@@ -24,28 +25,61 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
     let context = RclGraphContext::new()
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
-    if matches.get_flag("show_types") {
+    let show_types = matches.get_flag("show_types");
+    let count_only = matches.get_flag("count_services");
+
+    let mut items: Vec<(String, Option<String>)> = Vec::new();
+    if show_types {
         let pairs = context
             .get_service_names_and_types()
             .map_err(|e| anyhow!("Failed to query services: {}", e))?;
         for (name, ty) in pairs {
-            println!("{} [{}]", name, ty);
+            items.push((name, Some(ty)));
         }
+    } else {
+        let services = context
+            .get_service_names()
+            .map_err(|e| anyhow!("Failed to query services: {}", e))?;
+        for name in services {
+            items.push((name, None));
+        }
+    }
+
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+
+    if count_only {
+        println!(
+            "{} {}",
+            "Total:".bright_green(),
+            items.len().to_string().bright_white().bold()
+        );
         return Ok(());
     }
 
-    let services = context
-        .get_service_names()
-        .map_err(|e| anyhow!("Failed to query services: {}", e))?;
-
-    if matches.get_flag("count_services") {
-        println!("{}", services.len());
+    if items.is_empty() {
+        eprintln!(
+            "{} {}",
+            "No services found.".yellow(),
+            format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
+        );
         return Ok(());
     }
 
-    for name in services {
-        println!("{}", name);
+    let total = items.len();
+
+    println!("{}", "Available Services:".bright_yellow().bold());
+    for (name, ty) in &items {
+        match ty {
+            Some(t) => println!("  {} {}", name.bright_cyan(), format!("[{}]", t).green()),
+            None => println!("  {}", name.bright_cyan()),
+        }
     }
+    println!();
+    println!(
+        "{} {} services found",
+        "Total:".bright_green(),
+        total.to_string().bright_white().bold()
+    );
     Ok(())
 }
 

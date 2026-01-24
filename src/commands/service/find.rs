@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use colored::*;
 
 use crate::arguments::service::CommonServiceArgs;
 use crate::graph::RclGraphContext;
@@ -42,13 +43,39 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
     names.dedup();
 
     if matches.get_flag("count_services") {
-        println!("{}", names.len());
+        println!(
+            "{} {}",
+            "Total:".bright_green(),
+            names.len().to_string().bright_white().bold()
+        );
         return Ok(());
     }
 
-    for name in names {
-        println!("{}", name);
+    if names.is_empty() {
+        eprintln!(
+            "{} {}",
+            "No services found for type".yellow(),
+            format!("[{}]", service_type).bright_cyan()
+        );
+        return Ok(());
     }
+
+    let total = names.len();
+
+    println!(
+        "{} {}",
+        "Services with type".bright_yellow().bold(),
+        format!("[{}]", service_type).bright_cyan()
+    );
+    for name in &names {
+        println!("  {}", name.bright_cyan());
+    }
+    println!();
+    println!(
+        "{} {} services found",
+        "Total:".bright_green(),
+        total.to_string().bright_white().bold()
+    );
     Ok(())
 }
 

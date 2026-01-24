@@ -7,6 +7,7 @@ pub use crate::shared::action_operations;
 pub use crate::shared::dynamic_messages::DynamicSubscriber;
 pub use crate::shared::graph_context::RclGraphContext;
 pub use crate::shared::graph_types::{TopicEndpointInfo, TopicInfo};
+pub use crate::shared::interface_operations;
 
 pub use crate::shared::node_operations;
 pub use crate::shared::service_operations;

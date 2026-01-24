@@ -2,6 +2,7 @@ use crate::arguments::action::CommonActionArgs;
 use crate::graph::{action_operations, RclGraphContext};
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use colored::*;
 
 fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<()> {
     if common_args.use_sim_time {
@@ -23,21 +24,53 @@ fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<()>
     let mut actions = action_operations::get_action_names(&context)?;
     actions.sort();
 
-    if matches.get_flag("count_actions") {
-        println!("{}", actions.len());
+    let show_types = matches.get_flag("show_types");
+    let count_only = matches.get_flag("count_actions");
+
+    let mut items: Vec<(String, Option<String>)> = Vec::new();
+    for name in actions {
+        if show_types {
+            let ty = action_operations::get_action_type(&context, &name)?;
+            items.push((name, ty));
+        } else {
+            items.push((name, None));
+        }
+    }
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+
+    if count_only {
+        println!(
+            "{} {}",
+            "Total:".bright_green(),
+            items.len().to_string().bright_white().bold()
+        );
         return Ok(());
     }
 
-    let show_types = matches.get_flag("show_types");
-    for name in actions {
-        if show_types {
-            let ty = action_operations::get_action_type(&context, &name)?
-                .unwrap_or_else(|| "<unknown>".to_string());
-            println!("{} [{}]", name, ty);
-        } else {
-            println!("{}", name);
+    if items.is_empty() {
+        eprintln!(
+            "{} {}",
+            "No actions found.".yellow(),
+            format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
+        );
+        return Ok(());
+    }
+
+    let total = items.len();
+
+    println!("{}", "Available Actions:".bright_yellow().bold());
+    for (name, ty) in &items {
+        match ty {
+            Some(t) => println!("  {} {}", name.bright_cyan(), format!("[{}]", t).green()),
+            None => println!("  {}", name.bright_cyan()),
         }
     }
+    println!();
+    println!(
+        "{} {} actions found",
+        "Total:".bright_green(),
+        total.to_string().bright_white().bold()
+    );
 
     Ok(())
 }

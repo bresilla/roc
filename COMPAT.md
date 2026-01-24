@@ -33,11 +33,11 @@ Legend:
 | `roc action list` | Native Rust | Action discovery via service graph scan; `src/commands/action/list.rs`, `src/shared/action_operations.rs` |
 | `roc action info` | Native Rust | Best-effort type inference via `*_SendGoal` service type; `src/commands/action/info.rs`, `src/shared/action_operations.rs` |
 | `roc action goal` (`send_goal`) | ROS 2 CLI | `src/commands/action/goal.rs` |
-| `roc interface list` | ROS 2 CLI | `src/commands/interface/list.rs` |
-| `roc interface package` | ROS 2 CLI | `src/commands/interface/package.rs` |
-| `roc interface all` (`packages`) | ROS 2 CLI | `src/commands/interface/all.rs` |
-| `roc interface show` | ROS 2 CLI | `src/commands/interface/show.rs` |
-| `roc interface model` (`proto`) | ROS 2 CLI | `src/commands/interface/model.rs` |
+| `roc interface list` | Native Rust | Scans `AMENT_PREFIX_PATH` for `share/<pkg>/{msg,srv,action}`; `src/commands/interface/list.rs`, `src/shared/interface_operations.rs` |
+| `roc interface package` | Native Rust | Lists interfaces from `share/<pkg>/{msg,srv,action}`; `src/commands/interface/package.rs`, `src/shared/interface_operations.rs` |
+| `roc interface all` (`packages`) | Native Rust | Lists packages that ship `{msg,srv,action}` folders; `src/commands/interface/all.rs`, `src/shared/interface_operations.rs` |
+| `roc interface show` | Native Rust | Reads installed `.msg/.srv/.action` file; `src/commands/interface/show.rs`, `src/shared/interface_operations.rs` |
+| `roc interface model` (`proto`) | Native Rust | Parses `.msg/.srv/.action` and outputs a YAML prototype (Goal for actions, Request for services); `src/commands/interface/model.rs`, `src/shared/interface_operations.rs`, `src/shared/ros_interface_parser.rs` |
 | `roc frame list` | ROS 2 CLI | wraps `ros2 run tf2_tools view_frames`; `src/commands/frame/list.rs` |
 | `roc frame echo` | ROS 2 CLI | wraps `ros2 run tf2_ros tf2_echo`; `src/commands/frame/echo.rs` |
 | `roc frame info` | ROS 2 CLI | wraps `ros2 run tf2_ros buffer_client`; `src/commands/frame/info.rs` |

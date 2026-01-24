@@ -1,42 +1,24 @@
+use anyhow::Result;
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 interface proto".to_owned();
+use crate::graph::interface_operations;
 
+fn run_command(matches: ArgMatches) -> Result<()> {
     let type_ = matches.get_one::<String>("type").unwrap();
-    command.push_str(" ");
-    command.push_str(&type_.to_string());
-
-    if matches.get_flag("no_quotes") {
-        command.push_str(" --no-quotes");
-    }
-
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
-    }
+    let no_quotes = matches.get_flag("no_quotes");
+    let text = interface_operations::model_interface(type_, no_quotes)?;
+    print!("{}", text);
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+pub fn handle(matches: ArgMatches) {
+    if let Err(e) = run_command(matches) {
+        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
+            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
+                return;
+            }
+        }
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

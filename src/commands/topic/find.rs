@@ -2,11 +2,11 @@ use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::time::Duration;
 use colored::*;
+use std::time::Duration;
 
 // Topic Find Implementation
-// 
+//
 // This implementation finds topics by message type using:
 // 1. Direct RCL API calls to get topic names and types
 // 2. Filtering topics by the specified message type
@@ -27,7 +27,8 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 
     // Get topics with their types
     let topics_with_types = {
-        context.get_topics_with_types()
+        context
+            .get_topics_with_types()
             .map_err(|e| anyhow!("Failed to get topic types: {}", e))?
     };
 
@@ -48,7 +49,15 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 
     // Handle --count-topics flag
     if matches.get_flag("count_topics") {
-        println!("{}", matching_topics.len());
+        if common_args.ros_style {
+            println!("{}", matching_topics.len());
+        } else {
+            println!(
+                "{} {}",
+                "Total:".bright_green(),
+                matching_topics.len().to_string().bright_white().bold()
+            );
+        }
         return Ok(());
     }
 
@@ -62,15 +71,29 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
             println!("{}", topic);
         }
     } else {
-        // Enhanced colored output
-        if !matching_topics.is_empty() {
-            println!("{} {}", "Topics with type".bright_yellow().bold(), message_type.bright_cyan());
-            for topic in matching_topics {
-                println!("  {}", topic.bright_white());
-            }
-        } else {
-            println!("{} {}", "No topics found with type".yellow(), message_type.bright_cyan());
+        if matching_topics.is_empty() {
+            eprintln!(
+                "{} {}",
+                "No topics found with type".yellow(),
+                format!("[{}]", message_type).bright_cyan()
+            );
+            return Ok(());
         }
+
+        println!(
+            "{} {}",
+            "Topics with type".bright_yellow().bold(),
+            format!("[{}]", message_type).bright_cyan()
+        );
+        for topic in matching_topics.iter() {
+            println!("  {}", topic.bright_cyan());
+        }
+        println!();
+        println!(
+            "{} {} topics found",
+            "Total:".bright_green(),
+            matching_topics.len().to_string().bright_white().bold()
+        );
     }
 
     Ok(())

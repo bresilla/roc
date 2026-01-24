@@ -1,38 +1,24 @@
+use anyhow::Result;
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 interface package".to_owned();
+use crate::graph::interface_operations;
 
+fn run_command(matches: ArgMatches) -> Result<()> {
     let package_name = matches.get_one::<String>("package_name").unwrap();
-    command.push_str(" ");
-    command.push_str(&package_name.to_string());
-
-    let mut cmd = Command::new("bash")
-    .arg("-c")
-    .arg(command)
-    .stdout(Stdio::piped())
-    .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
-        }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
+    for t in interface_operations::list_interfaces_in_package(package_name)? {
+        println!("{}", t);
     }
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches){
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+pub fn handle(matches: ArgMatches) {
+    if let Err(e) = run_command(matches) {
+        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
+            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
+                return;
+            }
+        }
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

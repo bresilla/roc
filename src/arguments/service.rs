@@ -114,7 +114,7 @@ pub fn cmd() -> Command {
             Command::new("list")
             .about("Output a list of available services")
             .aliases(["l", "ls"])
-            .arg_required_else_help(true)
+            // Allow calling without args (default behavior is to list services).
             .arg(
                 Arg::new("show_types")
                 .short('t')
