@@ -8,13 +8,14 @@ authors = ["Trim Bresilla <trim.bresilla@gmail.com>"]
 description = "Robot Operations Command Center"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+build = "build.rs"
 
 [[bin]]
 name = "roc"
 path = "src/main.rs"
 
 [dependencies]
-rclrs = { version = "0.7.0" }
+rclrs = { path = "deps/ros2_rust/rclrs" }
 tokio = { version = "1.49", features = ["full"] }
 anyhow = "1.0.75"
 clap = { version = "4.5", features = ["derive"] }
@@ -34,3 +35,6 @@ regex = "1.11"
 
 [dev-dependencies]
 tempfile = "3.3"
+
+[build-dependencies]
+bindgen = "0.70"

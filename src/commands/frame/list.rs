@@ -1,42 +1,62 @@
+use anyhow::Result;
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
+use colored::*;
+use std::time::{Duration, Instant};
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 run tf2_tools view_frames".to_owned();
+use crate::shared::tf2_subscriber::TfFrameIndex;
 
-    if matches.get_flag("all") {
-        command.push_str(" --all");
-    }
-    
-    if matches.get_flag("count_frames") {
-        command.push_str(" --count-frames");
-    }
+fn run_command(matches: ArgMatches) -> Result<()> {
+    let _show_all = matches.get_flag("all");
+    let count_only = matches.get_flag("count_frames");
 
-    let mut cmd = Command::new("bash")
-        .arg("-c")
-        .arg(command)
-        .stdout(Stdio::piped())
-        .spawn()?;
+    let index = TfFrameIndex::new()?;
 
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
+    // Wait briefly to collect messages.
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_millis(500) {
+        std::thread::sleep(Duration::from_millis(50));
+        if !index.frames().is_empty() {
             break;
         }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
     }
+
+    let frames = index.frames();
+    if count_only {
+        println!(
+            "{} {}",
+            "Total:".bright_green(),
+            frames.len().to_string().bright_white().bold()
+        );
+        return Ok(());
+    }
+
+    if frames.is_empty() {
+        eprintln!("{}", "No frames found.".yellow());
+        return Ok(());
+    }
+
+    println!("{}", "Available Frames:".bright_yellow().bold());
+    for f in &frames {
+        println!("  {}", f.bright_cyan());
+    }
+    println!();
+    println!(
+        "{} {} frames found",
+        "Total:".bright_green(),
+        frames.len().to_string().bright_white().bold()
+    );
+
     Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+    if let Err(e) = run_command(matches) {
+        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
+            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
+                return;
+            }
+        }
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }
