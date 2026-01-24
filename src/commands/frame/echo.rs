@@ -1,50 +1,89 @@
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
+use colored::*;
+use std::time::{Duration, Instant};
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 run tf2_ros tf2_echo".to_owned();
+use crate::shared::tf2_subscriber::TfFrameIndex;
+use crate::shared::tf_tree::TfGraph;
 
-    let frame_id = matches.get_one::<String>("frame_id").unwrap();
-    let child_frame_id = matches.get_one::<String>("child_frame_id").unwrap();
-    command.push_str(" ");
-    command.push_str(&frame_id.to_string());
-    command.push_str(" ");
-    command.push_str(&child_frame_id.to_string());
+fn run_command(matches: ArgMatches) -> Result<()> {
+    let frame_id = matches
+        .get_one::<String>("FRAME_ID")
+        .ok_or_else(|| anyhow!("FRAME_ID is required"))?;
+    let child_frame_id = matches
+        .get_one::<String>("CHILD_FRAME_ID")
+        .ok_or_else(|| anyhow!("CHILD_FRAME_ID is required"))?;
 
-    if let Some(rate) = matches.get_one::<String>("rate") {
-        command.push_str(" --rate ");
-        command.push_str(&rate.to_string());
-    }
-    
-    if matches.get_flag("once") {
-        command.push_str(" --once");
-    }
+    let rate_hz = matches
+        .get_one::<String>("rate")
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or(10.0);
+    let once = matches.get_flag("once");
 
-    let mut cmd = Command::new("bash")
-        .arg("-c")
-        .arg(command)
-        .stdout(Stdio::piped())
-        .spawn()?;
+    let period = if rate_hz <= 0.0 {
+        Duration::from_millis(100)
+    } else {
+        Duration::from_secs_f64(1.0 / rate_hz)
+    };
 
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
+    let index = TfFrameIndex::new()?;
+    let mut last_print = Instant::now() - period;
 
-    let mut buffer = [0u8; 1024];
     loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
-            break;
+        std::thread::sleep(Duration::from_millis(10));
+        if last_print.elapsed() < period {
+            continue;
         }
+        last_print = Instant::now();
 
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
+        let graph = TfGraph::from_edges(index.edges());
+        let Some((tf, kind)) = graph.lookup(frame_id, child_frame_id) else {
+            eprintln!(
+                "{} {} {}",
+                "No transform from".yellow(),
+                frame_id.bright_cyan(),
+                child_frame_id.bright_cyan()
+            );
+            if once {
+                return Ok(());
+            }
+            continue;
+        };
+
+        let kind_str = match kind {
+            crate::shared::tf2_subscriber::TfEdgeKind::Static => "static",
+            crate::shared::tf2_subscriber::TfEdgeKind::Dynamic => "dynamic",
+        };
+
+        println!("{}", "Transform:".bright_yellow().bold());
+        println!(
+            "  {}",
+            format!("{} -> {}", frame_id, child_frame_id).bright_cyan()
+        );
+        println!(
+            "  {}",
+            format!(
+                "t=[{:.6},{:.6},{:.6}] q=[{:.6},{:.6},{:.6},{:.6}] type=[{}]",
+                tf.tx, tf.ty, tf.tz, tf.qx, tf.qy, tf.qz, tf.qw, kind_str
+            )
+            .bright_white()
+        );
+        println!();
+
+        if once {
+            return Ok(());
+        }
     }
-    Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+    if let Err(e) = run_command(matches) {
+        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
+            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
+                return;
+            }
+        }
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

@@ -38,10 +38,10 @@ Legend:
 | `roc interface all` (`packages`) | Native Rust | Lists packages that ship `{msg,srv,action}` folders; `src/commands/interface/all.rs`, `src/shared/interface_operations.rs` |
 | `roc interface show` | Native Rust | Reads installed `.msg/.srv/.action` file; `src/commands/interface/show.rs`, `src/shared/interface_operations.rs` |
 | `roc interface model` (`proto`) | Native Rust | Parses `.msg/.srv/.action` and outputs a YAML prototype (Goal for actions, Request for services); `src/commands/interface/model.rs`, `src/shared/interface_operations.rs`, `src/shared/ros_interface_parser.rs` |
-| `roc frame list` | ROS 2 CLI | wraps `ros2 run tf2_tools view_frames`; `src/commands/frame/list.rs` |
-| `roc frame echo` | ROS 2 CLI | wraps `ros2 run tf2_ros tf2_echo`; `src/commands/frame/echo.rs` |
-| `roc frame info` | ROS 2 CLI | wraps `ros2 run tf2_ros buffer_client`; `src/commands/frame/info.rs` |
-| `roc frame pub` | ROS 2 CLI | wraps `ros2 run tf2_ros static_transform_publisher`; `src/commands/frame/pub_.rs` |
+| `roc frame list` | Native Rust | Subscribes to `/tf` + `/tf_static` (`tf2_msgs/msg/TFMessage`) and prints edges + type=[static/dynamic]; `src/commands/frame/list.rs`, `src/shared/tf2_subscriber.rs` |
+| `roc frame echo` | Native Rust | Builds a TF graph from `/tf` + `/tf_static` and resolves transforms (supports multi-hop); `src/commands/frame/echo.rs`, `src/shared/tf2_subscriber.rs`, `src/shared/tf_tree.rs` |
+| `roc frame info` | Native Rust | Prints parents/children for a frame and exports dot/json/yaml; `src/commands/frame/info.rs`, `src/shared/tf_dump.rs` |
+| `roc frame pub` | Native Rust | Publishes one static transform to `/tf_static` (transient local) and stays alive unless `--detach`; `src/commands/frame/pub_.rs` |
 | `roc run <pkg> <exe>` | Native Rust | Finds executable in workspace/install and runs it directly; `src/commands/run/mod.rs` |
 | `roc launch <pkg> <launch>` | ROS 2 CLI | always executes `ros2 launch ...`; `src/commands/launch/mod.rs` |
 | `roc work create` | Native Rust | generates package skeletons; `src/commands/work/create/command.rs` |

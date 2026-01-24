@@ -3,7 +3,7 @@ use clap::ArgMatches;
 use colored::*;
 use std::time::{Duration, Instant};
 
-use crate::shared::tf2_subscriber::TfFrameIndex;
+use crate::shared::tf2_subscriber::{TfEdgeKind, TfFrameIndex};
 
 fn run_command(matches: ArgMatches) -> Result<()> {
     let _show_all = matches.get_flag("all");
@@ -12,38 +12,48 @@ fn run_command(matches: ArgMatches) -> Result<()> {
     let index = TfFrameIndex::new()?;
 
     // Wait briefly to collect messages.
+    // /tf_static can be delivered once at startup; give DDS a moment.
     let start = Instant::now();
-    while start.elapsed() < Duration::from_millis(500) {
+    while start.elapsed() < Duration::from_millis(1500) {
         std::thread::sleep(Duration::from_millis(50));
-        if !index.frames().is_empty() {
+        if index.has_any_data() {
             break;
         }
     }
 
-    let frames = index.frames();
+    let edges = index.edges();
     if count_only {
         println!(
             "{} {}",
             "Total:".bright_green(),
-            frames.len().to_string().bright_white().bold()
+            edges.len().to_string().bright_white().bold()
         );
         return Ok(());
     }
 
-    if frames.is_empty() {
+    if edges.is_empty() {
         eprintln!("{}", "No frames found.".yellow());
         return Ok(());
     }
 
-    println!("{}", "Available Frames:".bright_yellow().bold());
-    for f in &frames {
-        println!("  {}", f.bright_cyan());
+    println!("{}", "Available Transforms:".bright_yellow().bold());
+    for ((parent, child), tf, kind) in &edges {
+        let lhs = format!("{} -> {}", parent, child);
+        let kind_str = match kind {
+            TfEdgeKind::Static => "static",
+            TfEdgeKind::Dynamic => "dynamic",
+        };
+        let rhs = format!(
+            "t=[{:.3},{:.3},{:.3}] q=[{:.3},{:.3},{:.3},{:.3}] type=[{}]",
+            tf.tx, tf.ty, tf.tz, tf.qx, tf.qy, tf.qz, tf.qw, kind_str
+        );
+        println!("  {} {}", lhs.bright_cyan(), rhs.bright_black());
     }
     println!();
     println!(
-        "{} {} frames found",
+        "{} {} transforms found",
         "Total:".bright_green(),
-        frames.len().to_string().bright_white().bold()
+        edges.len().to_string().bright_white().bold()
     );
 
     Ok(())

@@ -12,4 +12,6 @@ pub mod ros_tf_msgs_sys;
 pub mod rosbag2;
 pub mod service_operations;
 pub mod tf2_subscriber;
+pub mod tf_dump;
+pub mod tf_tree;
 pub mod topic_operations;

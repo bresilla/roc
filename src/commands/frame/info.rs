@@ -1,62 +1,107 @@
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::process::Stdio;
-use tokio::process::Command;
-use tokio::io::AsyncReadExt;
+use colored::*;
+use std::fs;
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
-async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let mut command = "ros2 run tf2_ros buffer_client".to_owned();
+use crate::shared::tf2_subscriber::TfFrameIndex;
+use crate::shared::tf_dump;
 
-    let frame_name = matches.get_one::<String>("frame_name").unwrap();
-    command.push_str(" ");
-    command.push_str(&frame_name.to_string());
+fn run_command(matches: ArgMatches) -> Result<()> {
+    let frame_name = matches
+        .get_one::<String>("FRAME_NAME")
+        .ok_or_else(|| anyhow!("FRAME_NAME is required"))?;
 
-    if matches.get_flag("include_hidden_services") {
-        command.push_str(" --include-hidden-services");
+    let export_dot = matches.get_one::<String>("export_dot").map(PathBuf::from);
+    let export_json = matches.get_one::<String>("export_json").map(PathBuf::from);
+    let export_yaml = matches.get_one::<String>("export_yaml").map(PathBuf::from);
+    let export_image = matches.get_one::<String>("export_image").map(PathBuf::from);
+
+    if export_image.is_some() {
+        // We don't generate images yet; dot export is native and can be rendered by graphviz.
+        return Err(anyhow!(
+            "--export-image is not supported natively yet (use --export-dot)"
+        ));
     }
 
-    if let Some(export_dot) = matches.get_one::<String>("export_dot") {
-        command.push_str(" --export-dot ");
-        command.push_str(&export_dot.to_string());
-    }
-    
-    if let Some(export_json) = matches.get_one::<String>("export_json") {
-        command.push_str(" --export-json ");
-        command.push_str(&export_json.to_string());
-    }
-    
-    if let Some(export_yaml) = matches.get_one::<String>("export_yaml") {
-        command.push_str(" --export-yaml ");
-        command.push_str(&export_yaml.to_string());
-    }
-
-    if let Some(export_image) = matches.get_one::<String>("export_image") {
-        command.push_str(" --export-image ");
-        command.push_str(&export_image.to_string());
-    }
-
-    let mut cmd = Command::new("bash")
-        .arg("-c")
-        .arg(command)
-        .stdout(Stdio::piped())
-        .spawn()?;
-
-    let stdout = cmd.stdout.take().unwrap();
-    let mut reader = tokio::io::BufReader::new(stdout);
-
-    let mut buffer = [0u8; 1024];
-    loop {
-        let n = reader.read(&mut buffer).await?;
-        if n == 0 {
+    let index = TfFrameIndex::new()?;
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_millis(1500) {
+        std::thread::sleep(Duration::from_millis(50));
+        if index.has_any_data() {
             break;
         }
-
-        let output = String::from_utf8_lossy(&buffer[0..n]);
-        print!("{}", output);
     }
+
+    let graph = tf_dump::export_graph(index.edges());
+
+    if let Some(path) = export_dot {
+        fs::write(&path, tf_dump::export_dot(&graph))
+            .map_err(|e| anyhow!("Failed to write {}: {}", path.display(), e))?;
+    }
+    if let Some(path) = export_json {
+        let s = serde_json::to_string_pretty(&graph)?;
+        fs::write(&path, s).map_err(|e| anyhow!("Failed to write {}: {}", path.display(), e))?;
+    }
+    if let Some(path) = export_yaml {
+        let s = serde_yaml::to_string(&graph)?;
+        fs::write(&path, s).map_err(|e| anyhow!("Failed to write {}: {}", path.display(), e))?;
+    }
+
+    let (parents, children) = tf_dump::build_parent_children_map(&graph.edges);
+    let incoming = parents.get(frame_name).cloned().unwrap_or_default();
+    let outgoing = children.get(frame_name).cloned().unwrap_or_default();
+
+    if incoming.is_empty() && outgoing.is_empty() {
+        return Err(anyhow!("Frame '{}' not found in TF graph", frame_name));
+    }
+
+    println!(
+        "{} {}",
+        "Frame:".bright_yellow().bold(),
+        frame_name.bright_cyan()
+    );
+    println!();
+
+    println!("{}", "Parents:".bright_yellow().bold());
+    if incoming.is_empty() {
+        println!("  {}", "<none>".bright_black());
+    } else {
+        for e in &incoming {
+            println!(
+                "  {} {}",
+                format!("{} -> {}", e.parent, e.child).bright_cyan(),
+                format!("type=[{}]", e.kind).bright_black()
+            );
+        }
+    }
+
+    println!();
+    println!("{}", "Children:".bright_yellow().bold());
+    if outgoing.is_empty() {
+        println!("  {}", "<none>".bright_black());
+    } else {
+        for e in &outgoing {
+            println!(
+                "  {} {}",
+                format!("{} -> {}", e.parent, e.child).bright_cyan(),
+                format!("type=[{}]", e.kind).bright_black()
+            );
+        }
+    }
+
     Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+    if let Err(e) = run_command(matches) {
+        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
+            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
+                return;
+            }
+        }
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }

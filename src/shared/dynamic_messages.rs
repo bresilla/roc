@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Result};
-use rclrs::{Context, CreateBasicExecutor, DynamicMessage, MessageTypeName, Node, SpinOptions};
+use rclrs::{
+    Context, CreateBasicExecutor, DynamicMessage, IntoPrimitiveOptions, MessageTypeName, Node,
+    QoSProfile, SpinOptions,
+};
 use std::{
     fmt,
     sync::{mpsc, Arc, Mutex},
@@ -42,7 +45,21 @@ impl DynamicSubscriber {
         let context = Context::default_from_env()?;
         let executor = context.create_basic_executor();
         let node = executor.create_node("roc_dynamic_subscriber")?;
-        Self::new_with_node(node, executor, topic_name, message_type)
+        Self::new_with_node_qos(
+            node,
+            executor,
+            topic_name,
+            message_type,
+            QoSProfile::topics_default(),
+        )
+    }
+
+    /// Create a new dynamic subscription with a custom QoS profile.
+    pub fn new_qos(topic_name: &str, message_type: &str, qos: QoSProfile) -> Result<Self> {
+        let context = Context::default_from_env()?;
+        let executor = context.create_basic_executor();
+        let node = executor.create_node("roc_dynamic_subscriber")?;
+        Self::new_with_node_qos(node, executor, topic_name, message_type, qos)
     }
 
     /// Create a new dynamic subscription using an existing node.
@@ -54,6 +71,22 @@ impl DynamicSubscriber {
         topic_name: &str,
         message_type: &str,
     ) -> Result<Self> {
+        Self::new_with_node_qos(
+            node,
+            executor,
+            topic_name,
+            message_type,
+            QoSProfile::topics_default(),
+        )
+    }
+
+    pub fn new_with_node_qos(
+        node: Node,
+        executor: rclrs::Executor,
+        topic_name: &str,
+        message_type: &str,
+        qos: QoSProfile,
+    ) -> Result<Self> {
         let (tx, rx) = mpsc::channel::<ReceivedDynamicMessage>();
         let tx = Arc::new(Mutex::new(tx));
 
@@ -63,7 +96,7 @@ impl DynamicSubscriber {
 
         let subscription = node.create_dynamic_subscription(
             msg_type,
-            topic_name,
+            topic_name.qos(qos),
             move |msg: DynamicMessage, info: rclrs::MessageInfo| {
                 if let Ok(lock) = tx.lock() {
                     let _ = lock.send(ReceivedDynamicMessage { message: msg, info });

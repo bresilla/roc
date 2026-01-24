@@ -1,3 +1,3 @@
 [submodule "deps/ros2_rust"]
 	path = deps/ros2_rust
-	url = https://github.com/bresilla/ros2_rust
+	url = git@github.com:bresilla/ros2_rust.git
