@@ -30,8 +30,8 @@ Legend:
 | `roc param describe` | Native Rust | Calls `/describe_parameters`; `src/commands/param/describe.rs` |
 | `roc param export` (`dump`) | Native Rust | Exports a ROS2-style YAML (approx) by listing + getting all params; `src/commands/param/export.rs` |
 | `roc param import` (`load`) | Native Rust | Loads ROS2-style YAML (approx) and sets params via `/set_parameters`; `src/commands/param/import.rs` |
-| `roc action list` | ROS 2 CLI | `src/commands/action/list.rs` |
-| `roc action info` | ROS 2 CLI | `src/commands/action/info.rs` |
+| `roc action list` | Native Rust | Action discovery via service graph scan; `src/commands/action/list.rs`, `src/shared/action_operations.rs` |
+| `roc action info` | Native Rust | Best-effort type inference via `*_SendGoal` service type; `src/commands/action/info.rs`, `src/shared/action_operations.rs` |
 | `roc action goal` (`send_goal`) | ROS 2 CLI | `src/commands/action/goal.rs` |
 | `roc interface list` | ROS 2 CLI | `src/commands/interface/list.rs` |
 | `roc interface package` | ROS 2 CLI | `src/commands/interface/package.rs` |

@@ -3,6 +3,7 @@
 //! This module provides a small, safe wrapper around `rclrs` graph APIs.
 //! It replaces the previous raw `rcl`/`rmw` usage.
 
+pub use crate::shared::action_operations;
 pub use crate::shared::dynamic_messages::DynamicSubscriber;
 pub use crate::shared::graph_context::RclGraphContext;
 pub use crate::shared::graph_types::{TopicEndpointInfo, TopicInfo};
