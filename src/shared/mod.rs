@@ -7,5 +7,6 @@ pub mod node_operations;
 pub mod package_discovery;
 pub mod param_operations;
 pub mod ros_interface_parser;
+pub mod rosbag2;
 pub mod service_operations;
 pub mod topic_operations;
