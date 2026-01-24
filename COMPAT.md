@@ -12,11 +12,11 @@ Legend:
 | `roc topic info` | Native Rust | `src/commands/topic/info.rs` |
 | `roc topic kind` (`type`) | Native Rust | `src/commands/topic/kind.rs` |
 | `roc topic find` | Native Rust | `src/commands/topic/find.rs` |
-| `roc topic echo` | Hybrid | Native subscription, **falls back** to `ros2 topic echo` for some message types; `src/commands/topic/echo.rs` |
+| `roc topic echo` | Native Rust | Native dynamic subscription + YAML/CSV formatting; field selectors support dotted paths (e.g. `--field data`); `src/commands/topic/echo.rs` |
 | `roc topic hz` | Native Rust | `src/commands/topic/hz.rs` |
 | `roc topic bw` | Native Rust | `src/commands/topic/bw.rs` (uses string-length as size estimate) |
 | `roc topic pub` | Native Rust | `src/commands/topic/pub_.rs` (dynamic publisher) |
-| `roc topic delay` | ROS 2 CLI (partial) | Uses `ros2 topic echo --csv` and (currently) logs instead of republishing; `src/commands/topic/delay.rs` |
+| `roc topic delay` | Native Rust | Dynamic subscribe + buffer + dynamic publish after delay; `src/commands/topic/delay.rs` |
 | `roc node list` | Native Rust | Graph discovery via `rclrs`; `src/commands/node/list.rs` |
 | `roc node info` | Native Rust | Uses `rclrs` per-node graph queries; `src/commands/node/info.rs` |
 | `roc service list` | Native Rust | Graph discovery via `rclrs`; `src/commands/service/list.rs` |
