@@ -10,6 +10,7 @@ pub mod ros_interface_parser;
 pub mod ros_tf_introspection;
 pub mod ros_tf_msgs_sys;
 pub mod rosbag2;
+pub mod serialized_transport;
 pub mod service_operations;
 pub mod tf2_subscriber;
 pub mod tf_dump;

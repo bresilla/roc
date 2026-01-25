@@ -50,10 +50,10 @@ Legend:
 | `roc work build` | Native Rust | colcon-replacement build system; `src/commands/work/build/*` |
 | `roc idl protobuf` (`proto`, `pb`) | Native Rust | bidirectional `.proto` ↔ `.msg`; `src/commands/idl/protobuf.rs` |
 | `roc idl ros2msg` (`msg`, `ros2`) | Native Rust | `.msg` → `.proto`; `src/commands/idl/ros2msg.rs` |
-| `roc bag record` | ROS 2 CLI | wraps `ros2 bag record`; `src/commands/bag/record.rs` |
+| `roc bag record` | Hybrid (in progress) | MCAP (CDR) native path in progress; currently wraps `ros2 bag record`; `src/commands/bag/record.rs`, `src/shared/serialized_transport.rs` |
 | `roc bag list` | Native Rust | Scans for rosbag2 directories via `metadata.yaml`; `src/commands/bag/list.rs`, `src/shared/rosbag2.rs` |
 | `roc bag info` | Native Rust | Parses rosbag2 `metadata.yaml` and prints summary; `src/commands/bag/info.rs`, `src/shared/rosbag2.rs` |
-| `roc bag play` | Stub/WIP | prints placeholder; `src/commands/bag/play.rs` |
+| `roc bag play` | Stub/WIP | Planned MCAP (CDR) playback; `src/commands/bag/play.rs`, `src/shared/serialized_transport.rs` |
 | `roc daemon start` | Stub/WIP | prints placeholder; `src/commands/daemon/start.rs` |
 | `roc daemon stop` | Stub/WIP | prints placeholder; `src/commands/daemon/stop.rs` |
 | `roc daemon status` | Stub/WIP | prints placeholder; `src/commands/daemon/status.rs` |

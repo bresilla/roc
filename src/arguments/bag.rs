@@ -23,16 +23,23 @@ pub fn cmd() -> Command {
         )
         .subcommand(
             Command::new("record")
-                .about("Record messages into a bag (ROS 2 CLI wrapper for now)")
+                .about("Record messages into an MCAP file")
                 .aliases(["r", "rec"])
                 .arg(arg!([topics] ... "Topics to record"))
-                .arg(arg!(-o --output <OUTPUT> "Output directory name"))
-                .arg(arg!(--all "Record all topics").action(ArgAction::SetTrue)),
+                .arg(arg!(-o --output <OUTPUT> "Output MCAP file path"))
+                .arg(arg!(--all "Record all topics").action(ArgAction::SetTrue))
+                .arg(arg!(--type <TYPE> "Message type (single-topic override)").required(false))
+                .arg(
+                    arg!(--separated "Write one MCAP per topic when recording multiple topics")
+                        .action(ArgAction::SetTrue),
+                ),
         )
         .subcommand(
             Command::new("play")
-                .about("Play back a bag (WIP)")
+                .about("Play back MCAP files")
                 .aliases(["p"])
-                .arg(arg!(<PATH> "Bag directory to play").required(true)),
+                .arg(arg!(<PATHS> ... "MCAP files to play").required(true))
+                .arg(arg!(--rate <RATE> "Playback rate multiplier (default: 1.0)"))
+                .arg(arg!(--loop "Loop playback").action(ArgAction::SetTrue)),
         )
 }
