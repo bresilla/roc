@@ -11,6 +11,100 @@ pub fn handle(matches: ArgMatches) {
     }
 }
 
+fn is_valid_identifier(value: &str) -> bool {
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() => {}
+        _ => return false,
+    }
+
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+fn validate_inputs(
+    package_name: &str,
+    package_format: &str,
+    description: &str,
+    license: &str,
+    build_type: &str,
+    dependencies: &[&str],
+    maintainer_email: &str,
+    maintainer_name: &str,
+    node_name: Option<&String>,
+    library_name: Option<&String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !is_valid_identifier(package_name) {
+        return Err(format!(
+            "Invalid package name '{}'. Use lowercase letters, digits, and underscores, and start with a letter",
+            package_name
+        )
+        .into());
+    }
+
+    if package_format != "2" && package_format != "3" {
+        return Err(format!(
+            "Unsupported package format '{}'. Supported values are 2 or 3",
+            package_format
+        )
+        .into());
+    }
+
+    if description.trim().is_empty() {
+        return Err("Package description cannot be empty".into());
+    }
+
+    if license.trim().is_empty() {
+        return Err("Package license cannot be empty".into());
+    }
+
+    if maintainer_name.trim().is_empty() {
+        return Err("Maintainer name cannot be empty".into());
+    }
+
+    if maintainer_email.trim().is_empty()
+        || !maintainer_email.contains('@')
+        || maintainer_email.contains(' ')
+    {
+        return Err(format!("Invalid maintainer email '{}'.", maintainer_email).into());
+    }
+
+    for dep in dependencies {
+        if !is_valid_identifier(dep) {
+            return Err(format!(
+                "Invalid dependency '{}'. Use lowercase letters, digits, and underscores",
+                dep
+            )
+            .into());
+        }
+    }
+
+    if let Some(node) = node_name {
+        if !is_valid_identifier(node) {
+            return Err(format!(
+                "Invalid node name '{}'. Use lowercase letters, digits, and underscores",
+                node
+            )
+            .into());
+        }
+    }
+
+    if let Some(library) = library_name {
+        if !is_valid_identifier(library) {
+            return Err(format!(
+                "Invalid library name '{}'. Use lowercase letters, digits, and underscores",
+                library
+            )
+            .into());
+        }
+    }
+
+    if build_type == "ament_python" && library_name.is_some() {
+        return Err("--library_name is only supported for CMake-based packages".into());
+    }
+
+    Ok(())
+}
+
 fn create_package(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let package_name = matches.get_one::<String>("PACKAGE_NAME").unwrap();
 
@@ -56,6 +150,19 @@ fn create_package(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>>
         "ament_cmake" | "ament_python" | "cmake" => {}
         _ => return Err(format!("Unsupported build type: {}", build_type).into()),
     }
+
+    validate_inputs(
+        package_name,
+        package_format,
+        description,
+        license,
+        build_type,
+        &dependencies,
+        maintainer_email,
+        maintainer_name,
+        node_name,
+        library_name,
+    )?;
 
     // Create package directory
     let package_path = Path::new(destination_directory).join(package_name);

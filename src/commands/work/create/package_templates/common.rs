@@ -1,6 +1,15 @@
 /// Common ROS 2 package templates that are language-agnostic
 use std::error::Error;
 
+fn escape_xml(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 pub fn create_package_xml(
     package_name: &str,
     package_format: &str,
@@ -11,6 +20,12 @@ pub fn create_package_xml(
     build_type: &str,
     dependencies: &[&str],
 ) -> Result<String, Box<dyn Error>> {
+    let package_name_escaped = escape_xml(package_name);
+    let description_escaped = escape_xml(description);
+    let license_escaped = escape_xml(license);
+    let maintainer_name_escaped = escape_xml(maintainer_name);
+    let maintainer_email_escaped = escape_xml(maintainer_email);
+
     let mut xml = format!(
         r#"<?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
@@ -21,12 +36,17 @@ pub fn create_package_xml(
   <maintainer email="{}">{}</maintainer>
   <license>{}</license>
 "#,
-        package_format, package_name, description, maintainer_email, maintainer_name, license
+        package_format,
+        package_name_escaped,
+        description_escaped,
+        maintainer_email_escaped,
+        maintainer_name_escaped,
+        license_escaped
     );
 
     // Add dependencies
     for dep in dependencies {
-        xml.push_str(&format!("  <depend>{}</depend>\n", dep));
+        xml.push_str(&format!("  <depend>{}</depend>\n", escape_xml(dep)));
     }
 
     // Add build type specific tags
@@ -62,5 +82,28 @@ pub fn capitalize_first_letter(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::create_package_xml;
+
+    #[test]
+    fn escapes_xml_sensitive_fields() {
+        let xml = create_package_xml(
+            "demo_pkg",
+            "3",
+            "Rock & Roll <demo>",
+            "Apache-2.0",
+            "O'Neil",
+            "oneil@example.com",
+            "ament_cmake",
+            &["std_msgs"],
+        )
+        .unwrap();
+
+        assert!(xml.contains("Rock &amp; Roll &lt;demo&gt;"));
+        assert!(xml.contains("O&apos;Neil"));
     }
 }

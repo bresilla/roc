@@ -2,6 +2,15 @@ use super::common::capitalize_first_letter;
 /// Python specific ROS 2 package templates
 use std::error::Error;
 
+fn escape_python_single_quoted(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+        .replace('\'', "\\'")
+}
+
 pub fn create_setup_py(
     package_name: &str,
     node_name: Option<&String>,
@@ -11,6 +20,10 @@ pub fn create_setup_py(
     license: &str,
 ) -> Result<String, Box<dyn Error>> {
     let mut entry_points = String::new();
+    let maintainer_name = escape_python_single_quoted(maintainer_name);
+    let maintainer_email = escape_python_single_quoted(maintainer_email);
+    let description = escape_python_single_quoted(description);
+    let license = escape_python_single_quoted(license);
 
     if let Some(node_name_str) = node_name {
         entry_points = format!(
@@ -204,5 +217,26 @@ def test_{}():
                 test_file.replace(".py", "").replace("test_", "")
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::create_setup_py;
+
+    #[test]
+    fn escapes_single_quotes_in_setup_metadata() {
+        let setup_py = create_setup_py(
+            "demo_pkg",
+            None,
+            "O'Neil",
+            "oneil@example.com",
+            "robot's package",
+            "Apache-2.0",
+        )
+        .unwrap();
+
+        assert!(setup_py.contains("maintainer='O\\'Neil'"));
+        assert!(setup_py.contains("description='robot\\'s package'"));
     }
 }
