@@ -1,4 +1,5 @@
 use clap::ArgMatches;
+use colored::Colorize;
 use std::path::PathBuf;
 
 use crate::commands::work::build::{ColconBuilder, BuildConfig};
@@ -53,15 +54,26 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
     if !user_provided_base_paths && !config.workspace_root.join("src").exists() {
         config.base_paths = vec![config.workspace_root.clone()];
         println!(
+            "{}",
             "No 'src' directory found; scanning workspace root for packages"
+                .bright_yellow()
         );
     }
     
     // Update isolated mode based on merge_install flag
     config.isolated = !config.merge_install;
     
-    println!("🔧 Building ROS2 workspace with roc (colcon replacement)");
-    println!("Workspace: {}", config.workspace_root.display());
+    println!(
+        "{}",
+        "Building ROS2 workspace with roc (colcon replacement)"
+            .bright_cyan()
+            .bold()
+    );
+    println!(
+        "{} {}",
+        "Workspace:".bright_blue().bold(),
+        config.workspace_root.display().to_string().bright_white()
+    );
     
     // Create and run the builder
     let mut builder = ColconBuilder::new(config);
@@ -75,9 +87,9 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
     // Build all packages
     builder.build_packages()?;
     
-    println!("\n✅ Build completed successfully!");
-    println!("To use the workspace, run:");
-    println!("  source install/setup.bash");
+    println!("\n{}", "Build completed successfully".bright_green().bold());
+    println!("{}", "To use the workspace, run: ".bright_blue().bold());
+    println!("  {}", "source install/setup.bash".bright_white());
     
     Ok(())
 }
@@ -86,10 +98,14 @@ pub fn handle(matches: ArgMatches) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     match rt.block_on(run_command(matches)) {
         Ok(_) => {
-            println!("Build completed successfully!");
+            println!("{}", "Done".bright_green().bold());
         }
         Err(e) => {
-            eprintln!("❌ Build failed: {}", e);
+            eprintln!(
+                "{} {}",
+                "Build failed:".bright_red().bold(),
+                e.to_string().bright_white()
+            );
             std::process::exit(1);
         }
     }

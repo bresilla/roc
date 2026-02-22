@@ -1,20 +1,18 @@
-
-/// Package template system for ROS 2 packages
-/// 
-/// This module provides a modular template system that supports multiple build systems:
-/// - CMake/C++ packages (ament_cmake)
-/// - Python packages (ament_python) 
-/// - Rust packages (ament_cmake_ros with Cargo)
-
-mod common;
-mod cmake;
-mod python;
 #[allow(dead_code)]
 mod cargo;
+mod cmake;
+/// Package template system for ROS 2 packages
+///
+/// This module provides a modular template system that supports multiple build systems:
+/// - CMake/C++ packages (ament_cmake)
+/// - Python packages (ament_python)
+/// - Rust packages (ament_cmake_ros with Cargo)
+mod common;
+mod python;
 
 // Re-export all template functions for backward compatibility
-pub use common::*;
 pub use cmake::*;
+pub use common::*;
 pub use python::*;
 
 #[cfg(test)]
@@ -32,8 +30,9 @@ mod tests {
             "test@example.com",
             "ament_cmake",
             &["rclcpp", "std_msgs"],
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         assert!(xml.contains("<name>test_package</name>"));
         assert!(xml.contains("<description>A test package</description>"));
         assert!(xml.contains("<build_type>ament_cmake</build_type>"));
@@ -41,8 +40,9 @@ mod tests {
 
     #[test]
     fn test_create_cmake_lists() {
-        let cmake = create_cmake_lists("test_package", Some(&"test_node".to_string()), None).unwrap();
-        
+        let cmake =
+            create_cmake_lists("test_package", Some(&"test_node".to_string()), None).unwrap();
+
         assert!(cmake.contains("project(test_package)"));
         assert!(cmake.contains("find_package(rclcpp REQUIRED)"));
         assert!(cmake.contains("ament_package()"));
@@ -51,8 +51,16 @@ mod tests {
 
     #[test]
     fn test_create_setup_py() {
-        let setup = create_setup_py("test_package", Some(&"test_node".to_string())).unwrap();
-        
+        let setup = create_setup_py(
+            "test_package",
+            Some(&"test_node".to_string()),
+            "Test User",
+            "test@example.com",
+            "Test package",
+            "Apache-2.0",
+        )
+        .unwrap();
+
         assert!(setup.contains("name=package_name"));
         assert!(setup.contains("test_node = test_package.test_node:main"));
     }

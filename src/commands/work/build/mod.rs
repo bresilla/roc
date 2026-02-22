@@ -2,7 +2,6 @@
 // This module provides functionality to replace colcon build for ROS 2 workspaces
 
 pub mod command;
-pub mod package_discovery;
 pub mod dependency_graph;
 pub mod build_executor;
 pub mod environment_manager;
@@ -10,49 +9,11 @@ pub mod environment_manager;
 // Re-export the handle function for easier access
 pub use command::handle;
 
+use colored::Colorize;
 use std::path::PathBuf;
 
-// TODO: Future migration - these types are very similar to crate::shared::package_discovery
-// Consider migrating to shared discovery system for consistency
-// pub use crate::shared::package_discovery::{Package as PackageMeta, BuildType};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum BuildType {
-    AmentCmake,
-    AmentPython,
-    Cmake,
-    Other(String),
-}
-
-impl From<&str> for BuildType {
-    fn from(s: &str) -> Self {
-        match s {
-            "ament_cmake" => BuildType::AmentCmake,
-            "ament_python" => BuildType::AmentPython,
-            "cmake" => BuildType::Cmake,
-            other => BuildType::Other(other.to_string()),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PackageMeta {
-    pub name: String,
-    pub path: PathBuf,
-    pub build_type: BuildType,
-    #[allow(dead_code)]
-    pub version: String,
-    #[allow(dead_code)]
-    pub description: String,
-    #[allow(dead_code)]
-    pub maintainers: Vec<String>,
-    pub build_deps: Vec<String>,
-    pub buildtool_deps: Vec<String>,
-    #[allow(dead_code)]
-    pub exec_deps: Vec<String>,
-    #[allow(dead_code)]
-    pub test_deps: Vec<String>,
-}
+pub use crate::shared::package_discovery::{BuildType, Package as PackageMeta};
+use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
 
 #[derive(Debug, Clone)]
 pub struct BuildConfig {
@@ -110,7 +71,26 @@ impl ColconBuilder {
     }
 
     pub fn discover_packages(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.packages = package_discovery::discover_packages(&self.config.base_paths)?;
+        let discovery_config = DiscoveryConfig {
+            base_paths: self.config.base_paths.clone(),
+            include_hidden: false,
+            max_depth: Some(10),
+            exclude_patterns: vec![
+                "build".to_string(),
+                "install".to_string(),
+                "log".to_string(),
+                ".git".to_string(),
+                ".vscode".to_string(),
+                "target".to_string(),
+                "node_modules".to_string(),
+                "__pycache__".to_string(),
+            ],
+        };
+
+        self.packages = discover_packages(&discovery_config)
+            .map_err(|e| -> Box<dyn std::error::Error> {
+                Box::new(std::io::Error::other(e.to_string()))
+            })?;
 
         if self.packages.is_empty() {
             return Err("No ROS packages found in the selected base paths".into());
@@ -119,9 +99,19 @@ impl ColconBuilder {
         // Apply package filters
         self.apply_package_filters();
         
-        println!("Discovered {} packages", self.packages.len());
+        println!(
+            "{} {} {}",
+            "Discovered".bright_cyan().bold(),
+            self.packages.len().to_string().bright_white().bold(),
+            "packages".bright_cyan().bold()
+        );
         for pkg in &self.packages {
-            println!("  - {} ({})", pkg.name, format!("{:?}", pkg.build_type));
+            println!(
+                "  {} {} {}",
+                "-".bright_black(),
+                pkg.name.bright_white().bold(),
+                format!("({:?})", pkg.build_type).bright_black()
+            );
         }
         
         Ok(())
@@ -130,9 +120,9 @@ impl ColconBuilder {
     pub fn resolve_dependencies(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.build_order = dependency_graph::topological_sort(&self.packages)?;
         
-        println!("Build order:");
+        println!("{}", "Build order".bright_cyan().bold());
         for &idx in &self.build_order {
-            println!("  {}", self.packages[idx].name);
+            println!("  {}", self.packages[idx].name.bright_white());
         }
         
         Ok(())
@@ -161,7 +151,11 @@ impl ColconBuilder {
         let setup_bash_path = self.config.install_base.join("setup.bash");
         env_manager.generate_setup_script(&setup_bash_path)?;
         
-        println!("📝 Generated setup script: {}", setup_bash_path.display());
+        println!(
+            "{} {}",
+            "Generated setup script:".bright_green().bold(),
+            setup_bash_path.display().to_string().bright_white()
+        );
         
         Ok(())
     }

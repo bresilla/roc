@@ -1,10 +1,17 @@
+use super::common::capitalize_first_letter;
 /// Python specific ROS 2 package templates
 use std::error::Error;
-use super::common::capitalize_first_letter;
 
-pub fn create_setup_py(package_name: &str, node_name: Option<&String>) -> Result<String, Box<dyn Error>> {
+pub fn create_setup_py(
+    package_name: &str,
+    node_name: Option<&String>,
+    maintainer_name: &str,
+    maintainer_email: &str,
+    description: &str,
+    license: &str,
+) -> Result<String, Box<dyn Error>> {
     let mut entry_points = String::new();
-    
+
     if let Some(node_name_str) = node_name {
         entry_points = format!(
             "            '{} = {}.{}:main',",
@@ -28,10 +35,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='TODO',
-    maintainer_email='todo@example.com',
-    description='TODO: Package description',
-    license='Apache-2.0',
+    maintainer='{}',
+    maintainer_email='{}',
+    description='{}',
+    license='{}',
     tests_require=['pytest'],
     entry_points={{
         'console_scripts': [
@@ -40,12 +47,15 @@ setup(
     }},
 )
 "#,
-        package_name, entry_points
+        package_name, maintainer_name, maintainer_email, description, license, entry_points
     ))
 }
 
-pub fn create_setup_cfg() -> String {
-    "[develop]\nscript_dir=$base/lib/PACKAGE_NAME\n[install]\ninstall_scripts=$base/lib/PACKAGE_NAME\n".to_string()
+pub fn create_setup_cfg(package_name: &str) -> String {
+    format!(
+        "[develop]\nscript_dir=$base/lib/{}\n[install]\ninstall_scripts=$base/lib/{}\n",
+        package_name, package_name
+    )
 }
 
 pub fn create_python_node_template(_package_name: &str, node_name: &str) -> String {
@@ -103,8 +113,7 @@ if __name__ == '__main__':
 
 pub fn create_python_test_template(test_file: &str) -> String {
     match test_file {
-        "test_copyright.py" => {
-            r#"# Copyright 2015 Open Source Robotics Foundation, Inc.
+        "test_copyright.py" => r#"# Copyright 2015 Open Source Robotics Foundation, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -129,10 +138,9 @@ import pytest
 def test_copyright():
     rc = main(argv=['.', 'test'])
     assert rc == 0
-"#.to_string()
-        }
-        "test_flake8.py" => {
-            r#"# Copyright 2017 Open Source Robotics Foundation, Inc.
+"#
+        .to_string(),
+        "test_flake8.py" => r#"# Copyright 2017 Open Source Robotics Foundation, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -157,10 +165,9 @@ def test_flake8():
     assert rc == 0, \
         'Found %d code style errors / warnings:\n' % len(errors) + \
         '\n'.join(errors)
-"#.to_string()
-        }
-        "test_pep257.py" => {
-            r#"# Copyright 2015 Open Source Robotics Foundation, Inc.
+"#
+        .to_string(),
+        "test_pep257.py" => r#"# Copyright 2015 Open Source Robotics Foundation, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -183,8 +190,8 @@ import pytest
 def test_pep257():
     rc = main(argv=['.', 'test'])
     assert rc == 0
-"#.to_string()
-        }
+"#
+        .to_string(),
         _ => {
             format!(
                 r#"import pytest

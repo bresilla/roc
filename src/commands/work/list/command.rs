@@ -5,13 +5,25 @@ use std::fs;
 use anyhow::Result;
 use crate::shared::package_discovery::{discover_packages, DiscoveryConfig, BuildType};
 
+fn has_isolated_install(package_name: &str, install_base: &PathBuf) -> bool {
+    install_base.join(package_name).exists()
+}
+
+fn has_merged_install(package_name: &str, install_base: &PathBuf) -> bool {
+    install_base.join("share").join(package_name).exists()
+        || install_base.join("lib").join(package_name).exists()
+}
+
 fn format_build_status(package_path: &PathBuf, build_base: &PathBuf, install_base: &PathBuf) -> String {
     let package_name = package_path.file_name().unwrap().to_string_lossy();
     let build_dir = build_base.join(&*package_name);
-    let install_dir = install_base.join(&*package_name);
+    let has_isolated = has_isolated_install(package_name.as_ref(), install_base);
+    let has_merged = has_merged_install(package_name.as_ref(), install_base);
     
-    if install_dir.exists() {
+    if has_isolated {
         "✓ Built".green().to_string()
+    } else if has_merged {
+        "✓ Built (merged)".green().to_string()
     } else if build_dir.exists() {
         "⚠ Partial".yellow().to_string()
     } else {

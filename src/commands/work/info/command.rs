@@ -5,6 +5,15 @@ use anyhow::Result;
 use crate::shared::package_discovery::{discover_packages, DiscoveryConfig, BuildType};
 use roxmltree::Document;
 
+fn has_isolated_install(package_name: &str, install_base: &std::path::Path) -> bool {
+    install_base.join(package_name).exists()
+}
+
+fn has_merged_install(package_name: &str, install_base: &std::path::Path) -> bool {
+    install_base.join("share").join(package_name).exists()
+        || install_base.join("lib").join(package_name).exists()
+}
+
 fn format_build_type(build_type: &BuildType) -> String {
     match build_type {
         BuildType::AmentCmake => "ament_cmake".blue().to_string(),
@@ -173,9 +182,13 @@ async fn run_command(matches: ArgMatches) -> Result<()> {
     print_section_header("Build Status");
     let package_build_dir = build_base.join(&package.name);
     let package_install_dir = install_base.join(&package.name);
+    let isolated_install = has_isolated_install(&package.name, &install_base);
+    let merged_install = has_merged_install(&package.name, &install_base);
     
-    let build_status = if package_install_dir.exists() {
-        "✓ Built and installed".green()
+    let build_status = if isolated_install {
+        "✓ Built and installed (isolated)".green()
+    } else if merged_install {
+        "✓ Built and installed (merged)".green()
     } else if package_build_dir.exists() {
         "⚠ Partially built (not installed)".yellow()
     } else {
@@ -188,8 +201,10 @@ async fn run_command(matches: ArgMatches) -> Result<()> {
         println!("  Build directory: {}", package_build_dir.display().to_string().bright_black());
     }
     
-    if package_install_dir.exists() {
+    if isolated_install {
         println!("  Install directory: {}", package_install_dir.display().to_string().bright_black());
+    } else if merged_install {
+        println!("  Install directory: {}", install_base.display().to_string().bright_black());
     }
     
     Ok(())
