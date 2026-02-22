@@ -1,312 +1,131 @@
-
 <img align="right" width="32%" src="./misc/logo.png">
 
 # ROC - Robot Operations Command
 
-**A high-performance ROS2 command-line tool written in Rust**
+ROC is a ROS 2 command-line tool implemented in Rust. It implements many ROS 2 workflows directly and uses command naming close to the `ros2` CLI.
 
-ROC is a modern replacement for the ROS2 CLI toolchain, built with Rust for performance and reliability. Unlike other implementations, ROC directly interfaces with the RCL (ROS Client Library) and RMW (ROS Middleware) layers through FFI bindings, providing native-level performance and detailed introspection capabilities.
+For detailed command-by-command implementation status, see `COMPAT.md`.
 
-## 🚀 Features
+## Installation
 
-- **🎯 True Generic Message System**: World's first truly generic ROS2 message handling - works with ANY message type without hardcoding
-- **⚡ Runtime Type Discovery**: Automatic ROS2 message type introspection and serialization using native type support libraries
-- **🔧 Direct RCL/RMW Integration**: Native bindings to ROS2's core libraries with zero Python overhead
-- **📊 Comprehensive Topic Information**: Detailed QoS profiles, endpoint discovery, and type introspection
-- **🚀 High Performance**: Built in Rust for speed and memory safety
-- **🔄 Complete CLI Compatibility**: Drop-in replacement for `ros2` commands
-- **🐛 Advanced Debugging**: Detailed endpoint information including GIDs and type hashes
-- **🖥️ Shell Completions**: Dynamic completions for bash, zsh, and fish
+### From crates.io
 
-## 📋 Installation
-
-### From Crates.io
 ```bash
 cargo install rocc
 ```
 
-### From Source
+### From source
+
 ```bash
-git clone https://github.com/your-org/roc.git
+git clone https://github.com/bresilla/roc.git
 cd roc
 cargo build --release
 ```
 
-### Binary Releases
-Download pre-built binaries from our [releases page](https://github.com/your-org/roc/releases).
-
-## 🔧 Usage
+## Basic usage
 
 ```bash
-roc <COMMAND> [SUBCOMMAND] [OPTIONS] [ARGS]
+roc <COMMAND> [SUBCOMMAND] [OPTIONS]
 ```
 
-### Monitor Commands
-- `action` `[a]` - Action server introspection and interaction
-- `topic` `[t]` - Topic monitoring, publishing, and detailed info
-- `service` `[s]` - Service discovery and calling
-- `param` `[p]` - Parameter management and introspection
-- `node` `[n]` - Node discovery and information
-- `interface` `[i]` - Message/service type introspection
+Main command groups:
 
-### Workspace Commands
-- `run` `[r]` - Execute ROS2 packages and nodes
-- `launch` `[l]` - Launch file execution
-- `work` `[w]` - **Complete workspace management suite**
-  - `build` - **Colcon replacement build system** with parallel builds, dependency resolution, and environment management
-  - `create` - Package creation wizard for ament_cmake, ament_python, and cmake packages
-  - `list` - Package discovery and listing
-  - `info` - Package metadata and dependency information
+- `topic` - topic discovery, publish, echo, bandwidth/rate/delay tools
+- `service` - service discovery; `service call` currently delegates to `ros2`
+- `action` - action discovery; `action goal` currently delegates to `ros2`
+- `node` - node discovery and introspection
+- `param` - parameter operations
+- `interface` - ROS interface inspection
+- `frame` - TF frame tools
+- `bag` - MCAP recording/playback and rosbag metadata tools
+- `run` - executable discovery and execution
+- `launch` - launch file discovery with execution delegated to `ros2 launch`
+- `work` - workspace package create/list/info/build
+- `idl` - protobuf and ROS message conversion tools
 
-### Utility Commands
-- `bag` `[b]` - ROS bag recording and playback
-- `daemon` `[d]` - Daemon and bridge management
-- `middleware` `[m]` - RMW configuration and diagnostics
-- `frame` `[f]` - Transform frame utilities
-- `idl` `[interface-def]` - **Interface Definition Language tools**
-  - `protobuf` - **Bidirectional conversion between Protobuf (.proto) and ROS2 (.msg) files**
-
-## 🎯 Key Advantages
-
-### Native Performance
-ROC bypasses the Python layer entirely, interfacing directly with RCL/RMW through optimized Rust FFI bindings. This provides:
-- Faster startup times
-- Lower memory usage
-- More reliable operation
-- Better error handling
-
-### 🎯 Revolutionary Generic Message System
-ROC features a truly generic ROS2 message system that works with **ANY** message type without hardcoding:
+Use command help to inspect options:
 
 ```bash
-# Works automatically with ANY message type - no code changes needed!
-roc topic pub /my_topic custom_msgs/msg/MyComplexType '{field1: value, nested: {data: 42}}'
-roc topic pub /sensors std_msgs/msg/Int8 '{data: 5}'
-roc topic pub /control geometry_msgs/msg/Twist '{linear: {x: 1.0}}'
-
-# Even custom message types work instantly
-roc topic pub /robot_status my_robot/msg/CustomStatus '{active: true, battery: 85.5}'
+roc --help
+roc work --help
+roc topic pub --help
 ```
 
-**Key Innovation:**
-- **Universal Compatibility**: Works with std_msgs, geometry_msgs, sensor_msgs, and ANY custom message type
-- **Runtime Type Discovery**: Automatically loads message type definitions at runtime using ROS2's introspection system
-- **Zero Configuration**: No compilation or setup required for new message types
-- **Memory Safe**: Full Rust safety guarantees with optimized C struct serialization
+## Workspace commands
 
-### Enhanced Topic Information
-Get comprehensive topic details that exceed the standard ROS2 CLI:
+`roc work` includes package and workspace utilities:
+
+- `roc work create` - scaffold packages (`ament_cmake`, `ament_python`, `cmake`)
+- `roc work list` - list discovered packages and build state
+- `roc work info <package>` - print package metadata
+- `roc work build` - build workspace packages with dependency ordering
+
+Examples:
 
 ```bash
-roc topic info /chatter --verbose
-```
-
-This provides detailed QoS profiles, endpoint information, GIDs, type hashes, and publisher/subscriber discovery data.
-
-### Architecture
-ROC is built on a layered architecture:
-- **🎯 Generic Message System**: Runtime type discovery and universal message handling
-- **🔧 RCL/RMW FFI Layer**: Direct bindings to ROS2 core libraries
-- **📊 Graph Context**: Efficient ROS graph introspection
-- **🖥️ Command Interface**: Familiar CLI matching ROS2 tools
-- **🐚 Shell Integration**: Dynamic completions and scripting support
-
-## 📚 Documentation
-
-Comprehensive documentation is available in the [ROC Book](./book/), including:
-- **Architecture Overview**: How ROC interfaces with ROS2
-- **RCL/RMW Integration**: Technical details of the FFI bindings
-- **Implementation Guide**: Deep dives into graph context and endpoint discovery
-- **Examples**: Practical usage patterns and integration examples
-
-To build and serve the documentation locally:
-```bash
-cd book
-mdbook serve
-```
-
-## � Interface Definition Language (IDL) Tools
-
-ROC includes powerful tools for working with different interface definition languages, enabling seamless interoperability between ROS2 and other systems.
-
-### Protobuf ↔ ROS2 Conversion (`roc idl protobuf`)
-
-Convert between Protobuf (.proto) and ROS2 (.msg) formats with automatic direction detection:
-
-```bash
-# Convert .proto files to .msg files
-roc idl protobuf robot.proto sensor_data.proto
-
-# Convert .msg files to .proto files  
-roc idl protobuf RobotStatus.msg SensorData.msg
-
-# Specify output directory
-roc idl protobuf --output ./generated robot.proto
-
-# Dry run to preview output
-roc idl protobuf --dry-run robot.proto
-```
-
-**Key Features:**
-- **Automatic Direction Detection**: Detects conversion direction based on file extensions
-- **Advanced Protobuf Support**: Handles nested messages, enums, oneofs, maps, and comments
-- **Dependency Resolution**: Generates files in correct dependency order
-- **Inplace Output**: Generates files in the same directory as input by default
-- **Type Mapping**: Intelligent conversion between Protobuf and ROS2 types
-- **Pure Rust Implementation**: No external dependencies or tools required
-
-**Supported Protobuf Features:**
-- Primitive types (int32, string, bool, etc.)
-- Repeated fields (arrays)
-- Nested messages and custom types
-- Enums with value mapping
-- Oneof fields
-- Map types
-- Comments and documentation
-- Proto3 syntax
-
-**Example Conversion:**
-```protobuf
-// robot.proto
-syntax = "proto3";
-package robotics;
-
-message RobotStatus {
-  bool active = 1;
-  string name = 2;
-  repeated double joint_positions = 3;
-}
-
-message Robot {
-  RobotStatus status = 1;
-  int32 id = 2;
-}
-```
-
-Converts to:
-```msg
-# RobotStatus.msg
-bool active
-string name
-float64[] joint_positions
-
-# Robot.msg  
-RobotStatus status
-int32 id
-```
-
-## �🛠️ Workspace Management
-
-ROC includes a complete workspace management system that serves as a **drop-in replacement for colcon**:
-
-### Build System (`roc work build`)
-- **Full colcon compatibility**: All major colcon build options supported
-- **Parallel builds**: Multi-threaded compilation with automatic dependency resolution
-- **Package discovery**: Automatic scanning and parsing of package.xml manifests
-- **Environment management**: Automatic setup of build and runtime environments
-- **Isolated/merged installs**: Support for both colcon install modes
-- **Build types supported**: ament_cmake, ament_python, cmake
-
-```bash
-# Build entire workspace (like colcon build)
+# Build all packages in the current workspace
 roc work build
 
-# Build specific packages
-roc work build --packages-select my_package another_package
+# Build selected packages
+roc work build --packages-select my_pkg other_pkg
 
-# Parallel builds with custom worker count
-roc work build --parallel-workers 8
-
-# Build with merged install space
+# Build with merged install layout
 roc work build --merge-install
 
-# Continue on errors
-roc work build --continue-on-error
+# Create a CMake package
+roc work create my_pkg --build_type ament_cmake --node_name talker
+
+# Inspect package details
+roc work info my_pkg
 ```
 
-### Package Creation (`roc work create`)
-Intelligent package creation wizard that generates properly structured ROS2 packages:
+## IDL and protobuf conversion
+
+`roc idl protobuf` converts between `.proto` and `.msg` files.
 
 ```bash
-# Create C++ package
-roc work create my_cpp_package --build-type ament_cmake
+# Proto -> msg
+roc idl protobuf robot.proto
 
-# Create Python package  
-roc work create my_py_package --build-type ament_python
+# Msg -> proto
+roc idl protobuf RobotStatus.msg
 
-# Create with dependencies and metadata
-roc work create my_package \
-  --build-type ament_cmake \
-  --dependencies rclcpp std_msgs \
-  --description "My awesome ROS2 package" \
-  --maintainer-name "Your Name" \
-  --maintainer-email "you@domain.com"
+# Write generated files to a directory
+roc idl protobuf --output ./generated robot.proto
 ```
 
-### Package Management
-```bash
-# List all packages in workspace
-roc work list
+## Architecture notes
 
-# Get detailed package information
-roc work info my_package --xml
-```
+The project is organized into command modules under `src/commands` and argument definitions under `src/arguments`.
 
-## 🛠️ Development
-- Rust 1.70+ 
-- ROS2 (Humble, Iron, or Rolling)
-- clang/libclang (for bindgen)
+- ROS interactions are implemented through Rust code and ROS 2 bindings.
+- Some subcommands intentionally delegate to `ros2` today. Current delegated paths are:
+  - `roc service call`
+  - `roc action goal`
+  - `roc launch <pkg> <launch>`
+- Workspace package discovery logic is shared across `work` commands.
 
-### Building
+Refer to:
+
+- `COMPAT.md` for feature status
+- `FEATURES.md` for high-level feature notes
+- `book/` for extended project documentation
+
+## Development
+
+Requirements:
+
+- Rust toolchain
+- ROS 2 environment available/sourced for ROS-dependent commands
+- clang/libclang for bindgen-based builds
+
+Build and test:
+
 ```bash
 cargo build --release
-```
-
-### Testing
-```bash
 cargo test
 ```
 
-### Contributing
-We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+## License
 
-## 📊 Status
-
-ROC is actively developed and production-ready for most ROS2 workflows. Current implementation status:
-
-- 🏆 **Topic Operations**: **Full feature parity with revolutionary generic message system**
-  - ✅ **Universal Message Support**: Works with ANY ROS2 message type automatically
-  - ✅ **Runtime Type Discovery**: Dynamic type support loading and introspection  
-  - ✅ **Memory-Safe Serialization**: Optimized C struct handling with Rust safety
-  - ✅ **Intelligent Fallbacks**: Graceful handling of problematic middleware combinations
-- ✅ **Service Operations**: Complete service introspection and calling
-- ✅ **Node Operations**: Node discovery and detailed information
-- ✅ **Parameter Operations**: Full parameter management
-- ✅ **Interface Operations**: Message and service type introspection
-- ✅ **IDL Tools**: **Complete Protobuf ↔ ROS2 conversion**
-  - ✅ Bidirectional conversion with automatic direction detection
-  - ✅ Advanced Protobuf feature support (nested messages, enums, oneofs, maps)
-  - ✅ Pure Rust implementation with no external dependencies
-  - ✅ Intelligent type mapping and dependency resolution
-- ✅ **Workspace Operations**: **Complete colcon replacement build system**
-  - ✅ Build system with parallel execution and dependency resolution
-  - ✅ Package creation wizard for all major build types
-  - ✅ Environment management and setup script generation
-  - ✅ Package discovery and metadata extraction
-- 🚧 **Action Operations**: Basic functionality (expanding)
-- 🚧 **Bag Operations**: Recording and playbook (in progress)
-- ⏳ **Launch Operations**: Planning phase
-
-## 🤝 Why ROC?
-
-ROC was created to address limitations in the existing ROS2 toolchain:
-- **🎯 Universal Message Support**: First tool to work with ANY ROS2 message type without hardcoding or recompilation
-- **⚡ Performance**: Native Rust implementation eliminates Python overhead
-- **🛡️ Reliability**: Strong typing and memory safety reduce runtime errors  
-- **🔧 Completeness**: Direct RCL/RMW access enables features not available in the standard CLI
-- **👨‍💻 Developer Experience**: Better error messages, shell completions, and debugging tools
-- **🏗️ Build System Innovation**: Modern colcon replacement with superior dependency resolution, parallel execution, and cleaner environment management
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+Licensed under MIT. See `LICENSE.md`.
