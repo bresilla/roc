@@ -217,3 +217,34 @@ pub fn handle(matches: ArgMatches) {
         std::process::exit(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{has_isolated_install, has_merged_install};
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn detects_isolated_install_layout() {
+        let temp = tempdir().unwrap();
+        let install_base = temp.path().join("install");
+        let package_name = "demo_pkg";
+
+        fs::create_dir_all(install_base.join(package_name)).unwrap();
+
+        assert!(has_isolated_install(package_name, &install_base));
+        assert!(!has_merged_install(package_name, &install_base));
+    }
+
+    #[test]
+    fn detects_merged_install_layout() {
+        let temp = tempdir().unwrap();
+        let install_base = temp.path().join("install");
+        let package_name = "demo_pkg";
+
+        fs::create_dir_all(install_base.join("share").join(package_name)).unwrap();
+
+        assert!(!has_isolated_install(package_name, &install_base));
+        assert!(has_merged_install(package_name, &install_base));
+    }
+}

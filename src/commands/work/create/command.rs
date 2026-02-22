@@ -341,3 +341,58 @@ fn create_python_package(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{is_valid_identifier, validate_inputs};
+
+    #[test]
+    fn identifier_validation_accepts_ros_style_names() {
+        assert!(is_valid_identifier("demo_pkg"));
+        assert!(is_valid_identifier("pkg2"));
+        assert!(is_valid_identifier("a"));
+    }
+
+    #[test]
+    fn identifier_validation_rejects_invalid_names() {
+        assert!(!is_valid_identifier("DemoPkg"));
+        assert!(!is_valid_identifier("2demo"));
+        assert!(!is_valid_identifier("demo-pkg"));
+    }
+
+    #[test]
+    fn create_validation_rejects_library_for_python() {
+        let result = validate_inputs(
+            "demo_pkg",
+            "3",
+            "description",
+            "Apache-2.0",
+            "ament_python",
+            &[],
+            "maintainer@example.com",
+            "Maintainer",
+            None,
+            Some(&"helper_lib".to_string()),
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn create_validation_accepts_valid_configuration() {
+        let result = validate_inputs(
+            "demo_pkg",
+            "3",
+            "description",
+            "Apache-2.0",
+            "ament_cmake",
+            &["rclcpp", "std_msgs"],
+            "maintainer@example.com",
+            "Maintainer",
+            Some(&"talker".to_string()),
+            Some(&"helper_lib".to_string()),
+        );
+
+        assert!(result.is_ok());
+    }
+}

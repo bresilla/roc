@@ -128,3 +128,65 @@ pub fn handle(matches: ArgMatches) {
         std::process::exit(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::format_build_status;
+    use std::fs;
+    use std::path::PathBuf;
+    use tempfile::tempdir;
+
+    fn package_path(workspace: &PathBuf, package_name: &str) -> PathBuf {
+        workspace.join("src").join(package_name)
+    }
+
+    #[test]
+    fn build_status_reports_isolated_install() {
+        let temp = tempdir().unwrap();
+        let workspace = temp.path().to_path_buf();
+        let build_base = workspace.join("build");
+        let install_base = workspace.join("install");
+        let package_name = "demo_pkg";
+        let pkg_path = package_path(&workspace, package_name);
+
+        fs::create_dir_all(&pkg_path).unwrap();
+        fs::create_dir_all(install_base.join(package_name)).unwrap();
+
+        let status = format_build_status(&pkg_path, &build_base, &install_base);
+        assert!(status.contains("Built"));
+        assert!(!status.contains("merged"));
+    }
+
+    #[test]
+    fn build_status_reports_merged_install() {
+        let temp = tempdir().unwrap();
+        let workspace = temp.path().to_path_buf();
+        let build_base = workspace.join("build");
+        let install_base = workspace.join("install");
+        let package_name = "demo_pkg";
+        let pkg_path = package_path(&workspace, package_name);
+
+        fs::create_dir_all(&pkg_path).unwrap();
+        fs::create_dir_all(install_base.join("share").join(package_name)).unwrap();
+
+        let status = format_build_status(&pkg_path, &build_base, &install_base);
+        assert!(status.contains("Built"));
+        assert!(status.contains("merged"));
+    }
+
+    #[test]
+    fn build_status_reports_partial_when_only_build_exists() {
+        let temp = tempdir().unwrap();
+        let workspace = temp.path().to_path_buf();
+        let build_base = workspace.join("build");
+        let install_base = workspace.join("install");
+        let package_name = "demo_pkg";
+        let pkg_path = package_path(&workspace, package_name);
+
+        fs::create_dir_all(&pkg_path).unwrap();
+        fs::create_dir_all(build_base.join(package_name)).unwrap();
+
+        let status = format_build_status(&pkg_path, &build_base, &install_base);
+        assert!(status.contains("Partial"));
+    }
+}
