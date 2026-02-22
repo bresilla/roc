@@ -227,6 +227,13 @@ fn create_package(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+#[cfg(test)]
+pub(crate) fn create_package_for_tests(
+    matches: ArgMatches,
+) -> Result<(), Box<dyn std::error::Error>> {
+    create_package(matches)
+}
+
 fn create_cmake_package(
     package_path: &Path,
     package_name: &str,

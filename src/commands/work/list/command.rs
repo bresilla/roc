@@ -54,8 +54,7 @@ fn get_creation_time(package_path: &PathBuf) -> String {
     "Unknown".to_string()
 }
 
-async fn run_command(matches: ArgMatches) -> Result<()> {
-    let workspace_root = std::env::current_dir()?;
+async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) -> Result<()> {
     let build_base = workspace_root.join("build");
     let install_base = workspace_root.join("install");
     
@@ -119,6 +118,16 @@ async fn run_command(matches: ArgMatches) -> Result<()> {
     );
     
     Ok(())
+}
+
+async fn run_command(matches: ArgMatches) -> Result<()> {
+    let workspace_root = std::env::current_dir()?;
+    run_command_in_workspace(matches, workspace_root).await
+}
+
+#[cfg(test)]
+pub(crate) async fn run_command_for_tests(matches: ArgMatches, workspace_root: PathBuf) -> Result<()> {
+    run_command_in_workspace(matches, workspace_root).await
 }
 
 pub fn handle(matches: ArgMatches) {
