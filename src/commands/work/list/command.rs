@@ -31,6 +31,15 @@ fn format_build_status(package_path: &PathBuf, build_base: &PathBuf, install_bas
     }
 }
 
+#[cfg(test)]
+pub(crate) fn format_build_status_for_tests(
+    package_path: &PathBuf,
+    build_base: &PathBuf,
+    install_base: &PathBuf,
+) -> String {
+    format_build_status(package_path, build_base, install_base)
+}
+
 fn format_build_type(build_type: &BuildType) -> String {
     match build_type {
         BuildType::AmentCmake => "ament_cmake".blue().to_string(),

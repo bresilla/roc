@@ -14,6 +14,35 @@ fn has_merged_install(package_name: &str, install_base: &std::path::Path) -> boo
         || install_base.join("lib").join(package_name).exists()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InstallLayout {
+    None,
+    Isolated,
+    Merged,
+}
+
+fn detect_install_layout(package_name: &str, install_base: &std::path::Path) -> InstallLayout {
+    if has_isolated_install(package_name, install_base) {
+        InstallLayout::Isolated
+    } else if has_merged_install(package_name, install_base) {
+        InstallLayout::Merged
+    } else {
+        InstallLayout::None
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn detect_install_layout_for_tests(
+    package_name: &str,
+    install_base: &std::path::Path,
+) -> String {
+    match detect_install_layout(package_name, install_base) {
+        InstallLayout::None => "none".to_string(),
+        InstallLayout::Isolated => "isolated".to_string(),
+        InstallLayout::Merged => "merged".to_string(),
+    }
+}
+
 fn format_build_type(build_type: &BuildType) -> String {
     match build_type {
         BuildType::AmentCmake => "ament_cmake".blue().to_string(),
@@ -181,17 +210,18 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
     print_section_header("Build Status");
     let package_build_dir = build_base.join(&package.name);
     let package_install_dir = install_base.join(&package.name);
-    let isolated_install = has_isolated_install(&package.name, &install_base);
-    let merged_install = has_merged_install(&package.name, &install_base);
+    let install_layout = detect_install_layout(&package.name, &install_base);
     
-    let build_status = if isolated_install {
-        "✓ Built and installed (isolated)".green()
-    } else if merged_install {
-        "✓ Built and installed (merged)".green()
-    } else if package_build_dir.exists() {
-        "⚠ Partially built (not installed)".yellow()
-    } else {
-        "✗ Not built".red()
+    let build_status = match install_layout {
+        InstallLayout::Isolated => "✓ Built and installed (isolated)".green(),
+        InstallLayout::Merged => "✓ Built and installed (merged)".green(),
+        InstallLayout::None => {
+            if package_build_dir.exists() {
+                "⚠ Partially built (not installed)".yellow()
+            } else {
+                "✗ Not built".red()
+            }
+        }
     };
     
     println!("  {}", build_status);
@@ -200,10 +230,14 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
         println!("  Build directory: {}", package_build_dir.display().to_string().bright_black());
     }
     
-    if isolated_install {
-        println!("  Install directory: {}", package_install_dir.display().to_string().bright_black());
-    } else if merged_install {
-        println!("  Install directory: {}", install_base.display().to_string().bright_black());
+    match install_layout {
+        InstallLayout::Isolated => {
+            println!("  Install directory: {}", package_install_dir.display().to_string().bright_black());
+        }
+        InstallLayout::Merged => {
+            println!("  Install directory: {}", install_base.display().to_string().bright_black());
+        }
+        InstallLayout::None => {}
     }
     
     Ok(())
@@ -232,7 +266,7 @@ pub fn handle(matches: ArgMatches) {
 
 #[cfg(test)]
 mod tests {
-    use super::{has_isolated_install, has_merged_install};
+    use super::{detect_install_layout, has_isolated_install, has_merged_install, InstallLayout};
     use std::fs;
     use tempfile::tempdir;
 
@@ -258,5 +292,16 @@ mod tests {
 
         assert!(!has_isolated_install(package_name, &install_base));
         assert!(has_merged_install(package_name, &install_base));
+    }
+
+    #[test]
+    fn detect_install_layout_returns_merged() {
+        let temp = tempdir().unwrap();
+        let install_base = temp.path().join("install");
+        let package_name = "demo_pkg";
+
+        fs::create_dir_all(install_base.join("share").join(package_name)).unwrap();
+
+        assert_eq!(detect_install_layout(package_name, &install_base), InstallLayout::Merged);
     }
 }
