@@ -5,9 +5,11 @@ use crate::commands::work::build::{ColconBuilder, BuildConfig};
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let mut config = BuildConfig::default();
+    let mut user_provided_base_paths = false;
     
     // Parse command line arguments
     if let Some(base_paths) = matches.get_many::<String>("base_paths") {
+        user_provided_base_paths = true;
         config.base_paths = base_paths.map(PathBuf::from).collect();
     }
     
@@ -45,6 +47,15 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
     // Set build and install directories
     config.build_base = config.workspace_root.join("build");
     config.install_base = config.workspace_root.join("install");
+
+    // Colcon-compatible fallback: if the default `src` path does not exist,
+    // discover packages from the workspace root.
+    if !user_provided_base_paths && !config.workspace_root.join("src").exists() {
+        config.base_paths = vec![config.workspace_root.clone()];
+        println!(
+            "No 'src' directory found; scanning workspace root for packages"
+        );
+    }
     
     // Update isolated mode based on merge_install flag
     config.isolated = !config.merge_install;

@@ -111,6 +111,10 @@ impl ColconBuilder {
 
     pub fn discover_packages(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.packages = package_discovery::discover_packages(&self.config.base_paths)?;
+
+        if self.packages.is_empty() {
+            return Err("No ROS packages found in the selected base paths".into());
+        }
         
         // Apply package filters
         self.apply_package_filters();
