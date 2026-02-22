@@ -1,5 +1,62 @@
 # Changelog
 
+## [0.3.0] - 2026-02-22
+
+### <!-- 0 -->⛰️  Features
+
+- Validate create inputs and escape generated metadata
+- Unify discovery and improve build/create UX
+- Implement MCAP reading and writing for bag commands
+- Native Rust tf frame commands
+- Add ros2_rust as a submodule
+- Add initial TF frame listing functionality
+- Implement native `roc bag list` and `roc bag info`
+- Implement native ROS interface discovery and parsing
+- Implement native action list and info commands
+- Implement native Rust topic delay command
+- Implement native ROS parameter commands
+- Implement revolutionary generic message system
+- Implement dynamic message introspection and type support
+- Add ROS message serialization for dynamic types
+- Implement dynamic type support for RCL publishers
+- Support dynamic message type serialization and deserialization
+- Introduce dynamic message type support
+- Refactor topic handling for improved clarity and robustness
+- Consolidate package discovery and enhance protobuf commands
+- Integrate IDL and protobuf support for message conversion
+- Implement basic topic delay analysis and stub
+- Improve communication robustness and consistency
+- Implement native ROS 2 topic introspection commands
+- Implement core ROS 2 topic commands and graph API
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Support colcon-style build flags and fail fast on empty discovery
+- Disable message publishing
+
+### <!-- 2 -->🚜 Refactor
+
+- Refactor graph module and improve project documentation
+
+### <!-- 3 -->📚 Documentation
+
+- Rewrite README in neutral reference style
+- Document dynamic ROS2 message type loading
+- Clarify `roc topic` status and limitations in `FEATURES.md`
+- Refactor README to highlight workspace management
+- Replace all logo images throughout codebase
+
+### <!-- 6 -->🧪 Testing
+
+- Add merged-install e2e flow coverage
+- Add temp-workspace create/list/info flow
+- Add coverage for status and create validation
+- Enhance dynamic type support loading
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Remove unused test and message files
+
 ## [0.2.3] - 2025-06-19
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks

@@ -1,6 +1,6 @@
+use super::common::capitalize_first_letter;
 /// CMake/C++ specific ROS 2 package templates
 use std::error::Error;
-use super::common::capitalize_first_letter;
 
 pub fn create_cmake_lists(
     package_name: &str,
@@ -140,8 +140,12 @@ int main(int argc, char * argv[])
 }
 
 pub fn create_cpp_header_template(package_name: &str, class_name: &str) -> String {
-    let include_guard = format!("{}__{}__HPP_", package_name.to_uppercase(), class_name.to_uppercase());
-    
+    let include_guard = format!(
+        "{}__{}__HPP_",
+        package_name.to_uppercase(),
+        class_name.to_uppercase()
+    );
+
     format!(
         r#"#ifndef {}
 #define {}

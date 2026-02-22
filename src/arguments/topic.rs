@@ -1,4 +1,4 @@
-use clap::{Command, Arg, ArgAction, ArgMatches};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 
 /// Common topic arguments that are extracted from the parent topic command
 #[derive(Debug, Clone)]

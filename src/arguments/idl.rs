@@ -1,4 +1,4 @@
-use clap::{Command, Arg, ArgAction};
+use clap::{Arg, ArgAction, Command};
 
 pub fn cmd() -> Command {
     Command::new("idl")

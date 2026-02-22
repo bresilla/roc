@@ -3,7 +3,7 @@ members = ["."]
 
 [package]
 name = "rocc"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["Trim Bresilla <trim.bresilla@gmail.com>"]
 description = "Robot Operations Command Center"
 edition = "2021"

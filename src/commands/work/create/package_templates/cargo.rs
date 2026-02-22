@@ -1,6 +1,6 @@
+use super::common::capitalize_first_letter;
 /// Cargo/Rust specific ROS 2 package templates
 use std::error::Error;
-use super::common::capitalize_first_letter;
 
 #[allow(dead_code)]
 pub fn create_cargo_toml(
@@ -210,23 +210,23 @@ mod tests {{
     }}
 }}
 "#,
-        package_name,        // //! {} library
-        package_name,        // //! This library provides functionality for the {} ROS 2 package.
-        package_name,        // /// Main library struct for {}
-        class_name_cap,      // pub struct {} {
-        class_name_cap,      // impl {} {
-        class_name_cap,      // pub fn do_something(&self) -> Result<(), {}Error> {
-        class_name_cap,      // impl Default for {} {
-        package_name,        // /// Custom error type for {}
-        class_name_cap,      // pub enum {}Error {
-        class_name_cap,      // impl fmt::Display for {}Error {
-        class_name_cap,      // {}Error::Generic(msg) => write!(f, "Generic error: {{}}", msg),
-        class_name_cap,      // {}Error::Rclrs(e) => write!(f, "ROS 2 error: {{}}", e),
-        class_name_cap,      // impl std::error::Error for {}Error {}
-        class_name_cap,      // impl From<RclrsError> for {}Error {
-        class_name_cap,      // {}Error::Rclrs(error)
-        class_name_cap,      // let lib = {}::new();
-        class_name_cap,      // let lib = {}::with_name("test".to_string());
-        class_name_cap       // let lib = {}::new();
+        package_name,   // //! {} library
+        package_name,   // //! This library provides functionality for the {} ROS 2 package.
+        package_name,   // /// Main library struct for {}
+        class_name_cap, // pub struct {} {
+        class_name_cap, // impl {} {
+        class_name_cap, // pub fn do_something(&self) -> Result<(), {}Error> {
+        class_name_cap, // impl Default for {} {
+        package_name,   // /// Custom error type for {}
+        class_name_cap, // pub enum {}Error {
+        class_name_cap, // impl fmt::Display for {}Error {
+        class_name_cap, // {}Error::Generic(msg) => write!(f, "Generic error: {{}}", msg),
+        class_name_cap, // {}Error::Rclrs(e) => write!(f, "ROS 2 error: {{}}", e),
+        class_name_cap, // impl std::error::Error for {}Error {}
+        class_name_cap, // impl From<RclrsError> for {}Error {
+        class_name_cap, // {}Error::Rclrs(error)
+        class_name_cap, // let lib = {}::new();
+        class_name_cap, // let lib = {}::with_name("test".to_string());
+        class_name_cap  // let lib = {}::new();
     )
 }
