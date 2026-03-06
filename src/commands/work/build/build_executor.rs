@@ -653,12 +653,45 @@ impl<'a> BuildExecutor<'a> {
         &self,
         packages: &[PackageMeta],
     ) -> Result<(), Box<dyn std::error::Error>> {
+        self.generate_package_metadata_files(packages)?;
+
         let install_dir = self.config.install_base.clone();
 
         if self.config.merge_install {
             self.generate_merged_setup_scripts(&install_dir)?;
         } else {
             self.generate_isolated_setup_scripts(&install_dir, packages)?;
+        }
+
+        Ok(())
+    }
+
+    fn generate_package_metadata_files(
+        &self,
+        packages: &[PackageMeta],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let metadata_dir = self
+            .config
+            .install_base
+            .join("share")
+            .join("colcon-core")
+            .join("packages");
+        fs::create_dir_all(&metadata_dir)?;
+
+        let built_packages: HashSet<&str> = self.install_paths.keys().map(|name| name.as_str()).collect();
+        for package in packages {
+            if !self.install_paths.contains_key(&package.name) {
+                continue;
+            }
+
+            let runtime_deps = package
+                .runtime_deps()
+                .into_iter()
+                .filter(|dep| built_packages.contains(dep.as_str()))
+                .collect::<Vec<_>>();
+            let metadata_path = metadata_dir.join(&package.name);
+            let metadata_contents = runtime_deps.join("\n");
+            fs::write(metadata_path, metadata_contents)?;
         }
 
         Ok(())
@@ -846,7 +879,8 @@ fi
 #[cfg(test)]
 mod tests {
     use super::BuildExecutor;
-    use crate::commands::work::build::BuildConfig;
+    use crate::commands::work::build::{BuildConfig, BuildType, PackageMeta};
+    use std::path::PathBuf;
     use tempfile::tempdir;
 
     #[test]
@@ -870,5 +904,66 @@ mod tests {
         assert!(config.install_base.join("COLCON_IGNORE").exists());
         assert!(config.log_base.join("COLCON_IGNORE").exists());
         assert!(config.log_base.join("latest").join("COLCON_IGNORE").exists());
+    }
+
+    #[test]
+    fn generate_package_metadata_files_writes_workspace_runtime_dependencies() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let mut executor = BuildExecutor::new(&config);
+        executor
+            .install_paths
+            .insert("base_pkg".to_string(), config.install_base.join("base_pkg"));
+        executor.install_paths.insert(
+            "consumer_pkg".to_string(),
+            config.install_base.join("consumer_pkg"),
+        );
+
+        let packages = vec![
+            PackageMeta {
+                name: "base_pkg".to_string(),
+                path: PathBuf::from("/tmp/base_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "base".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: Vec::new(),
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
+                exec_deps: Vec::new(),
+                test_deps: Vec::new(),
+            },
+            PackageMeta {
+                name: "consumer_pkg".to_string(),
+                path: PathBuf::from("/tmp/consumer_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "consumer".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: vec!["base_pkg".to_string()],
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: vec!["external_pkg".to_string()],
+                exec_deps: vec!["base_pkg".to_string()],
+                test_deps: Vec::new(),
+            },
+        ];
+
+        executor.generate_package_metadata_files(&packages).unwrap();
+
+        let metadata_root = config.install_base.join("share/colcon-core/packages");
+        assert_eq!(
+            std::fs::read_to_string(metadata_root.join("base_pkg")).unwrap(),
+            ""
+        );
+        assert_eq!(
+            std::fs::read_to_string(metadata_root.join("consumer_pkg")).unwrap(),
+            "base_pkg"
+        );
     }
 }
