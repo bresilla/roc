@@ -19,6 +19,6 @@ pub fn handle(matches: ArgMatches) {
 }
 
 pub mod echo;
-pub mod list;
 pub mod info;
+pub mod list;
 pub mod pub_;

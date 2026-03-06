@@ -1,15 +1,15 @@
-pub mod get;
-pub mod list;
-pub mod set;
-pub mod export;
-pub mod remove;
 pub mod describe;
+pub mod export;
+pub mod get;
 pub mod import;
+pub mod list;
+pub mod remove;
+pub mod set;
 
-use clap::ArgMatches;
 use crate::arguments::param::CommonParamArgs;
+use clap::ArgMatches;
 
-pub fn handle(matches: ArgMatches){
+pub fn handle(matches: ArgMatches) {
     // Extract common param arguments from the parent command
     let common_args = CommonParamArgs::from_matches(&matches);
 

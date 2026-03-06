@@ -1,7 +1,7 @@
+use crate::arguments::action::CommonActionArgs;
 use clap::ArgMatches;
 use std::process::Stdio;
 use tokio::process::Command;
-use crate::arguments::action::CommonActionArgs;
 
 async fn run_command(
     matches: ArgMatches,
@@ -47,7 +47,7 @@ async fn run_command(
     Ok(())
 }
 
-pub fn handle(matches: ArgMatches, common_args: CommonActionArgs){
+pub fn handle(matches: ArgMatches, common_args: CommonActionArgs) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let _ = rt.block_on(run_command(matches, common_args));
 }

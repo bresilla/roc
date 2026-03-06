@@ -1,12 +1,12 @@
 pub mod call;
 pub mod find;
-pub mod list;
 pub mod kind;
+pub mod list;
 
-use clap::ArgMatches;
 use crate::arguments::service::CommonServiceArgs;
+use clap::ArgMatches;
 
-pub fn handle(matches: ArgMatches){
+pub fn handle(matches: ArgMatches) {
     // Extract common service arguments from the parent command
     let common_args = CommonServiceArgs::from_matches(&matches);
 

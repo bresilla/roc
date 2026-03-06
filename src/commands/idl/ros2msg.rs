@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 struct Ros2MsgConversionOptions {
     msg_files: Vec<PathBuf>,
-    output_dir: Option<PathBuf>,  // None means inplace, Some means explicit output directory
+    output_dir: Option<PathBuf>, // None means inplace, Some means explicit output directory
     package_name: Option<String>,
     verbose: bool,
     dry_run: bool,
@@ -20,8 +20,9 @@ impl Ros2MsgConversionOptions {
             .map(PathBuf::from)
             .collect();
 
-        let output_dir = matches.get_one::<String>("output_dir")
-            .filter(|s| *s != ".")  // If it's "." (default), treat as None for inplace
+        let output_dir = matches
+            .get_one::<String>("output_dir")
+            .filter(|s| *s != ".") // If it's "." (default), treat as None for inplace
             .map(PathBuf::from);
 
         let package_name = matches.get_one::<String>("package_name").cloned();
@@ -103,12 +104,13 @@ fn convert_ros2msg_to_protobuf(options: &Ros2MsgConversionOptions) -> Result<()>
             None => msg_file.parent().unwrap_or(Path::new(".")).to_path_buf(),
         };
 
-        let msg_name = msg_file.file_stem()
+        let msg_name = msg_file
+            .file_stem()
             .and_then(|s| s.to_str())
             .ok_or_else(|| anyhow!("Invalid message file name: {:?}", msg_file))?;
-        
+
         let output_file = output_dir.join(format!("{}.proto", msg_name));
-        
+
         if options.verbose {
             println!("   Generated: {}", output_file.display());
         }
@@ -120,10 +122,11 @@ fn convert_ros2msg_to_protobuf(options: &Ros2MsgConversionOptions) -> Result<()>
         } else {
             // Create the directory if it doesn't exist (for inplace mode)
             if let Some(parent) = output_file.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| anyhow!("Failed to create directory {}: {}", parent.display(), e))?;
+                fs::create_dir_all(parent).map_err(|e| {
+                    anyhow!("Failed to create directory {}: {}", parent.display(), e)
+                })?;
             }
-            
+
             fs::write(&output_file, proto_content)
                 .map_err(|e| anyhow!("Failed to write proto file: {}", e))?;
         }
@@ -132,16 +135,21 @@ fn convert_ros2msg_to_protobuf(options: &Ros2MsgConversionOptions) -> Result<()>
     Ok(())
 }
 
-fn parse_msg_to_proto(msg_content: &str, msg_file: &Path, package_name: &Option<String>) -> Result<String> {
-    let msg_name = msg_file.file_stem()
+fn parse_msg_to_proto(
+    msg_content: &str,
+    msg_file: &Path,
+    package_name: &Option<String>,
+) -> Result<String> {
+    let msg_name = msg_file
+        .file_stem()
         .and_then(|s| s.to_str())
         .ok_or_else(|| anyhow!("Invalid message file name: {:?}", msg_file))?;
 
     let mut proto_content = String::new();
-    
+
     // Add proto syntax
     proto_content.push_str("syntax = \"proto3\";\n\n");
-    
+
     // Add package declaration
     if let Some(pkg) = package_name {
         proto_content.push_str(&format!("package {};\n\n", pkg));
@@ -150,21 +158,21 @@ fn parse_msg_to_proto(msg_content: &str, msg_file: &Path, package_name: &Option<
         let derived_package = derive_package_name_from_path(msg_file);
         proto_content.push_str(&format!("package {};\n\n", derived_package));
     }
-    
+
     // Parse message fields
     let fields = parse_ros2_message_fields(msg_content)?;
-    
+
     // Generate protobuf message
     proto_content.push_str(&format!("message {} {{\n", msg_name));
-    
+
     for (i, field) in fields.iter().enumerate() {
         let field_number = i + 1;
         let proto_field = convert_ros2_field_to_proto(field, field_number)?;
         proto_content.push_str(&format!("  {}\n", proto_field));
     }
-    
+
     proto_content.push_str("}\n");
-    
+
     Ok(proto_content)
 }
 
@@ -179,42 +187,46 @@ struct Ros2Field {
 
 fn parse_ros2_message_fields(content: &str) -> Result<Vec<Ros2Field>> {
     let mut fields = Vec::new();
-    
+
     for line in content.lines() {
         let line = line.trim();
-        
+
         // Skip empty lines and comments
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        
+
         // Parse field: "type name" or "type[] name" with optional comment
         let (field_part, comment) = if let Some(comment_pos) = line.find('#') {
-            (line[..comment_pos].trim(), Some(line[comment_pos+1..].trim().to_string()))
+            (
+                line[..comment_pos].trim(),
+                Some(line[comment_pos + 1..].trim().to_string()),
+            )
         } else {
             (line, None)
         };
-        
+
         let parts: Vec<&str> = field_part.split_whitespace().collect();
         if parts.len() != 2 {
             continue; // Skip malformed lines
         }
-        
+
         let field_type = parts[0];
         let field_name = parts[1];
-        
+
         // Check if it's an array type
         let (base_type, is_array) = if field_type.ends_with("[]") {
             (field_type.strip_suffix("[]").unwrap(), true)
         } else {
             (field_type, false)
         };
-        
+
         // Check if it's optional (from comment)
-        let is_optional = comment.as_ref()
+        let is_optional = comment
+            .as_ref()
             .map(|c| c.contains("optional"))
             .unwrap_or(false);
-        
+
         fields.push(Ros2Field {
             field_type: base_type.to_string(),
             field_name: field_name.to_string(),
@@ -223,40 +235,43 @@ fn parse_ros2_message_fields(content: &str) -> Result<Vec<Ros2Field>> {
             comment,
         });
     }
-    
+
     Ok(fields)
 }
 
 fn convert_ros2_field_to_proto(field: &Ros2Field, field_number: usize) -> Result<String> {
     let proto_type = convert_ros2_type_to_proto(&field.field_type);
-    
+
     let mut proto_field = String::new();
-    
+
     // Add repeated if it's an array
     if field.is_array {
         proto_field.push_str("repeated ");
     } else if field.is_optional {
         proto_field.push_str("optional ");
     }
-    
-    proto_field.push_str(&format!("{} {} = {}", proto_type, field.field_name, field_number));
-    
+
+    proto_field.push_str(&format!(
+        "{} {} = {}",
+        proto_type, field.field_name, field_number
+    ));
+
     // Add comment if present
     if let Some(comment) = &field.comment {
         proto_field.push_str(&format!(";  // {}", comment));
     } else {
         proto_field.push(';');
     }
-    
+
     Ok(proto_field)
 }
 
 fn convert_ros2_type_to_proto(ros2_type: &str) -> String {
     match ros2_type {
         "bool" => "bool".to_string(),
-        "int8" => "int32".to_string(),  // Proto3 doesn't have int8
-        "uint8" => "uint32".to_string(), // Proto3 doesn't have uint8
-        "int16" => "int32".to_string(), // Proto3 doesn't have int16
+        "int8" => "int32".to_string(),    // Proto3 doesn't have int8
+        "uint8" => "uint32".to_string(),  // Proto3 doesn't have uint8
+        "int16" => "int32".to_string(),   // Proto3 doesn't have int16
         "uint16" => "uint32".to_string(), // Proto3 doesn't have uint16
         "int32" => "int32".to_string(),
         "uint32" => "uint32".to_string(),
@@ -285,7 +300,7 @@ fn derive_package_name_from_path(msg_file: &Path) -> String {
             return dir_name.replace('-', "_").replace(' ', "_").to_lowercase();
         }
     }
-    
+
     // Default package name
     "generated_messages".to_string()
 }

@@ -1,9 +1,9 @@
+use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
+use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
-use std::fs;
-use anyhow::Result;
-use crate::shared::package_discovery::{discover_packages, DiscoveryConfig, BuildType};
 use roxmltree::Document;
+use std::fs;
 
 fn has_isolated_install(package_name: &str, install_base: &std::path::Path) -> bool {
     install_base.join(package_name).exists()
@@ -99,7 +99,8 @@ fn extract_urls(xml_content: &str) -> Vec<(String, String)> {
             .filter(|n| n.has_tag_name("url"))
             .filter_map(|n| {
                 let url_type = n.attribute("type").unwrap_or("website");
-                n.text().map(|text| (url_type.to_string(), text.to_string()))
+                n.text()
+                    .map(|text| (url_type.to_string(), text.to_string()))
             })
             .collect()
     } else {
@@ -107,13 +108,16 @@ fn extract_urls(xml_content: &str) -> Vec<(String, String)> {
     }
 }
 
-async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path::PathBuf) -> Result<()> {
+async fn run_command_in_workspace(
+    matches: ArgMatches,
+    workspace_root: std::path::PathBuf,
+) -> Result<()> {
     let package_name = matches.get_one::<String>("PACKAGE_NAME").unwrap();
     let show_xml = matches.get_flag("xml");
 
     let build_base = workspace_root.join("build");
     let install_base = workspace_root.join("install");
-    
+
     // Use the new shared discovery system
     let config = DiscoveryConfig {
         base_paths: vec![workspace_root.clone()],
@@ -130,41 +134,62 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
             "__pycache__".to_string(),
         ],
     };
-    
+
     let packages = discover_packages(&config)?;
-    
+
     // Find the requested package
-    let package = packages.iter()
+    let package = packages
+        .iter()
         .find(|pkg| pkg.name == *package_name)
         .ok_or_else(|| anyhow::anyhow!("Package '{}' not found in workspace", package_name))?;
-    
+
     let package_xml_path = package.path.join("package.xml");
-    
+
     if show_xml {
         // Just print the raw XML content
         let xml_content = fs::read_to_string(&package_xml_path)?;
         println!("{}", xml_content);
         return Ok(());
     }
-    
+
     // Parse the XML for detailed information
     let xml_content = fs::read_to_string(&package_xml_path)?;
-    
+
     // Print package header
     println!("{}", "Package Information".bright_cyan().bold());
     println!("{}", "=".repeat(50).bright_black());
-    
+
     // Basic information
-    println!("{}: {}", "Name".bright_yellow().bold(), package.name.bright_white().bold());
-    println!("{}: {}", "Version".bright_yellow().bold(), package.version.bright_white());
-    println!("{}: {}", "Build Type".bright_yellow().bold(), format_build_type(&package.build_type));
-    println!("{}: {}", "Path".bright_yellow().bold(), package.path.display().to_string().bright_black());
-    
+    println!(
+        "{}: {}",
+        "Name".bright_yellow().bold(),
+        package.name.bright_white().bold()
+    );
+    println!(
+        "{}: {}",
+        "Version".bright_yellow().bold(),
+        package.version.bright_white()
+    );
+    println!(
+        "{}: {}",
+        "Build Type".bright_yellow().bold(),
+        format_build_type(&package.build_type)
+    );
+    println!(
+        "{}: {}",
+        "Path".bright_yellow().bold(),
+        package.path.display().to_string().bright_black()
+    );
+
     // Description
     if !package.description.is_empty() {
-        println!("{}: {}", "Description".bright_yellow().bold(), package.description.bright_white());
+        println!(
+            "{}: {}",
+            "Description".bright_yellow().bold(),
+            package.description.bright_white()
+        );
     }
-    
+
     // Maintainers
     if !package.maintainers.is_empty() {
         print_section_header("Maintainers");
@@ -172,7 +197,7 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
             println!("  • {}", maintainer.bright_white());
         }
     }
-    
+
     // Authors
     let authors = extract_authors(&xml_content);
     if !authors.is_empty() {
@@ -181,7 +206,7 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
             println!("  • {}", author.bright_white());
         }
     }
-    
+
     // Licenses
     let licenses = extract_licenses(&xml_content);
     if !licenses.is_empty() {
@@ -190,7 +215,7 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
             println!("  • {}", license.bright_white());
         }
     }
-    
+
     // URLs
     let urls = extract_urls(&xml_content);
     if !urls.is_empty() {
@@ -199,22 +224,25 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
             println!("  • {}: {}", url_type.bright_magenta(), url.bright_white());
         }
     }
-    
+
     // Dependencies
     print_dependencies(&package.depend_deps, "Generic Dependencies");
     print_dependencies(&package.build_deps, "Build Dependencies");
     print_dependencies(&package.buildtool_deps, "Build Tool Dependencies");
     print_dependencies(&package.build_export_deps, "Build Export Dependencies");
     print_dependencies(&package.exec_deps, "Execution Dependencies");
-    print_dependencies(&package.runtime_deps(), "Derived Runtime/Setup Dependencies");
+    print_dependencies(
+        &package.runtime_deps(),
+        "Derived Runtime/Setup Dependencies",
+    );
     print_dependencies(&package.test_deps, "Test Dependencies");
-    
+
     // Build status
     print_section_header("Build Status");
     let package_build_dir = build_base.join(&package.name);
     let package_install_dir = install_base.join(&package.name);
     let install_layout = detect_install_layout(&package.name, &install_base);
-    
+
     let build_status = match install_layout {
         InstallLayout::Isolated => "✓ Built and installed (isolated)".green(),
         InstallLayout::Merged => "✓ Built and installed (merged)".green(),
@@ -226,23 +254,32 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
             }
         }
     };
-    
+
     println!("  {}", build_status);
-    
+
     if package_build_dir.exists() {
-        println!("  Build directory: {}", package_build_dir.display().to_string().bright_black());
+        println!(
+            "  Build directory: {}",
+            package_build_dir.display().to_string().bright_black()
+        );
     }
-    
+
     match install_layout {
         InstallLayout::Isolated => {
-            println!("  Install directory: {}", package_install_dir.display().to_string().bright_black());
+            println!(
+                "  Install directory: {}",
+                package_install_dir.display().to_string().bright_black()
+            );
         }
         InstallLayout::Merged => {
-            println!("  Install directory: {}", install_base.display().to_string().bright_black());
+            println!(
+                "  Install directory: {}",
+                install_base.display().to_string().bright_black()
+            );
         }
         InstallLayout::None => {}
     }
-    
+
     Ok(())
 }
 
@@ -305,6 +342,9 @@ mod tests {
 
         fs::create_dir_all(install_base.join("share").join(package_name)).unwrap();
 
-        assert_eq!(detect_install_layout(package_name, &install_base), InstallLayout::Merged);
+        assert_eq!(
+            detect_install_layout(package_name, &install_base),
+            InstallLayout::Merged
+        );
     }
 }

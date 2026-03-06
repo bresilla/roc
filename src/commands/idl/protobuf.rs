@@ -14,7 +14,7 @@ enum ConversionDirection {
 #[derive(Debug, Clone)]
 struct ProtobufConversionOptions {
     input_files: Vec<PathBuf>,
-    output_dir: Option<PathBuf>,  // None means inplace, Some means explicit output directory
+    output_dir: Option<PathBuf>, // None means inplace, Some means explicit output directory
     package_name: Option<String>,
     config_file: Option<PathBuf>,
     include_dirs: Vec<PathBuf>,
@@ -44,13 +44,14 @@ impl ProtobufConversionOptions {
             None // Will be determined per project during discovery
         };
 
-        let output_dir = matches.get_one::<String>("output_dir")
-            .filter(|s| *s != ".")  // If it's "." (default), treat as None for inplace
+        let output_dir = matches
+            .get_one::<String>("output_dir")
+            .filter(|s| *s != ".") // If it's "." (default), treat as None for inplace
             .map(PathBuf::from);
 
         let package_name = matches.get_one::<String>("package_name").cloned();
         let config_file = matches.get_one::<String>("config_file").map(PathBuf::from);
-        
+
         let include_dirs: Vec<PathBuf> = matches
             .get_many::<String>("include_dirs")
             .map(|values| values.map(PathBuf::from).collect())
@@ -104,7 +105,9 @@ fn detect_conversion_direction(files: &[PathBuf]) -> Result<ConversionDirection>
     }
 
     if proto_count > 0 && msg_count > 0 {
-        return Err(anyhow!("Cannot mix .proto and .msg files in the same conversion"));
+        return Err(anyhow!(
+            "Cannot mix .proto and .msg files in the same conversion"
+        ));
     }
 
     if proto_count > 0 {
@@ -164,7 +167,10 @@ fn handle_discovery_mode(options: &ProtobufConversionOptions) -> Result<()> {
             println!("   Try specifying a different search root with --search-root <path>");
             println!("   or use 'roc idl protobuf <files>' to convert specific files.");
         } else {
-            println!("⚠️  No ROS2 packages with IDL files found in {}.", options.search_root.display());
+            println!(
+                "⚠️  No ROS2 packages with IDL files found in {}.",
+                options.search_root.display()
+            );
         }
         return Ok(());
     }
@@ -192,7 +198,11 @@ fn handle_discovery_mode(options: &ProtobufConversionOptions) -> Result<()> {
             };
 
             if let Err(e) = convert_proto_to_msg(&proto_options) {
-                eprintln!("Error converting proto files in {}: {}", project.package_path.display(), e);
+                eprintln!(
+                    "Error converting proto files in {}: {}",
+                    project.package_path.display(),
+                    e
+                );
                 continue;
             }
         }
@@ -214,7 +224,11 @@ fn handle_discovery_mode(options: &ProtobufConversionOptions) -> Result<()> {
             };
 
             if let Err(e) = convert_msg_to_proto(&msg_options) {
-                eprintln!("Error converting msg files in {}: {}", project.package_path.display(), e);
+                eprintln!(
+                    "Error converting msg files in {}: {}",
+                    project.package_path.display(),
+                    e
+                );
                 continue;
             }
         }
@@ -329,9 +343,9 @@ fn convert_proto_files_to_msg(options: &ProtobufConversionOptions) -> Result<()>
                 Some(dir) => dir.clone(),
                 None => proto_file.parent().unwrap_or(Path::new(".")).to_path_buf(),
             };
-            
+
             let output_file = output_dir.join(format!("{}.msg", message_name));
-            
+
             if options.verbose {
                 println!("   Generated: {}", output_file.display());
             }
@@ -343,10 +357,11 @@ fn convert_proto_files_to_msg(options: &ProtobufConversionOptions) -> Result<()>
             } else {
                 // Create the directory if it doesn't exist (for inplace mode)
                 if let Some(parent) = output_file.parent() {
-                    fs::create_dir_all(parent)
-                        .map_err(|e| anyhow!("Failed to create directory {}: {}", parent.display(), e))?;
+                    fs::create_dir_all(parent).map_err(|e| {
+                        anyhow!("Failed to create directory {}: {}", parent.display(), e)
+                    })?;
                 }
-                
+
                 fs::write(&output_file, message_content)
                     .map_err(|e| anyhow!("Failed to write message file: {}", e))?;
             }
@@ -358,7 +373,7 @@ fn convert_proto_files_to_msg(options: &ProtobufConversionOptions) -> Result<()>
 
 fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(String, String)>> {
     // Enhanced parser that handles complex protobuf features including nested messages
-    
+
     let mut messages = Vec::new();
     let mut _enums: Vec<String> = Vec::new();
     let mut message_stack: Vec<String> = Vec::new(); // Track nested message context
@@ -406,7 +421,7 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
     // Second pass: actual parsing with context
     for line in proto_content.lines() {
         let line = line.trim();
-        
+
         // Skip comments and empty lines
         if line.is_empty() || line.starts_with("//") || line.starts_with('#') {
             continue;
@@ -422,7 +437,7 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
                 };
                 current_enum_values.clear();
                 bracket_count = 0;
-                
+
                 // Process enum when complete (simplified for this example)
                 if bracket_count == 0 {
                     let enum_content = "# Enum placeholder\nint32 value\n".to_string();
@@ -439,7 +454,7 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
                 } else {
                     format!("{}{}", message_stack.join(""), msg_name)
                 };
-                
+
                 message_stack.push(msg_name);
                 current_fields.clear();
                 oneof_fields.clear();
@@ -463,9 +478,13 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
         if !message_stack.is_empty() {
             if current_oneof.is_some() {
                 // Handle oneof fields
-                if let Some(ros_field) = parse_field_to_ros2_with_nested_context(line, &message_stack, &nested_types) {
+                if let Some(ros_field) =
+                    parse_field_to_ros2_with_nested_context(line, &message_stack, &nested_types)
+                {
                     let oneof_name = current_oneof.as_ref().unwrap();
-                    if let Some((_, fields)) = oneof_fields.iter_mut().find(|(name, _)| name == oneof_name) {
+                    if let Some((_, fields)) =
+                        oneof_fields.iter_mut().find(|(name, _)| name == oneof_name)
+                    {
                         fields.push(ros_field);
                     } else {
                         oneof_fields.push((oneof_name.clone(), vec![ros_field]));
@@ -473,7 +492,9 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
                 }
             } else {
                 // Handle regular fields
-                if let Some(ros_field) = parse_field_to_ros2_with_nested_context(line, &message_stack, &nested_types) {
+                if let Some(ros_field) =
+                    parse_field_to_ros2_with_nested_context(line, &message_stack, &nested_types)
+                {
                     current_fields.push(ros_field);
                 }
             }
@@ -488,20 +509,21 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
         if close_brackets > 0 && !message_stack.is_empty() {
             let _current_msg_name = message_stack.last().unwrap().clone();
             let full_msg_name = message_stack.join("");
-            
+
             // Generate oneof helper messages first
             for (oneof_name, oneof_field_list) in &oneof_fields {
-                let oneof_msg_name = format!("{}OneOf{}", full_msg_name, capitalize_first(oneof_name));
+                let oneof_msg_name =
+                    format!("{}OneOf{}", full_msg_name, capitalize_first(oneof_name));
                 let oneof_content = generate_oneof_message_content(&oneof_field_list, oneof_name);
                 messages.push((oneof_msg_name.clone(), oneof_content));
-                
+
                 // Add the oneof field to the main message
                 current_fields.push(format!("{} {}", oneof_msg_name, oneof_name));
             }
-            
+
             let message_content = generate_ros2_message_content(&current_fields);
             messages.push((full_msg_name, message_content));
-            
+
             // Pop the current message from stack
             message_stack.pop();
             current_fields.clear();
@@ -510,7 +532,10 @@ fn parse_proto_to_ros2(proto_content: &str, proto_file: &Path) -> Result<Vec<(St
     }
 
     if messages.is_empty() {
-        return Err(anyhow!("No messages or enums found in proto file: {}", proto_file.display()));
+        return Err(anyhow!(
+            "No messages or enums found in proto file: {}",
+            proto_file.display()
+        ));
     }
 
     Ok(messages)
@@ -530,15 +555,19 @@ fn extract_message_name(line: &str) -> Option<String> {
 fn parse_field_to_ros2_with_context(line: &str, message_context: &[String]) -> Option<String> {
     // Enhanced field parsing with support for nested message context
     let line = line.trim();
-    
+
     // Skip empty lines and comments
     if line.is_empty() || line.starts_with("//") || line.starts_with('#') {
         return None;
     }
-    
+
     // Skip structural lines but not field definitions
-    if line.starts_with("enum") || line.starts_with("message") || line.starts_with("oneof") ||
-       line == "{" || line == "}" {
+    if line.starts_with("enum")
+        || line.starts_with("message")
+        || line.starts_with("oneof")
+        || line == "{"
+        || line == "}"
+    {
         return None;
     }
 
@@ -590,7 +619,7 @@ fn parse_field_to_ros2_with_context(line: &str, message_context: &[String]) -> O
 
     let proto_type = parts[type_start_idx];
     let field_name = parts[type_start_idx + 1];
-    
+
     // Handle map types first
     if clean_line.contains("map<") {
         return handle_map_type(clean_line, field_name);
@@ -624,22 +653,22 @@ fn parse_field_to_ros2_with_context(line: &str, message_context: &[String]) -> O
 #[allow(dead_code)]
 fn resolve_type_with_context(proto_type: &str, message_context: &[String]) -> String {
     // Enhanced type resolution with proper nested message handling
-    
+
     // Handle qualified type names like "Robot.Status" or "Factory.Building.Room"
     if proto_type.contains('.') {
         let parts: Vec<&str> = proto_type.split('.').collect();
-        
+
         // Always flatten qualified names by joining all parts
         // "Robot.Status" -> "RobotStatus"
         // "Factory.Building.Room" -> "FactoryBuildingRoom"
         return parts.join("");
     }
-    
+
     // Convert protobuf primitive types to ROS2 types
     match proto_type {
         "bool" => "bool".to_string(),
         "int32" | "sint32" | "sfixed32" => "int32".to_string(),
-        "int64" | "sint64" | "sfixed64" => "int64".to_string(), 
+        "int64" | "sint64" | "sfixed64" => "int64".to_string(),
         "uint32" | "fixed32" => "uint32".to_string(),
         "uint64" | "fixed64" => "uint64".to_string(),
         "float" => "float32".to_string(),
@@ -650,7 +679,7 @@ fn resolve_type_with_context(proto_type: &str, message_context: &[String]) -> St
             // This is a custom message type
             // Only apply context prefixing if we're inside a nested message definition
             // and the type name looks like it could be a sibling nested type
-            
+
             // For now, let's be more conservative about when we apply context.
             // We'll only apply for types that are simple identifiers
             // and only when we're actually inside a nested context (not at the top level)
@@ -663,7 +692,7 @@ fn resolve_type_with_context(proto_type: &str, message_context: &[String]) -> St
                 // This is a heuristic: if the type starts with capital letter and is short,
                 // it might be a nested type. But for now, let's be conservative.
                 // In the future, we could track which types are actually defined as nested.
-                
+
                 // For now, don't apply context to avoid false positives like "Robot" -> "MissionRobot"
                 proto_type.to_string()
             } else {
@@ -674,18 +703,26 @@ fn resolve_type_with_context(proto_type: &str, message_context: &[String]) -> St
     }
 }
 
-fn parse_field_to_ros2_with_nested_context(line: &str, message_context: &[String], _nested_types: &std::collections::HashSet<String>) -> Option<String> {
+fn parse_field_to_ros2_with_nested_context(
+    line: &str,
+    message_context: &[String],
+    _nested_types: &std::collections::HashSet<String>,
+) -> Option<String> {
     // Enhanced field parsing with support for nested message context and knowledge of defined nested types
     let line = line.trim();
-    
+
     // Skip empty lines and comments
     if line.is_empty() || line.starts_with("//") || line.starts_with('#') {
         return None;
     }
-    
+
     // Skip structural lines but not field definitions
-    if line.starts_with("enum") || line.starts_with("message") || line.starts_with("oneof") ||
-       line == "{" || line == "}" {
+    if line.starts_with("enum")
+        || line.starts_with("message")
+        || line.starts_with("oneof")
+        || line == "{"
+        || line == "}"
+    {
         return None;
     }
 
@@ -737,14 +774,18 @@ fn parse_field_to_ros2_with_nested_context(line: &str, message_context: &[String
 
     let proto_type = parts[type_start_idx];
     let field_name = parts[type_start_idx + 1];
-    
+
     // Handle map types first
     if clean_line.contains("map<") {
         return handle_map_type(clean_line, field_name);
     }
 
     // Resolve the type name with proper context handling
-    let ros2_type = resolve_type_with_nested_context(proto_type, message_context, &std::collections::HashSet::new());
+    let ros2_type = resolve_type_with_nested_context(
+        proto_type,
+        message_context,
+        &std::collections::HashSet::new(),
+    );
 
     // Handle repeated fields
     let final_type = if is_repeated {
@@ -768,24 +809,28 @@ fn parse_field_to_ros2_with_nested_context(line: &str, message_context: &[String
     Some(field_definition)
 }
 
-fn resolve_type_with_nested_context(proto_type: &str, message_context: &[String], nested_types: &std::collections::HashSet<String>) -> String {
+fn resolve_type_with_nested_context(
+    proto_type: &str,
+    message_context: &[String],
+    nested_types: &std::collections::HashSet<String>,
+) -> String {
     // Enhanced type resolution with knowledge of defined nested types
-    
+
     // Handle qualified type names like "Robot.Status" or "Factory.Building.Room"
     if proto_type.contains('.') {
         let parts: Vec<&str> = proto_type.split('.').collect();
-        
+
         // Always flatten qualified names by joining all parts
         // "Robot.Status" -> "RobotStatus"
         // "Factory.Building.Room" -> "FactoryBuildingRoom"
         return parts.join("");
     }
-    
+
     // Convert protobuf primitive types to ROS2 types
     match proto_type {
         "bool" => "bool".to_string(),
         "int32" | "sint32" | "sfixed32" => "int32".to_string(),
-        "int64" | "sint64" | "sfixed64" => "int64".to_string(), 
+        "int64" | "sint64" | "sfixed64" => "int64".to_string(),
         "uint32" | "fixed32" => "uint32".to_string(),
         "uint64" | "fixed64" => "uint64".to_string(),
         "float" => "float32".to_string(),
@@ -797,13 +842,13 @@ fn resolve_type_with_nested_context(proto_type: &str, message_context: &[String]
             // Check if this is a known nested type that needs context prefixing
             if !message_context.is_empty() {
                 let potential_nested_type = format!("{}{}", message_context.join(""), proto_type);
-                
+
                 // If this potential nested type is in our known nested types, use it
                 if nested_types.contains(&potential_nested_type) {
                     return potential_nested_type;
                 }
             }
-            
+
             // Also check if this type exists as a top-level type
             // If not, and we're in a context, it might be a nested type we should prefix
             // This handles cases like "Room" inside "FactoryBuilding" where we should use "FactoryBuildingRoom"
@@ -812,24 +857,28 @@ fn resolve_type_with_nested_context(proto_type: &str, message_context: &[String]
                 for i in 0..message_context.len() {
                     let context_slice = &message_context[i..];
                     let full_context_type = format!("{}{}", context_slice.join(""), proto_type);
-                    
+
                     // Check if this full type exists in our nested types
                     if nested_types.contains(&full_context_type) {
                         return full_context_type;
                     }
                 }
-                
+
                 // For any context level, if type looks like a nested type name, try prefixing with full context
                 let full_context = message_context.join("");
                 let potential_type = format!("{}{}", full_context, proto_type);
-                
+
                 // If this type name follows the pattern of being a nested type (capitalized, short)
                 // and we're inside a parent message, assume it's a nested reference
-                if proto_type.chars().next().map_or(false, |c| c.is_uppercase()) {
+                if proto_type
+                    .chars()
+                    .next()
+                    .map_or(false, |c| c.is_uppercase())
+                {
                     return potential_type;
                 }
             }
-            
+
             // Otherwise, use the type as-is
             proto_type.to_string()
         }
@@ -840,7 +889,7 @@ fn convert_proto_type_to_ros2(proto_type: &str) -> &str {
     match proto_type {
         "bool" => "bool",
         "int32" | "sint32" | "sfixed32" => "int32",
-        "int64" | "sint64" | "sfixed64" => "int64", 
+        "int64" | "sint64" | "sfixed64" => "int64",
         "uint32" | "fixed32" => "uint32",
         "uint64" | "fixed64" => "uint64",
         "float" => "float32",
@@ -855,20 +904,23 @@ fn handle_map_type(line: &str, field_name: &str) -> Option<String> {
     // Parse map<key_type, value_type> field_name = number;
     if let Some(start) = line.find("map<") {
         if let Some(end) = line[start..].find('>') {
-            let end = start + end;  // Adjust for the offset
+            let end = start + end; // Adjust for the offset
             let map_content = &line[start + 4..end];
             let types: Vec<&str> = map_content.split(',').map(|s| s.trim()).collect();
-            
+
             if types.len() == 2 {
                 let _key_type = convert_proto_type_to_ros2(types[0]);
                 let _value_type = convert_proto_type_to_ros2(types[1]);
-                
+
                 // Generate entry message name (proper CamelCase)
                 let entry_name = format!("{}Entry", capitalize_first(field_name));
-                
+
                 // Return the array of entry type
                 // Note: In a full implementation, we would also generate the actual Entry message
-                return Some(format!("{}[] {}  # map<{}, {}>", entry_name, field_name, types[0], types[1]));
+                return Some(format!(
+                    "{}[] {}  # map<{}, {}>",
+                    entry_name, field_name, types[0], types[1]
+                ));
             }
         }
     }
@@ -906,7 +958,7 @@ fn extract_oneof_name(line: &str) -> Option<String> {
 #[allow(dead_code)]
 fn parse_enum_value(line: &str) -> Option<String> {
     let line = line.trim();
-    
+
     // Skip non-enum-value lines
     if line.is_empty() || line.starts_with("//") || line.contains('{') || line.contains('}') {
         return None;
@@ -921,7 +973,7 @@ fn parse_enum_value(line: &str) -> Option<String> {
             return Some(format!("int32 {}={}", name, value));
         }
     }
-    
+
     None
 }
 
@@ -939,16 +991,16 @@ fn generate_enum_message_content(enum_values: &[String]) -> String {
         "# Empty enum\nint32 value\n".to_string()
     } else {
         let mut content = String::new();
-        
+
         // Add all enum constants
         for enum_value in enum_values {
             content.push_str(enum_value);
             content.push('\n');
         }
-        
+
         // Add the value field
         content.push_str("\nint32 value\n");
-        
+
         content
     }
 }
@@ -959,32 +1011,32 @@ fn generate_oneof_message_content(oneof_fields: &[String], oneof_name: &str) -> 
     }
 
     let mut content = String::new();
-    
+
     // Generate constants for each field
     content.push_str(&format!("int8 {}_NOT_SET=0\n", oneof_name.to_uppercase()));
     for (i, field) in oneof_fields.iter().enumerate() {
         // Extract field name from "type name" format
         if let Some(field_name) = field.split_whitespace().nth(1) {
             content.push_str(&format!(
-                "int8 {}_{}_SET={}\n", 
-                oneof_name.to_uppercase(), 
-                field_name.to_uppercase(), 
+                "int8 {}_{}_SET={}\n",
+                oneof_name.to_uppercase(),
+                field_name.to_uppercase(),
                 i + 1
             ));
         }
     }
-    
+
     content.push('\n');
-    
+
     // Add all the oneof fields
     for field in oneof_fields {
         content.push_str(field);
         content.push('\n');
     }
-    
+
     // Add the which field
     content.push_str(&format!("int8 which\n"));
-    
+
     content
 }
 
@@ -994,8 +1046,8 @@ fn convert_msg_files_to_proto(options: &ProtobufConversionOptions) -> Result<()>
             println!("🔄 Converting {}...", msg_file.display());
         }
 
-        let msg_content = fs::read_to_string(msg_file)
-            .map_err(|e| anyhow!("Failed to read msg file: {}", e))?;
+        let msg_content =
+            fs::read_to_string(msg_file).map_err(|e| anyhow!("Failed to read msg file: {}", e))?;
 
         let proto_message = parse_msg_to_proto(&msg_content, msg_file)?;
 
@@ -1004,13 +1056,14 @@ fn convert_msg_files_to_proto(options: &ProtobufConversionOptions) -> Result<()>
             Some(dir) => dir.clone(),
             None => msg_file.parent().unwrap_or(Path::new(".")).to_path_buf(),
         };
-        
-        let msg_name = msg_file.file_stem()
+
+        let msg_name = msg_file
+            .file_stem()
             .and_then(|s| s.to_str())
             .ok_or_else(|| anyhow!("Invalid message file name: {}", msg_file.display()))?;
-        
+
         let output_file = output_dir.join(format!("{}.proto", msg_name));
-        
+
         if options.verbose {
             println!("   Generated: {}", output_file.display());
         }
@@ -1022,10 +1075,11 @@ fn convert_msg_files_to_proto(options: &ProtobufConversionOptions) -> Result<()>
         } else {
             // Create the directory if it doesn't exist (for inplace mode)
             if let Some(parent) = output_file.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| anyhow!("Failed to create directory {}: {}", parent.display(), e))?;
+                fs::create_dir_all(parent).map_err(|e| {
+                    anyhow!("Failed to create directory {}: {}", parent.display(), e)
+                })?;
             }
-            
+
             fs::write(&output_file, proto_message)
                 .map_err(|e| anyhow!("Failed to write proto file: {}", e))?;
         }
@@ -1035,59 +1089,66 @@ fn convert_msg_files_to_proto(options: &ProtobufConversionOptions) -> Result<()>
 }
 
 fn parse_msg_to_proto(msg_content: &str, msg_file: &Path) -> Result<String> {
-    let msg_name = msg_file.file_stem()
+    let msg_name = msg_file
+        .file_stem()
         .and_then(|s| s.to_str())
         .ok_or_else(|| anyhow!("Invalid message file name: {}", msg_file.display()))?;
 
     let mut proto_content = String::new();
     proto_content.push_str("syntax = \"proto3\";\n\n");
-    
+
     // Add package if we can derive it from path or file structure
     // For now, use a default package
     proto_content.push_str("package generated;\n\n");
-    
+
     proto_content.push_str(&format!("message {} {{\n", msg_name));
-    
+
     let mut field_number = 1;
-    
+
     for line in msg_content.lines() {
         let line = line.trim();
-        
+
         // Skip empty lines and comments
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        
+
         // Parse field definition: "type name" or "type name # comment"
         let clean_line = if let Some(comment_pos) = line.find('#') {
             line[..comment_pos].trim()
         } else {
             line
         };
-        
+
         if clean_line.is_empty() {
             continue;
         }
-        
+
         let parts: Vec<&str> = clean_line.split_whitespace().collect();
         if parts.len() >= 2 {
             let ros2_type = parts[0];
             let field_name = parts[1];
-            
+
             let proto_type = convert_ros2_type_to_proto(ros2_type);
-            
+
             if proto_type.starts_with("repeated ") {
-                proto_content.push_str(&format!("  {} {} = {};\n", proto_type, field_name, field_number));
+                proto_content.push_str(&format!(
+                    "  {} {} = {};\n",
+                    proto_type, field_name, field_number
+                ));
             } else {
-                proto_content.push_str(&format!("  {} {} = {};\n", proto_type, field_name, field_number));
+                proto_content.push_str(&format!(
+                    "  {} {} = {};\n",
+                    proto_type, field_name, field_number
+                ));
             }
-            
+
             field_number += 1;
         }
     }
-    
+
     proto_content.push_str("}\n");
-    
+
     Ok(proto_content)
 }
 
@@ -1098,13 +1159,13 @@ fn convert_ros2_type_to_proto(ros2_type: &str) -> String {
         let proto_base = convert_ros2_type_to_proto(base_type);
         return format!("repeated {}", proto_base);
     }
-    
+
     // Convert basic types
     match ros2_type {
         "bool" => "bool".to_string(),
-        "int8" => "int32".to_string(),  // Proto3 doesn't have int8
-        "uint8" => "uint32".to_string(), // Proto3 doesn't have uint8
-        "int16" => "int32".to_string(),  // Proto3 doesn't have int16
+        "int8" => "int32".to_string(),    // Proto3 doesn't have int8
+        "uint8" => "uint32".to_string(),  // Proto3 doesn't have uint8
+        "int16" => "int32".to_string(),   // Proto3 doesn't have int16
         "uint16" => "uint32".to_string(), // Proto3 doesn't have uint16
         "int32" => "int32".to_string(),
         "uint32" => "uint32".to_string(),

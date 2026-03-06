@@ -18,10 +18,10 @@ pub fn handle(matches: ArgMatches) {
     }
 }
 
-pub mod create;
-pub mod list;
-pub mod info;
 pub mod build;
+pub mod create;
+pub mod info;
+pub mod list;
 
 #[cfg(test)]
 mod tests {
@@ -61,12 +61,14 @@ mod tests {
         );
 
         create::command::create_package_for_tests(create_matches).unwrap();
-        assert!(workspace.join("src").join("demo_pkg").join("package.xml").exists());
+        assert!(workspace
+            .join("src")
+            .join("demo_pkg")
+            .join("package.xml")
+            .exists());
 
-        let list_matches = get_subcommand_matches(
-            vec!["work".to_string(), "list".to_string()],
-            "list",
-        );
+        let list_matches =
+            get_subcommand_matches(vec!["work".to_string(), "list".to_string()], "list");
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime
@@ -77,12 +79,19 @@ mod tests {
             .unwrap();
 
         let info_matches = get_subcommand_matches(
-            vec!["work".to_string(), "info".to_string(), "demo_pkg".to_string()],
+            vec![
+                "work".to_string(),
+                "info".to_string(),
+                "demo_pkg".to_string(),
+            ],
             "info",
         );
 
         runtime
-            .block_on(info::command::run_command_for_tests(info_matches, workspace))
+            .block_on(info::command::run_command_for_tests(
+                info_matches,
+                workspace,
+            ))
             .unwrap();
     }
 
@@ -125,13 +134,12 @@ mod tests {
         );
         assert!(list_status.contains("Built (merged)"));
 
-        let info_layout = info::command::detect_install_layout_for_tests("demo_py_pkg", &install_base);
+        let info_layout =
+            info::command::detect_install_layout_for_tests("demo_py_pkg", &install_base);
         assert_eq!(info_layout, "merged");
 
-        let list_matches = get_subcommand_matches(
-            vec!["work".to_string(), "list".to_string()],
-            "list",
-        );
+        let list_matches =
+            get_subcommand_matches(vec!["work".to_string(), "list".to_string()], "list");
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime
@@ -142,12 +150,19 @@ mod tests {
             .unwrap();
 
         let info_matches = get_subcommand_matches(
-            vec!["work".to_string(), "info".to_string(), "demo_py_pkg".to_string()],
+            vec![
+                "work".to_string(),
+                "info".to_string(),
+                "demo_py_pkg".to_string(),
+            ],
             "info",
         );
 
         runtime
-            .block_on(info::command::run_command_for_tests(info_matches, workspace))
+            .block_on(info::command::run_command_for_tests(
+                info_matches,
+                workspace,
+            ))
             .unwrap();
     }
 }

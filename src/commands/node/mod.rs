@@ -1,10 +1,10 @@
-pub mod list;
 pub mod info;
+pub mod list;
 
-use clap::ArgMatches;
 use crate::arguments::node::CommonNodeArgs;
+use clap::ArgMatches;
 
-pub fn handle(matches: ArgMatches){
+pub fn handle(matches: ArgMatches) {
     // Extract common node arguments from the parent command
     let common_args = CommonNodeArgs::from_matches(&matches);
 

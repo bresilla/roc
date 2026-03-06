@@ -1,6 +1,6 @@
+pub mod discovery;
 pub mod protobuf;
 pub mod ros2msg;
-pub mod discovery;
 
 use clap::ArgMatches;
 

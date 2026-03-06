@@ -21,7 +21,7 @@ pub fn handle(matches: ArgMatches) {
     }
 }
 
-pub mod record;
-pub mod play;
 pub mod info;
 pub mod list;
+pub mod play;
+pub mod record;

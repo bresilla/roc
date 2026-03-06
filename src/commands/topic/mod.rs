@@ -1,20 +1,20 @@
-pub mod list;
-pub mod hz;
+pub mod bw;
+pub mod delay;
 pub mod echo;
-pub mod pub_;
+pub mod find;
+pub mod hz;
 pub mod info;
 pub mod kind;
-pub mod bw;
-pub mod find;
-pub mod delay;
+pub mod list;
+pub mod pub_;
 
-use clap::ArgMatches;
 use crate::arguments::topic::CommonTopicArgs;
+use clap::ArgMatches;
 
-pub fn handle(matches: ArgMatches){
+pub fn handle(matches: ArgMatches) {
     // Extract common topic arguments from the parent command
     let common_args = CommonTopicArgs::from_matches(&matches);
-    
+
     match matches.subcommand() {
         Some(("list", args)) => {
             list::handle(args.clone(), common_args);

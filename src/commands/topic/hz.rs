@@ -106,7 +106,7 @@ async fn monitor_topic_rate(
 
     // Create dynamic subscription for real message rate monitoring
     let subscription = graph_context.create_subscription(topic_name, &topic_type)?;
-    
+
     println!("Subscribed to [{}]", topic_name);
     println!("Topic type: {}", topic_type);
 
@@ -116,7 +116,7 @@ async fn monitor_topic_rate(
     let check_interval = Duration::from_millis(10); // High frequency polling for accurate rate measurement
     let mut stats_print_timer = Instant::now();
     let stats_print_interval = Duration::from_millis(100); // Print stats every 100ms
-    
+
     println!("Monitoring topic rate (window size: {})...", window_size);
     println!("Press Ctrl+C to stop");
 
@@ -156,7 +156,9 @@ async fn monitor_topic_rate(
 
             if total_msgs > 0 {
                 // Calculate statistics for display
-                let periods: Vec<f64> = calc.timestamps.iter()
+                let periods: Vec<f64> = calc
+                    .timestamps
+                    .iter()
                     .zip(calc.timestamps.iter().skip(1))
                     .map(|(t1, t2)| t2.duration_since(*t1).as_secs_f64())
                     .collect();
@@ -164,14 +166,13 @@ async fn monitor_topic_rate(
                 let (min_period, max_period, std_dev) = if periods.len() > 0 {
                     let min_p = periods.iter().fold(f64::INFINITY, |a, &b| a.min(b));
                     let max_p = periods.iter().fold(0.0f64, |a, &b| a.max(b));
-                    
+
                     // Calculate standard deviation
                     let mean = periods.iter().sum::<f64>() / periods.len() as f64;
-                    let variance = periods.iter()
-                        .map(|p| (p - mean).powi(2))
-                        .sum::<f64>() / periods.len() as f64;
+                    let variance = periods.iter().map(|p| (p - mean).powi(2)).sum::<f64>()
+                        / periods.len() as f64;
                     let std_dev = variance.sqrt();
-                    
+
                     (min_p, max_p, std_dev)
                 } else {
                     (0.0, 0.0, 0.0)
@@ -201,7 +202,7 @@ async fn monitor_topic_rate(
                     Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
                     None => true,
                 };
-                
+
                 if should_warn {
                     println!("No publishers found for topic '{}'", topic_name);
                     LAST_NO_PUBLISHER_WARNING = Some(now);

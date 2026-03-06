@@ -1,5 +1,5 @@
-use std::{fs, env};
 use std::path::PathBuf;
+use std::{env, fs};
 
 /// Enhanced zsh completion script with support for all subcommands
 const SCRIPT: &str = r#"

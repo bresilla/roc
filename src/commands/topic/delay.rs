@@ -63,8 +63,8 @@ impl TopicDelayInterceptor {
         delay_duration: Duration,
         verbose: bool,
     ) -> Result<Self> {
-        let context = RclGraphContext::new()
-            .map_err(|e| anyhow!("Failed to create RCL context: {}", e))?;
+        let context =
+            RclGraphContext::new().map_err(|e| anyhow!("Failed to create RCL context: {}", e))?;
 
         let output_topic = output_topic.unwrap_or_else(|| {
             // Create namespaced delayed topic: /chatter -> /chatter/delayed
@@ -90,7 +90,8 @@ impl TopicDelayInterceptor {
         }
 
         // Verify input topic exists
-        let topics = self.context
+        let topics = self
+            .context
             .get_topic_names()
             .map_err(|e| anyhow!("Failed to get topic names: {}", e))?;
 
@@ -100,7 +101,8 @@ impl TopicDelayInterceptor {
 
         // Get topic type
         let topic_type = {
-            let topics_and_types = self.context
+            let topics_and_types = self
+                .context
                 .get_topic_names_and_types()
                 .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
 
@@ -108,7 +110,9 @@ impl TopicDelayInterceptor {
                 .iter()
                 .find(|(name, _)| name == &self.input_topic)
                 .and_then(|(_, topic_type)| Some(topic_type.clone()))
-                .ok_or_else(|| anyhow!("Could not determine topic type for '{}'", self.input_topic))?
+                .ok_or_else(|| {
+                    anyhow!("Could not determine topic type for '{}'", self.input_topic)
+                })?
         };
 
         if self.verbose {
@@ -119,7 +123,11 @@ impl TopicDelayInterceptor {
         self.start_message_processing(&topic_type, running).await
     }
 
-    async fn start_message_processing(&mut self, topic_type: &str, running: Arc<AtomicBool>) -> Result<()> {
+    async fn start_message_processing(
+        &mut self,
+        topic_type: &str,
+        running: Arc<AtomicBool>,
+    ) -> Result<()> {
         // Create a dynamic subscription (native).
         // Note: this spins its own executor thread internally.
         let subscription = self
@@ -201,12 +209,11 @@ impl TopicDelayInterceptor {
 
         Ok(())
     }
-
 }
 
 fn parse_duration(duration_str: &str) -> Result<Duration> {
     let duration_str = duration_str.trim();
-    
+
     if duration_str.is_empty() {
         return Err(anyhow!("Empty duration string"));
     }
@@ -224,15 +231,16 @@ fn parse_duration(duration_str: &str) -> Result<Duration> {
                 break;
             }
         }
-        
+
         if split_pos == 0 {
             return Err(anyhow!("Invalid duration format: {}", duration_str));
         }
-        
+
         (&duration_str[..split_pos], &duration_str[split_pos..])
     };
 
-    let number: f64 = number_part.parse()
+    let number: f64 = number_part
+        .parse()
         .map_err(|_| anyhow!("Invalid number in duration: {}", number_part))?;
 
     if number < 0.0 {
@@ -244,7 +252,12 @@ fn parse_duration(duration_str: &str) -> Result<Duration> {
         "s" | "sec" | "seconds" => Duration::from_secs_f64(number),
         "m" | "min" | "minutes" => Duration::from_secs_f64(number * 60.0),
         "h" | "hr" | "hours" => Duration::from_secs_f64(number * 3600.0),
-        _ => return Err(anyhow!("Unknown time unit: {}. Use ms, s, m, or h", unit_part)),
+        _ => {
+            return Err(anyhow!(
+                "Unknown time unit: {}. Use ms, s, m, or h",
+                unit_part
+            ))
+        }
     };
 
     Ok(duration)

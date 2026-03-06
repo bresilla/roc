@@ -1,5 +1,5 @@
+use crate::completions::{dynamic, shells};
 use clap::ArgMatches;
-use crate::completions::{shells, dynamic};
 
 /// Handle `roc completion` (print or install)
 pub fn handle(matches: ArgMatches) {

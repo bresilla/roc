@@ -1,17 +1,21 @@
-use clap::ArgMatches;
-use std::{fs, env};
-use std::path::PathBuf;
-use walkdir::WalkDir;
-use std::collections::HashSet;
 use crate::utils::{get_ros_workspace_paths, is_executable};
+use clap::ArgMatches;
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::{env, fs};
+use walkdir::WalkDir;
 
 /// Handle internal dynamic completion (_complete)
 pub fn handle(matches: ArgMatches) {
     let command = matches.get_one::<String>("command").unwrap();
     let sub = matches.get_one::<String>("subcommand");
     let subsub = matches.get_one::<String>("subsubcommand");
-    let pos = matches.get_one::<String>("position").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
-    let current_args: Vec<String> = matches.get_many::<String>("current_args")
+    let pos = matches
+        .get_one::<String>("position")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let current_args: Vec<String> = matches
+        .get_many::<String>("current_args")
         .map(|values| values.cloned().collect())
         .unwrap_or_default();
 
@@ -33,7 +37,7 @@ pub fn handle(matches: ArgMatches) {
                 }
             }
         }
-        
+
         // roc run completion
         ("run", None, None, 1) => {
             for package in find_packages() {
@@ -48,11 +52,13 @@ pub fn handle(matches: ArgMatches) {
                 }
             }
         }
-        
+
         // roc topic completion
         ("topic", None, None, 1) => {
             // Complete topic subcommands
-            let subcommands = ["echo", "info", "list", "pub", "bw", "delay", "find", "hz", "type"];
+            let subcommands = [
+                "echo", "info", "list", "pub", "bw", "delay", "find", "hz", "type",
+            ];
             for subcommand in subcommands {
                 println!("{}", subcommand);
             }
@@ -81,7 +87,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", msg_type);
             }
         }
-        
+
         // roc service completion
         ("service", None, None, 1) => {
             let subcommands = ["call", "find", "list", "type"];
@@ -99,10 +105,12 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", service_type);
             }
         }
-        
+
         // roc param completion
         ("param", None, None, 1) => {
-            let subcommands = ["get", "set", "list", "describe", "remove", "export", "import"];
+            let subcommands = [
+                "get", "set", "list", "describe", "remove", "export", "import",
+            ];
             for subcommand in subcommands {
                 println!("{}", subcommand);
             }
@@ -112,7 +120,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", param);
             }
         }
-        
+
         // roc node completion
         ("node", None, None, 1) => {
             let subcommands = ["list", "info"];
@@ -125,7 +133,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", node);
             }
         }
-        
+
         // roc action completion
         ("action", None, None, 1) => {
             let subcommands = ["list", "info", "goal"];
@@ -138,7 +146,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", action);
             }
         }
-        
+
         // roc interface completion
         ("interface", None, None, 1) => {
             let subcommands = ["list", "show", "package", "model"];
@@ -156,7 +164,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", package);
             }
         }
-        
+
         // roc bag completion
         ("bag", None, None, 1) => {
             let subcommands = ["record", "play", "info", "list"];
@@ -169,7 +177,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", bag);
             }
         }
-        
+
         // roc work completion
         ("work", None, None, 1) => {
             let subcommands = ["build", "create", "info", "list"];
@@ -182,7 +190,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", package);
             }
         }
-        
+
         // roc frame completion
         ("frame", None, None, 1) => {
             let subcommands = ["list", "echo", "info", "pub"];
@@ -195,7 +203,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", frame);
             }
         }
-        
+
         // roc daemon completion
         ("daemon", None, None, 1) => {
             let subcommands = ["start", "stop", "status"];
@@ -203,7 +211,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", subcommand);
             }
         }
-        
+
         // roc middleware completion
         ("middleware", None, None, 1) => {
             let subcommands = ["get", "set", "list"];
@@ -211,7 +219,7 @@ pub fn handle(matches: ArgMatches) {
                 println!("{}", subcommand);
             }
         }
-        
+
         _ => {
             // No completions for other positions/commands
         }
@@ -221,7 +229,7 @@ pub fn handle(matches: ArgMatches) {
 /// Scan ROS workspaces for launch files
 fn find_launch_files() -> Vec<String> {
     let mut launch_files = HashSet::new();
-    
+
     // Look in ROS system installation first
     if let Ok(distro) = env::var("ROS_DISTRO") {
         let ros_path = PathBuf::from(format!("/opt/ros/{}/share", distro));
@@ -242,7 +250,11 @@ fn find_launch_files() -> Vec<String> {
                             if let Some(next_slash) = after_share.find('/') {
                                 let package_name = &after_share[..next_slash];
                                 if let Some(file_name) = path.file_name() {
-                                    launch_files.insert(format!("{}:{}", package_name, file_name.to_string_lossy()));
+                                    launch_files.insert(format!(
+                                        "{}:{}",
+                                        package_name,
+                                        file_name.to_string_lossy()
+                                    ));
                                 }
                             }
                         }
@@ -251,7 +263,7 @@ fn find_launch_files() -> Vec<String> {
             }
         }
     }
-    
+
     // Also look in workspace directories
     for workspace_path in get_ros_workspace_paths() {
         if workspace_path.exists() && !workspace_path.to_string_lossy().contains("/opt/ros/") {
@@ -270,7 +282,11 @@ fn find_launch_files() -> Vec<String> {
                         while let Some(dir) = current_path {
                             if let Some(pkg_name) = find_package_name(&dir.to_path_buf()) {
                                 if let Some(file_name) = path.file_name() {
-                                    launch_files.insert(format!("{}:{}", pkg_name, file_name.to_string_lossy()));
+                                    launch_files.insert(format!(
+                                        "{}:{}",
+                                        pkg_name,
+                                        file_name.to_string_lossy()
+                                    ));
                                 }
                                 break;
                             }
@@ -281,7 +297,7 @@ fn find_launch_files() -> Vec<String> {
             }
         }
     }
-    
+
     launch_files.into_iter().collect()
 }
 
@@ -289,22 +305,23 @@ fn find_launch_files() -> Vec<String> {
 fn find_packages_with_launch_files() -> Vec<String> {
     let launch_files = find_launch_files();
     let mut packages = HashSet::new();
-    
+
     for launch_file in launch_files {
         if let Some((package, _)) = launch_file.split_once(':') {
             packages.insert(package.to_string());
         }
     }
-    
+
     packages.into_iter().collect()
 }
 
 /// Get launch files for a specific package (or all if no package specified)
 fn find_launch_files_for_package(package_filter: Option<&str>) -> Vec<String> {
     let all_launch_files = find_launch_files();
-    
+
     if let Some(package) = package_filter {
-        all_launch_files.into_iter()
+        all_launch_files
+            .into_iter()
             .filter(|launch_file| {
                 if let Some((pkg, _)) = launch_file.split_once(':') {
                     pkg == package
@@ -321,9 +338,10 @@ fn find_launch_files_for_package(package_filter: Option<&str>) -> Vec<String> {
 /// Get executables for a specific package (or all if no package specified)
 fn find_executables_for_package(package_filter: Option<&str>) -> Vec<String> {
     let all_executables = find_executables();
-    
+
     if let Some(package) = package_filter {
-        all_executables.into_iter()
+        all_executables
+            .into_iter()
             .filter(|executable| {
                 if let Some((pkg, _)) = executable.split_once(':') {
                     pkg == package
@@ -340,13 +358,13 @@ fn find_executables_for_package(package_filter: Option<&str>) -> Vec<String> {
 /// Scan ROS workspaces for executables
 fn find_executables() -> Vec<String> {
     let mut executables = HashSet::new();
-    
+
     // Look in ROS system installation first
     if let Ok(distro) = env::var("ROS_DISTRO") {
         // Check both lib and bin directories in ROS system installation
         let ros_lib_path = PathBuf::from(format!("/opt/ros/{}/lib", distro));
         let ros_bin_path = PathBuf::from(format!("/opt/ros/{}/bin", distro));
-        
+
         // Scan lib directory for package-specific executables
         if ros_lib_path.exists() {
             for entry in WalkDir::new(&ros_lib_path)
@@ -364,7 +382,11 @@ fn find_executables() -> Vec<String> {
                             if let Some(next_slash) = after_lib.find('/') {
                                 let package_name = &after_lib[..next_slash];
                                 if let Some(exec_name) = path.file_name() {
-                                    executables.insert(format!("{}:{}", package_name, exec_name.to_string_lossy()));
+                                    executables.insert(format!(
+                                        "{}:{}",
+                                        package_name,
+                                        exec_name.to_string_lossy()
+                                    ));
                                 }
                             }
                         }
@@ -372,7 +394,7 @@ fn find_executables() -> Vec<String> {
                 }
             }
         }
-        
+
         // Scan bin directory for general executables
         if ros_bin_path.exists() {
             for entry in WalkDir::new(&ros_bin_path)
@@ -393,7 +415,7 @@ fn find_executables() -> Vec<String> {
             }
         }
     }
-    
+
     // Also look in workspace directories
     let workspace_paths = get_ros_workspace_paths();
     for workspace_path in workspace_paths {
@@ -412,7 +434,11 @@ fn find_executables() -> Vec<String> {
                             if let Some(parent) = path.parent() {
                                 if let Some(pkg) = parent.file_name() {
                                     if is_executable(path) {
-                                        executables.insert(format!("{}:{}", pkg.to_string_lossy(), path.file_name().unwrap().to_string_lossy()));
+                                        executables.insert(format!(
+                                            "{}:{}",
+                                            pkg.to_string_lossy(),
+                                            path.file_name().unwrap().to_string_lossy()
+                                        ));
                                     }
                                 }
                             }
@@ -433,7 +459,11 @@ fn find_executables() -> Vec<String> {
                         if let Some(parent) = path.parent() {
                             if let Some(pkg) = parent.file_name() {
                                 if is_executable(path) {
-                                    executables.insert(format!("{}:{}", pkg.to_string_lossy(), path.file_name().unwrap().to_string_lossy()));
+                                    executables.insert(format!(
+                                        "{}:{}",
+                                        pkg.to_string_lossy(),
+                                        path.file_name().unwrap().to_string_lossy()
+                                    ));
                                 }
                             }
                         }
@@ -448,7 +478,7 @@ fn find_executables() -> Vec<String> {
 /// Get available packages in the workspace
 fn find_packages() -> Vec<String> {
     let mut packages = HashSet::new();
-    
+
     // Look in ROS system installation first
     if let Ok(distro) = env::var("ROS_DISTRO") {
         let ros_share_path = PathBuf::from(format!("/opt/ros/{}/share", distro));
@@ -470,7 +500,7 @@ fn find_packages() -> Vec<String> {
             }
         }
     }
-    
+
     // Also look in workspace directories
     for workspace_path in get_ros_workspace_paths() {
         if workspace_path.exists() && !workspace_path.to_string_lossy().contains("/opt/ros/") {
@@ -490,7 +520,7 @@ fn find_packages() -> Vec<String> {
             }
         }
     }
-    
+
     packages.into_iter().collect()
 }
 
@@ -510,7 +540,9 @@ fn find_package_name(dir: &PathBuf) -> Option<String> {
         }
         if let Some(parent) = current.parent() {
             current = parent.to_path_buf();
-        } else { break; }
+        } else {
+            break;
+        }
     }
     None
 }

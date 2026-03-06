@@ -468,7 +468,13 @@ mod tests {
         assert_eq!(packages[0].name, "test_package");
         assert_eq!(packages[0].build_type, BuildType::AmentCmake);
         assert_eq!(packages[0].depend_deps, vec!["std_msgs".to_string()]);
-        assert_eq!(packages[0].build_order_deps(), vec!["std_msgs", "rclcpp", "ament_cmake"]);
-        assert_eq!(packages[0].runtime_deps(), vec!["std_msgs", "rcutils", "rclcpp"]);
+        assert_eq!(
+            packages[0].build_order_deps(),
+            vec!["std_msgs", "rclcpp", "ament_cmake"]
+        );
+        assert_eq!(
+            packages[0].runtime_deps(),
+            vec!["std_msgs", "rcutils", "rclcpp"]
+        );
     }
 }

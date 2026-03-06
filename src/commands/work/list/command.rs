@@ -1,9 +1,9 @@
+use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
+use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
-use std::path::PathBuf;
 use std::fs;
-use anyhow::Result;
-use crate::shared::package_discovery::{discover_packages, DiscoveryConfig, BuildType};
+use std::path::PathBuf;
 
 fn has_isolated_install(package_name: &str, install_base: &PathBuf) -> bool {
     install_base.join(package_name).exists()
@@ -14,12 +14,16 @@ fn has_merged_install(package_name: &str, install_base: &PathBuf) -> bool {
         || install_base.join("lib").join(package_name).exists()
 }
 
-fn format_build_status(package_path: &PathBuf, build_base: &PathBuf, install_base: &PathBuf) -> String {
+fn format_build_status(
+    package_path: &PathBuf,
+    build_base: &PathBuf,
+    install_base: &PathBuf,
+) -> String {
     let package_name = package_path.file_name().unwrap().to_string_lossy();
     let build_dir = build_base.join(&*package_name);
     let has_isolated = has_isolated_install(package_name.as_ref(), install_base);
     let has_merged = has_merged_install(package_name.as_ref(), install_base);
-    
+
     if has_isolated {
         "✓ Built".green().to_string()
     } else if has_merged {
@@ -66,7 +70,7 @@ fn get_creation_time(package_path: &PathBuf) -> String {
 async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) -> Result<()> {
     let build_base = workspace_root.join("build");
     let install_base = workspace_root.join("install");
-    
+
     // Use the new shared discovery system - more flexible than just /src
     let config = DiscoveryConfig {
         base_paths: vec![workspace_root.clone()],
@@ -74,7 +78,7 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) 
         max_depth: Some(10), // Reasonable depth for workspace
         exclude_patterns: vec![
             "build".to_string(),
-            "install".to_string(), 
+            "install".to_string(),
             "log".to_string(),
             ".git".to_string(),
             ".vscode".to_string(),
@@ -83,33 +87,33 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) 
             "__pycache__".to_string(),
         ],
     };
-    
+
     let packages = discover_packages(&config)?;
-    
+
     if packages.is_empty() {
         println!("{}", "No ROS 2 packages found in the workspace.".yellow());
         return Ok(());
     }
-    
+
     // Check if user wants count only
     if matches.get_flag("count_packages") {
         println!("{}", packages.len());
         return Ok(());
     }
-    
+
     // Print header
     println!("{}", "ROS 2 Packages in Workspace".bright_cyan().bold());
     println!("{}", "=".repeat(80).bright_black());
-    
+
     // Sort packages by name for consistent output
     let mut sorted_packages = packages.clone();
     sorted_packages.sort_by(|a, b| a.name.cmp(&b.name));
-    
+
     for package in &sorted_packages {
         let status = format_build_status(&package.path, &build_base, &install_base);
         let build_type = format_build_type(&package.build_type);
         let created = get_creation_time(&package.path);
-        
+
         println!(
             "{:<25} {:<15} {:<20} {}",
             package.name.bright_white().bold(),
@@ -118,14 +122,14 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) 
             created.bright_black()
         );
     }
-    
+
     println!();
     println!(
         "{} {} packages found",
         "Total:".bright_cyan(),
         packages.len().to_string().bright_white().bold()
     );
-    
+
     Ok(())
 }
 
@@ -135,7 +139,10 @@ async fn run_command(matches: ArgMatches) -> Result<()> {
 }
 
 #[cfg(test)]
-pub(crate) async fn run_command_for_tests(matches: ArgMatches, workspace_root: PathBuf) -> Result<()> {
+pub(crate) async fn run_command_for_tests(
+    matches: ArgMatches,
+    workspace_root: PathBuf,
+) -> Result<()> {
     run_command_in_workspace(matches, workspace_root).await
 }
 

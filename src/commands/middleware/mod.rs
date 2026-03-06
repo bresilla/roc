@@ -18,6 +18,6 @@ pub fn handle(matches: ArgMatches) {
     }
 }
 
+pub mod get;
 pub mod list;
 pub mod set;
-pub mod get;

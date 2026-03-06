@@ -1,9 +1,9 @@
 mod arguments;
 mod commands;
 mod completions;
-mod utils;
 mod graph;
 mod shared;
+mod utils;
 use std::env;
 
 fn main() {

@@ -1,11 +1,11 @@
-pub mod list;
-pub mod info;
 pub mod goal;
+pub mod info;
+pub mod list;
 
-use clap::ArgMatches;
 use crate::arguments::action::CommonActionArgs;
+use clap::ArgMatches;
 
-pub fn handle(matches: ArgMatches){
+pub fn handle(matches: ArgMatches) {
     // Extract common action arguments from the parent command
     let common_args = CommonActionArgs::from_matches(&matches);
 

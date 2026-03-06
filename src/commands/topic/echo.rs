@@ -94,9 +94,7 @@ fn simple_to_yaml(v: &SimpleValue<'_>, opts: &EchoOptions) -> Result<YamlValue> 
     Ok(match v {
         SimpleValue::Float(x) => YamlValue::from(**x),
         SimpleValue::Double(x) => YamlValue::from(**x),
-        SimpleValue::LongDouble(_ptr) => {
-            YamlValue::String("<long double>".to_string())
-        }
+        SimpleValue::LongDouble(_ptr) => YamlValue::String("<long double>".to_string()),
         SimpleValue::Char(x) => YamlValue::from(**x),
         SimpleValue::WChar(x) => YamlValue::from(**x),
         SimpleValue::Boolean(b) => YamlValue::from(**b),
@@ -149,7 +147,9 @@ fn array_to_yaml(v: &ArrayValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
     let seq: Vec<YamlValue> = match v {
         ArrayValue::FloatArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
         ArrayValue::DoubleArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
-        ArrayValue::LongDoubleArray(_ptr, len) => vec![YamlValue::String(format!("<long double[{len}]>"))],
+        ArrayValue::LongDoubleArray(_ptr, len) => {
+            vec![YamlValue::String(format!("<long double[{len}]>"))]
+        }
         ArrayValue::CharArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
         ArrayValue::WCharArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
         ArrayValue::BooleanArray(a) => a.iter().map(|x| YamlValue::from(*x)).collect(),
@@ -167,7 +167,9 @@ fn array_to_yaml(v: &ArrayValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
                 vec![YamlValue::String("<string array suppressed>".to_string())]
             } else {
                 a.iter()
-                    .map(|s| YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts)))
+                    .map(|s| {
+                        YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
@@ -176,7 +178,9 @@ fn array_to_yaml(v: &ArrayValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
                 vec![YamlValue::String("<string array suppressed>".to_string())]
             } else {
                 a.iter()
-                    .map(|s| YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts)))
+                    .map(|s| {
+                        YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
@@ -185,7 +189,9 @@ fn array_to_yaml(v: &ArrayValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
                 vec![YamlValue::String("<wstring array suppressed>".to_string())]
             } else {
                 a.iter()
-                    .map(|s| YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts)))
+                    .map(|s| {
+                        YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
@@ -194,7 +200,9 @@ fn array_to_yaml(v: &ArrayValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
                 vec![YamlValue::String("<wstring array suppressed>".to_string())]
             } else {
                 a.iter()
-                    .map(|s| YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts)))
+                    .map(|s| {
+                        YamlValue::String(truncate_string_if_needed(s.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
@@ -215,7 +223,9 @@ fn sequence_to_yaml(v: &SequenceValue<'_>, opts: &EchoOptions) -> Result<YamlVal
     let seq: Vec<YamlValue> = match v {
         SequenceValue::FloatSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
         SequenceValue::DoubleSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        SequenceValue::LongDoubleSequence(_ptr) => vec![YamlValue::String("<long double sequence>".to_string())],
+        SequenceValue::LongDoubleSequence(_ptr) => {
+            vec![YamlValue::String("<long double sequence>".to_string())]
+        }
         SequenceValue::CharSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
         SequenceValue::WCharSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
         SequenceValue::BooleanSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
@@ -230,37 +240,53 @@ fn sequence_to_yaml(v: &SequenceValue<'_>, opts: &EchoOptions) -> Result<YamlVal
         SequenceValue::Int64Sequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
         SequenceValue::StringSequence(s) => {
             if opts.no_str {
-                vec![YamlValue::String("<string sequence suppressed>".to_string())]
+                vec![YamlValue::String(
+                    "<string sequence suppressed>".to_string(),
+                )]
             } else {
                 s.iter()
-                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .map(|st| {
+                        YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
         SequenceValue::BoundedStringSequence(s) => {
             if opts.no_str {
-                vec![YamlValue::String("<string sequence suppressed>".to_string())]
+                vec![YamlValue::String(
+                    "<string sequence suppressed>".to_string(),
+                )]
             } else {
                 s.iter()
-                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .map(|st| {
+                        YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
         SequenceValue::WStringSequence(s) => {
             if opts.no_str {
-                vec![YamlValue::String("<wstring sequence suppressed>".to_string())]
+                vec![YamlValue::String(
+                    "<wstring sequence suppressed>".to_string(),
+                )]
             } else {
                 s.iter()
-                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .map(|st| {
+                        YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
         SequenceValue::BoundedWStringSequence(s) => {
             if opts.no_str {
-                vec![YamlValue::String("<wstring sequence suppressed>".to_string())]
+                vec![YamlValue::String(
+                    "<wstring sequence suppressed>".to_string(),
+                )]
             } else {
                 s.iter()
-                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .map(|st| {
+                        YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
@@ -276,59 +302,107 @@ fn sequence_to_yaml(v: &SequenceValue<'_>, opts: &EchoOptions) -> Result<YamlVal
 fn bounded_sequence_to_yaml(v: &BoundedSequenceValue<'_>, opts: &EchoOptions) -> Result<YamlValue> {
     // Treat the same as unbounded sequence for printing.
     if opts.no_arr {
-        return Ok(YamlValue::String("<bounded sequence suppressed>".to_string()));
+        return Ok(YamlValue::String(
+            "<bounded sequence suppressed>".to_string(),
+        ));
     }
     let seq: Vec<YamlValue> = match v {
-        BoundedSequenceValue::FloatBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::DoubleBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::LongDoubleBoundedSequence(_ptr, ub) => {
-            vec![YamlValue::String(format!("<long double bounded sequence (max {ub})>"))]
+        BoundedSequenceValue::FloatBoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
         }
-        BoundedSequenceValue::CharBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::WCharBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::BooleanBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::OctetBoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::Uint8BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::Int8BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::Uint16BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::Int16BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::Uint32BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::Int32BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::Uint64BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
-        BoundedSequenceValue::Int64BoundedSequence(s) => s.iter().map(|x| YamlValue::from(*x)).collect(),
+        BoundedSequenceValue::DoubleBoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::LongDoubleBoundedSequence(_ptr, ub) => {
+            vec![YamlValue::String(format!(
+                "<long double bounded sequence (max {ub})>"
+            ))]
+        }
+        BoundedSequenceValue::CharBoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::WCharBoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::BooleanBoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::OctetBoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::Uint8BoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::Int8BoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::Uint16BoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::Int16BoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::Uint32BoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::Int32BoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::Uint64BoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
+        BoundedSequenceValue::Int64BoundedSequence(s) => {
+            s.iter().map(|x| YamlValue::from(*x)).collect()
+        }
         BoundedSequenceValue::StringBoundedSequence(s) => {
             if opts.no_str {
-                vec![YamlValue::String("<string sequence suppressed>".to_string())]
+                vec![YamlValue::String(
+                    "<string sequence suppressed>".to_string(),
+                )]
             } else {
                 s.iter()
-                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .map(|st| {
+                        YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
         BoundedSequenceValue::BoundedStringBoundedSequence(s) => {
             if opts.no_str {
-                vec![YamlValue::String("<string sequence suppressed>".to_string())]
+                vec![YamlValue::String(
+                    "<string sequence suppressed>".to_string(),
+                )]
             } else {
                 s.iter()
-                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .map(|st| {
+                        YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
         BoundedSequenceValue::WStringBoundedSequence(s) => {
             if opts.no_str {
-                vec![YamlValue::String("<wstring sequence suppressed>".to_string())]
+                vec![YamlValue::String(
+                    "<wstring sequence suppressed>".to_string(),
+                )]
             } else {
                 s.iter()
-                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .map(|st| {
+                        YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
         BoundedSequenceValue::BoundedWStringBoundedSequence(s) => {
             if opts.no_str {
-                vec![YamlValue::String("<wstring sequence suppressed>".to_string())]
+                vec![YamlValue::String(
+                    "<wstring sequence suppressed>".to_string(),
+                )]
             } else {
                 s.iter()
-                    .map(|st| YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts)))
+                    .map(|st| {
+                        YamlValue::String(truncate_string_if_needed(st.to_string().as_str(), opts))
+                    })
                     .collect()
             }
         }
@@ -353,7 +427,10 @@ fn value_to_yaml(v: &Value<'_>, opts: &EchoOptions) -> Result<YamlValue> {
 fn message_view_to_yaml(view: &DynamicMessageView<'_>, opts: &EchoOptions) -> Result<YamlValue> {
     let mut map = Mapping::new();
     for (name, v) in view.iter() {
-        map.insert(YamlValue::String(name.to_string()), value_to_yaml(&v, opts)?);
+        map.insert(
+            YamlValue::String(name.to_string()),
+            value_to_yaml(&v, opts)?,
+        );
     }
     Ok(YamlValue::Mapping(map))
 }
@@ -399,10 +476,7 @@ enum FieldSelectorPart {
     Index(usize),
 }
 
-fn select_field<'a>(
-    mut current: Value<'a>,
-    selector: &[FieldSelectorPart],
-) -> Option<Value<'a>> {
+fn select_field<'a>(mut current: Value<'a>, selector: &[FieldSelectorPart]) -> Option<Value<'a>> {
     for part in selector {
         match part {
             FieldSelectorPart::Field(name) => {
@@ -451,7 +525,10 @@ async fn echo_topic_messages(
 
     // Wait for topic to appear
     if !graph_context.wait_for_topic(&options.topic_name, Duration::from_secs(3))? {
-        return Err(anyhow!("Topic '{}' not found after waiting", options.topic_name));
+        return Err(anyhow!(
+            "Topic '{}' not found after waiting",
+            options.topic_name
+        ));
     }
 
     // Get topic type
@@ -488,9 +565,12 @@ async fn echo_topic_messages(
 
     // Create dynamic subscription using our new infrastructure
     let subscription = graph_context.create_subscription(&options.topic_name, &topic_type)?;
-    
-    println!("Subscribed to [{}] (type: {})", options.topic_name, topic_type);
-    
+
+    println!(
+        "Subscribed to [{}] (type: {})",
+        options.topic_name, topic_type
+    );
+
     let mut message_count = 0;
     let check_interval = Duration::from_millis(50); // 20 Hz polling
 
@@ -505,14 +585,26 @@ async fn echo_topic_messages(
         match subscription.take_message() {
             Ok(Some(received)) => {
                 message_count += 1;
-                
+
                 let view = received.message.view();
 
                 let output = if let Some(ref selector) = selector {
-                    let Some(v) = view.get(&selector.iter().find_map(|p| {
-                        if let FieldSelectorPart::Field(name) = p { Some(name.as_str()) } else { None }
-                    }).unwrap_or("")) else {
-                        return Err(anyhow!("Field '{}' not found", options.field.clone().unwrap_or_default()));
+                    let Some(v) = view.get(
+                        &selector
+                            .iter()
+                            .find_map(|p| {
+                                if let FieldSelectorPart::Field(name) = p {
+                                    Some(name.as_str())
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or(""),
+                    ) else {
+                        return Err(anyhow!(
+                            "Field '{}' not found",
+                            options.field.clone().unwrap_or_default()
+                        ));
                     };
 
                     // If the selector starts with an index, or has deeper parts, do a full traversal.
@@ -522,7 +614,10 @@ async fn echo_topic_messages(
                         select_field(v, &selector[1..])
                     };
                     let Some(selected) = selected else {
-                        return Err(anyhow!("Field '{}' not found", options.field.clone().unwrap_or_default()));
+                        return Err(anyhow!(
+                            "Field '{}' not found",
+                            options.field.clone().unwrap_or_default()
+                        ));
                     };
                     let yaml_v = value_to_yaml(&selected, &options)?;
                     if options.csv {

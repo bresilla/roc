@@ -1,5 +1,5 @@
-use std::{fs, env};
 use std::path::PathBuf;
+use std::{env, fs};
 
 /// Comprehensive bash completion script
 const SCRIPT: &str = r#"

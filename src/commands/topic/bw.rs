@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
 // Topic Bandwidth Implementation
-// 
+//
 // This implementation monitors topic bandwidth by:
 // 1. Tracking message rate and size estimates
 // 2. Calculating rolling averages over a time window
@@ -57,8 +57,8 @@ impl BandwidthCalculator {
         }
 
         let total_size: usize = self.message_sizes.iter().map(|(_, size)| size).sum();
-        let time_span = self.message_sizes.back().unwrap().0
-            - self.message_sizes.front().unwrap().0;
+        let time_span =
+            self.message_sizes.back().unwrap().0 - self.message_sizes.front().unwrap().0;
 
         if time_span.as_secs_f64() == 0.0 {
             return 0.0;
@@ -101,7 +101,8 @@ async fn monitor_topic_bandwidth(
 
     // Get topic type
     let topic_type = {
-        let topics_and_types = graph_context.get_topic_names_and_types()
+        let topics_and_types = graph_context
+            .get_topic_names_and_types()
             .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
 
         topics_and_types
@@ -121,7 +122,7 @@ async fn monitor_topic_bandwidth(
 
     println!("Subscribed to [{}]", topic_name);
     println!("Topic type: {}", topic_type);
-    
+
     let bandwidth_calc = Arc::new(Mutex::new(BandwidthCalculator::new(window_size)));
     let bandwidth_calc_clone = Arc::clone(&bandwidth_calc);
 
@@ -160,7 +161,9 @@ async fn monitor_topic_bandwidth(
 
             if msg_count > 0 {
                 // Calculate min/max/mean bandwidth from recent measurements
-                let bandwidth_samples: Vec<f64> = calc.message_sizes.iter()
+                let bandwidth_samples: Vec<f64> = calc
+                    .message_sizes
+                    .iter()
                     .zip(calc.message_sizes.iter().skip(1))
                     .map(|((t1, s1), (t2, _s2))| {
                         let time_diff = t2.duration_since(*t1).as_secs_f64();
@@ -174,7 +177,9 @@ async fn monitor_topic_bandwidth(
                     .collect();
 
                 let (min_bw, max_bw) = if bandwidth_samples.len() > 0 {
-                    let min_bw = bandwidth_samples.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+                    let min_bw = bandwidth_samples
+                        .iter()
+                        .fold(f64::INFINITY, |a, &b| a.min(b));
                     let max_bw = bandwidth_samples.iter().fold(0.0f64, |a, &b| a.max(b));
                     (min_bw, max_bw)
                 } else {
@@ -206,7 +211,7 @@ async fn monitor_topic_bandwidth(
                     Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
                     None => true,
                 };
-                
+
                 if should_warn {
                     println!("No publishers found for topic '{}'", topic_name);
                     LAST_NO_PUBLISHER_WARNING = Some(now);

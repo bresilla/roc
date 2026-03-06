@@ -7,9 +7,17 @@ use rclrs::{
 use std::thread;
 use std::time::{Duration, Instant};
 
-fn set_field_from_yaml(msg: &mut DynamicMessage, field: &str, value: &serde_yaml::Value) -> Result<()> {
+fn set_field_from_yaml(
+    msg: &mut DynamicMessage,
+    field: &str,
+    value: &serde_yaml::Value,
+) -> Result<()> {
     let Some(field_value) = msg.get_mut(field) else {
-        return Err(anyhow!("Unknown field '{}' for type {}", field, msg.structure().type_name));
+        return Err(anyhow!(
+            "Unknown field '{}' for type {}",
+            field,
+            msg.structure().type_name
+        ));
     };
 
     match field_value {
@@ -116,11 +124,7 @@ fn set_simple_value_from_yaml(
                     .as_str()
                     .ok_or_else(|| anyhow!("Nested field name must be a string"))?;
                 let Some(nested_field) = nested.get_mut(key) else {
-                    return Err(anyhow!(
-                        "Unknown nested field '{}.{}'",
-                        field,
-                        key
-                    ));
+                    return Err(anyhow!("Unknown nested field '{}.{}'", field, key));
                 };
                 match nested_field {
                     ValueMut::Simple(simple) => set_simple_value_from_yaml(key, simple, v)?,
@@ -149,8 +153,8 @@ fn build_message(message_type: &str, yaml: &str) -> Result<DynamicMessage> {
         .map_err(|e| anyhow!("Invalid message type '{}': {}", message_type, e))?;
     let mut msg = DynamicMessage::new(msg_type)?;
 
-    let yaml_value: serde_yaml::Value = serde_yaml::from_str(yaml)
-        .map_err(|e| anyhow!("Failed to parse YAML values: {}", e))?;
+    let yaml_value: serde_yaml::Value =
+        serde_yaml::from_str(yaml).map_err(|e| anyhow!("Failed to parse YAML values: {}", e))?;
 
     let map = yaml_value
         .as_mapping()

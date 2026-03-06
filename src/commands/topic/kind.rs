@@ -2,11 +2,11 @@ use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::time::Duration;
 use colored::*;
+use std::time::Duration;
 
 // Topic Type (Kind) Implementation
-// 
+//
 // This implementation shows the message type for a topic using:
 // 1. Direct RCL API calls to get topic types
 // 2. Simple topic name to type lookup
@@ -24,12 +24,17 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     // Wait for topic to appear (especially useful for /chatter)
     if !context.wait_for_topic(topic_name, Duration::from_secs(3))? {
         let daemon_status = RclGraphContext::get_daemon_status();
-        return Err(anyhow!("Topic '{}' not found. [{}]", topic_name, daemon_status));
+        return Err(anyhow!(
+            "Topic '{}' not found. [{}]",
+            topic_name,
+            daemon_status
+        ));
     }
 
     // Get topic type
     let topic_type = {
-        let topics_and_types = context.get_topic_names_and_types()
+        let topics_and_types = context
+            .get_topic_names_and_types()
             .map_err(|e| anyhow!("Failed to get topic types: {}", e))?;
 
         topics_and_types

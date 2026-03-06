@@ -1,12 +1,12 @@
-pub mod list;
-pub mod package;
 pub mod all;
+pub mod list;
 pub mod model;
+pub mod package;
 pub mod show;
 
 use clap::ArgMatches;
 
-pub fn handle(matches: ArgMatches){
+pub fn handle(matches: ArgMatches) {
     match matches.subcommand() {
         Some(("list", args)) => {
             list::handle(args.clone());
