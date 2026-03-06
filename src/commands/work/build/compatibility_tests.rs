@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use crate::commands::work::build::dependency_graph;
 use crate::commands::work::build::PackageMeta;
-use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
+use crate::commands::work::build::dependency_graph;
+use crate::shared::package_discovery::{DiscoveryConfig, discover_packages};
 
 fn fixture_workspace(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -82,7 +82,10 @@ fn dependency_chain_fixture_orders_packages_topologically() {
     let packages = discover_fixture_packages("dependency_chain");
     let order = dependency_graph::topological_sort(&packages).unwrap();
 
-    let ordered_names: Vec<&str> = order.iter().map(|idx| packages[*idx].name.as_str()).collect();
+    let ordered_names: Vec<&str> = order
+        .iter()
+        .map(|idx| packages[*idx].name.as_str())
+        .collect();
     assert_eq!(
         ordered_names,
         vec!["base_msgs_pkg", "consumer_node_pkg"],
@@ -97,12 +100,15 @@ fn merged_install_fixture_contains_expected_tree_shape() {
     assert_paths_exist(
         &install_root,
         &[
+            ".colcon_install_layout",
             "local_setup.sh",
             "local_setup.bash",
             "local_setup.zsh",
+            "local_setup.ps1",
             "setup.sh",
             "setup.bash",
             "setup.zsh",
+            "setup.ps1",
             "bin",
             "bin/demo_merged_node",
             "lib",
@@ -115,6 +121,7 @@ fn merged_install_fixture_contains_expected_tree_shape() {
             "share/demo_merged_pkg/package.sh",
             "share/demo_merged_pkg/package.bash",
             "share/demo_merged_pkg/package.zsh",
+            "share/demo_merged_pkg/package.ps1",
             "share/demo_merged_pkg/local_setup.sh",
             "share/demo_merged_pkg/local_setup.bash",
             "share/demo_merged_pkg/local_setup.zsh",

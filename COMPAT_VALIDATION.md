@@ -40,7 +40,8 @@ Observed tree deltas:
 - `colcon` generated `.ps1` wrappers and `_local_setup_util_*.py`
 - `colcon` and `roc` now both place package metadata below `install/<pkg>/share/colcon-core/packages/<pkg>` for isolated installs
 - `colcon` and `roc` now both normalize `COLCON_PREFIX_PATH` without a trailing separator in the validated case
-- remaining file-level deltas are concentrated in root `.ps1` workspace wrappers and `.colcon_install_layout`
+- `roc` now also emits root `local_setup.ps1`, `setup.ps1`, and `.colcon_install_layout`
+- remaining deltas are now concentrated in selector coverage and validation breadth, not the validated install tree shape
 
 Assessment:
 
@@ -68,8 +69,8 @@ Observed tree deltas:
 - `colcon` and `roc` now both install Python payloads under `install/<pkg>/lib/python3.12/site-packages`
 - `colcon` and `roc` now both install the package marker and `package.xml` under `install/<pkg>/share/...`
 - `colcon` and `roc` now both generate the `ament_prefix_path.*`, `pythonpath.*`, and `package.dsv` hook family for this validated case
-- `roc` also now generates `_local_setup_util_sh.py` and `_local_setup_util_ps1.py`
-- remaining file-level deltas are concentrated in root `.ps1` workspace wrappers and `.colcon_install_layout`
+- `roc` also now generates `_local_setup_util_sh.py`, `_local_setup_util_ps1.py`, root `.ps1` setup wrappers, and `.colcon_install_layout`
+- remaining deltas are now concentrated in selector coverage and validation breadth, not the validated install tree shape
 
 Assessment:
 
@@ -81,11 +82,11 @@ Assessment:
 
 `roc work build` is now close enough to substitute `colcon build` for the validated minimal `ament_cmake` case and the validated minimal `ament_python` case.
 
-It is still not full parity, because shell-family coverage and workspace metadata files still differ from `colcon`.
+It is still not full parity, because selector behavior and validation breadth still lag `colcon`.
 
 ## Next Fixes Suggested By Validation
 
-1. Add root `.ps1` setup outputs where `colcon` emits them.
-2. Add `.colcon_install_layout` and any other remaining workspace metadata files needed for parity.
-3. Expand selector validation against `colcon`.
-4. Validate against larger real workspaces before claiming parity.
+1. Expand selector validation against `colcon`.
+2. Validate against larger real workspaces before claiming parity.
+3. Compare resume behavior after partial and failed builds.
+4. Add broader merged-install and overlay validation cases.

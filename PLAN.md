@@ -64,8 +64,6 @@ Already implemented:
 
 Known remaining parity gaps from direct validation:
 
-- root `.ps1` workspace setup wrappers are still incomplete compared to `colcon`
-- `.colcon_install_layout` is still missing
 - selector parity still needs a broader comparison against `colcon`
 - validation coverage still needs to expand beyond the current minimal workspaces
 
@@ -106,6 +104,7 @@ Commit rule:
 - Slice 15: Python package registration and resource index layout
 - Slice 16: full hook set and helper scripts
 - Slice 17: package metadata placement and prefix chaining edge cases
+- Slice 19: PowerShell and install-layout metadata parity
 
 Those slices got the implementation close. They do **not** finish full parity.
 
@@ -207,27 +206,6 @@ Definition of done:
 Suggested commit title:
 
 - `Finish colcon package selection parity`
-
-### Slice 19: PowerShell and Cross-Shell Parity
-
-Objective:
-
-- stop treating non-POSIX setup outputs as optional
-
-Tasks:
-
-- generate `.ps1` outputs where `colcon` does
-- verify `.sh`, `.bash`, `.zsh`, and `.ps1` outputs all exist in the expected locations
-- ensure shell wrappers call the same helper structure across package and workspace scopes
-
-Definition of done:
-
-- validated install trees include the standard shell families from `colcon`
-- shell-output differences are reduced to clearly non-blocking details
-
-Suggested commit title:
-
-- `Add powershell and full shell setup parity`
 
 ### Slice 20: Real Workspace Parity Matrix
 

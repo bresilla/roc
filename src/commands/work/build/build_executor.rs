@@ -836,8 +836,8 @@ impl<'a> BuildExecutor<'a> {
         self.generate_package_setup_scripts(packages)?;
 
         let install_dir = self.config.install_base.clone();
-        self.generate_workspace_setup_scripts(&install_dir, packages)?;
         self.generate_workspace_helper_scripts(&install_dir)?;
+        self.generate_workspace_setup_scripts(&install_dir, packages)?;
 
         Ok(())
     }
@@ -953,9 +953,11 @@ impl<'a> BuildExecutor<'a> {
         let local_setup_sh = install_dir.join("local_setup.sh");
         let local_setup_bash = install_dir.join("local_setup.bash");
         let local_setup_zsh = install_dir.join("local_setup.zsh");
+        let local_setup_ps1 = install_dir.join("local_setup.ps1");
         let setup_sh = install_dir.join("setup.sh");
         let setup_bash = install_dir.join("setup.bash");
         let setup_zsh = install_dir.join("setup.zsh");
+        let setup_ps1 = install_dir.join("setup.ps1");
 
         fs::write(
             &local_setup_sh,
@@ -969,16 +971,23 @@ impl<'a> BuildExecutor<'a> {
             &local_setup_zsh,
             self.render_shell_wrapper("zsh", &local_setup_sh),
         )?;
+        fs::write(
+            &local_setup_ps1,
+            self.render_workspace_local_setup_ps1(install_dir, packages),
+        )?;
         fs::write(&setup_sh, self.render_workspace_setup_sh(install_dir))?;
         fs::write(&setup_bash, self.render_shell_wrapper("bash", &setup_sh))?;
         fs::write(&setup_zsh, self.render_shell_wrapper("zsh", &setup_sh))?;
+        fs::write(&setup_ps1, self.render_workspace_setup_ps1(install_dir))?;
 
         Self::make_executable_if_unix(&local_setup_sh)?;
         Self::make_executable_if_unix(&local_setup_bash)?;
         Self::make_executable_if_unix(&local_setup_zsh)?;
+        Self::make_executable_if_unix(&local_setup_ps1)?;
         Self::make_executable_if_unix(&setup_sh)?;
         Self::make_executable_if_unix(&setup_bash)?;
         Self::make_executable_if_unix(&setup_zsh)?;
+        Self::make_executable_if_unix(&setup_ps1)?;
 
         Ok(())
     }
@@ -987,6 +996,7 @@ impl<'a> BuildExecutor<'a> {
         &self,
         install_dir: &Path,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        fs::create_dir_all(install_dir)?;
         fs::write(
             install_dir.join("_local_setup_util_sh.py"),
             self.render_workspace_helper_script(false),
@@ -1013,12 +1023,22 @@ impl<'a> BuildExecutor<'a> {
         Self::write_colcon_ignore(install_dir)?;
         Self::write_colcon_ignore(log_dir)?;
         Self::write_colcon_ignore(&latest_log_dir)?;
+        Self::write_colcon_install_layout(install_dir, self.config.merge_install)?;
 
         Ok(())
     }
 
     fn write_colcon_ignore(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         fs::write(dir.join("COLCON_IGNORE"), "")?;
+        Ok(())
+    }
+
+    fn write_colcon_install_layout(
+        install_dir: &Path,
+        merge_install: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let layout = if merge_install { "merged" } else { "isolated" };
+        fs::write(install_dir.join(".colcon_install_layout"), layout)?;
         Ok(())
     }
 
@@ -1432,6 +1452,74 @@ fi
         content
     }
 
+    fn render_workspace_local_setup_ps1(
+        &self,
+        install_dir: &Path,
+        packages: &[PackageMeta],
+    ) -> String {
+        let helper_path = install_dir.join("_local_setup_util_ps1.py");
+        let mut content = format!(
+            r#"# Generated workspace local setup script
+
+$env:COLCON_CURRENT_PREFIX="{install_prefix}"
+
+function colcon_prepend_unique_value {{
+    param(
+        [string]$EnvVarName,
+        [string]$Value
+    )
+
+    $pathSeparator = [System.IO.Path]::PathSeparator
+    $currentValue = [Environment]::GetEnvironmentVariable($EnvVarName, "Process")
+    $entries = @()
+    if ($currentValue) {{
+        $entries = $currentValue.Split($pathSeparator) | Where-Object {{ $_ }}
+    }}
+    if ($entries -notcontains $Value) {{
+        $entries = @($Value) + $entries
+    }}
+    [Environment]::SetEnvironmentVariable($EnvVarName, ($entries -join $pathSeparator), "Process")
+}}
+
+function _colcon_prefix_powershell_source_script {{
+    param([string]$ScriptPath)
+    if (Test-Path $ScriptPath) {{
+        . $ScriptPath
+    }}
+}}
+
+"#,
+            install_prefix = install_dir.display()
+        );
+
+        if helper_path.exists() {
+            content.push_str(&format!(
+                "$_colcon_ordered_scripts = & python3 \"{helper}\" ps1\nforeach ($_colcon_script in $_colcon_ordered_scripts) {{\n    Invoke-Expression $_colcon_script\n}}\n",
+                helper = helper_path.display()
+            ));
+        } else {
+            for package in packages {
+                let Some(package_prefix) = self.install_paths.get(&package.name) else {
+                    continue;
+                };
+                let package_script = package_prefix
+                    .join("share")
+                    .join(&package.name)
+                    .join("package.ps1");
+                content.push_str(&format!(
+                    "if (Test-Path \"{package_script}\") {{\n    $env:COLCON_CURRENT_PREFIX=\"{package_prefix}\"\n    . \"{package_script}\"\n}}\n",
+                    package_script = package_script.display(),
+                    package_prefix = package_prefix.display()
+                ));
+            }
+        }
+
+        content.push_str(
+            "Remove-Item Env:\\COLCON_CURRENT_PREFIX -ErrorAction SilentlyContinue\n",
+        );
+        content
+    }
+
     fn render_workspace_setup_sh(&self, install_dir: &Path) -> String {
         format!(
             r#"#!/bin/sh
@@ -1516,6 +1604,81 @@ unset _colcon_prefix
 "#,
             install_prefix = install_dir.display(),
             local_setup = install_dir.join("local_setup.sh").display(),
+        )
+    }
+
+    fn render_workspace_setup_ps1(&self, install_dir: &Path) -> String {
+        format!(
+            r#"# Generated workspace setup script
+
+function colcon_prepend_unique_value {{
+    param(
+        [string]$EnvVarName,
+        [string]$Value
+    )
+
+    $pathSeparator = [System.IO.Path]::PathSeparator
+    $currentValue = [Environment]::GetEnvironmentVariable($EnvVarName, "Process")
+    $entries = @()
+    if ($currentValue) {{
+        $entries = $currentValue.Split($pathSeparator) | Where-Object {{ $_ }}
+    }}
+    if ($entries -notcontains $Value) {{
+        $entries = @($Value) + $entries
+    }}
+    [Environment]::SetEnvironmentVariable($EnvVarName, ($entries -join $pathSeparator), "Process")
+}}
+
+function colcon_normalize_path_list {{
+    param([string]$EnvVarName)
+
+    $pathSeparator = [System.IO.Path]::PathSeparator
+    $currentValue = [Environment]::GetEnvironmentVariable($EnvVarName, "Process")
+    if (-not $currentValue) {{
+        return
+    }}
+
+    $normalized = @()
+    foreach ($entry in $currentValue.Split($pathSeparator)) {{
+        if (-not [string]::IsNullOrWhiteSpace($entry)) {{
+            $normalized += $entry
+        }}
+    }}
+
+    if ($normalized.Count -gt 0) {{
+        [Environment]::SetEnvironmentVariable($EnvVarName, ($normalized -join $pathSeparator), "Process")
+    }} else {{
+        Remove-Item "Env:$EnvVarName" -ErrorAction SilentlyContinue
+    }}
+}}
+
+function _colcon_prefix_powershell_source_script {{
+    param([string]$ScriptPath)
+    if (Test-Path $ScriptPath) {{
+        . $ScriptPath
+    }}
+}}
+
+$_colcon_workspace_prefix = "{install_prefix}"
+colcon_normalize_path_list COLCON_PREFIX_PATH
+$_colcon_previous_prefixes = [Environment]::GetEnvironmentVariable("COLCON_PREFIX_PATH", "Process")
+if ($_colcon_previous_prefixes) {{
+    foreach ($_colcon_prefix in $_colcon_previous_prefixes.Split([System.IO.Path]::PathSeparator)) {{
+        if (-not [string]::IsNullOrWhiteSpace($_colcon_prefix) -and $_colcon_prefix -ne $_colcon_workspace_prefix) {{
+            _colcon_prefix_powershell_source_script (Join-Path $_colcon_prefix "local_setup.ps1")
+        }}
+    }}
+}}
+
+_colcon_prefix_powershell_source_script "{local_setup}"
+colcon_prepend_unique_value COLCON_PREFIX_PATH $_colcon_workspace_prefix
+colcon_normalize_path_list COLCON_PREFIX_PATH
+Remove-Variable _colcon_workspace_prefix -ErrorAction SilentlyContinue
+Remove-Variable _colcon_previous_prefixes -ErrorAction SilentlyContinue
+Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
+"#,
+            install_prefix = install_dir.display(),
+            local_setup = install_dir.join("local_setup.ps1").display(),
         )
     }
 
@@ -2035,6 +2198,10 @@ mod tests {
         assert!(config.build_base.join("COLCON_IGNORE").exists());
         assert!(config.install_base.join("COLCON_IGNORE").exists());
         assert!(config.log_base.join("COLCON_IGNORE").exists());
+        assert_eq!(
+            fs::read_to_string(config.install_base.join(".colcon_install_layout")).unwrap(),
+            "isolated"
+        );
         assert!(
             config
                 .log_base
@@ -2309,25 +2476,40 @@ mod tests {
         }];
 
         executor
+            .generate_workspace_helper_scripts(&config.install_base)
+            .unwrap();
+        executor
             .generate_workspace_setup_scripts(&config.install_base, &packages)
             .unwrap();
 
         assert!(config.install_base.join("local_setup.sh").exists());
         assert!(config.install_base.join("local_setup.bash").exists());
         assert!(config.install_base.join("local_setup.zsh").exists());
+        assert!(config.install_base.join("local_setup.ps1").exists());
         assert!(config.install_base.join("setup.sh").exists());
         assert!(config.install_base.join("setup.bash").exists());
         assert!(config.install_base.join("setup.zsh").exists());
+        assert!(config.install_base.join("setup.ps1").exists());
 
         let local_setup =
             std::fs::read_to_string(config.install_base.join("local_setup.sh")).unwrap();
         assert!(local_setup.contains("package.sh"));
         assert!(local_setup.contains("COLCON_CURRENT_PREFIX"));
 
+        let local_setup_ps1 =
+            std::fs::read_to_string(config.install_base.join("local_setup.ps1")).unwrap();
+        assert!(local_setup_ps1.contains("colcon_prepend_unique_value"));
+        assert!(local_setup_ps1.contains("_local_setup_util_ps1.py"));
+
         let setup_sh = std::fs::read_to_string(config.install_base.join("setup.sh")).unwrap();
         assert!(setup_sh.contains("COLCON_PREFIX_PATH"));
         assert!(setup_sh.contains("local_setup.sh"));
         assert!(setup_sh.contains("_colcon_normalize_path_list"));
+
+        let setup_ps1 = std::fs::read_to_string(config.install_base.join("setup.ps1")).unwrap();
+        assert!(setup_ps1.contains("local_setup.ps1"));
+        assert!(setup_ps1.contains("colcon_normalize_path_list"));
+        assert!(setup_ps1.contains("COLCON_PREFIX_PATH"));
     }
 
     #[test]
