@@ -6,6 +6,9 @@ pub mod dependency_graph;
 pub mod build_executor;
 pub mod environment_manager;
 
+#[cfg(test)]
+mod compatibility_tests;
+
 // Re-export the handle function for easier access
 pub use command::handle;
 
