@@ -64,8 +64,7 @@ Already implemented:
 
 Known remaining parity gaps from direct validation:
 
-- validation coverage still needs to expand beyond the current minimal workspaces
-- resume behavior still needs broader comparison against `colcon` on larger workspaces
+- release gating still needs to be made explicit before claiming full parity
 
 ## Non-Negotiable Constraints
 
@@ -106,6 +105,7 @@ Commit rule:
 - Slice 17: package metadata placement and prefix chaining edge cases
 - Slice 18: selector and build-state parity
 - Slice 19: PowerShell and install-layout metadata parity
+- Slice 20: real workspace parity matrix
 
 Those slices got the implementation close. They do **not** finish full parity.
 
@@ -180,36 +180,6 @@ Definition of done:
 Suggested commit title:
 
 - `Generate colcon helper scripts and standard package hooks`
-
-### Slice 20: Real Workspace Parity Matrix
-
-Objective:
-
-- prove parity against more than toy examples
-
-Tasks:
-
-- validate at least these workspace classes against `colcon`:
-  - minimal `ament_cmake`
-  - minimal `ament_python`
-  - mixed C++ and Python workspace
-  - dependency chain workspace
-  - overlay workspace
-- for each workspace compare:
-  - install tree
-  - setup files
-  - `ros2 pkg prefix`
-  - Python import
-  - downstream `find_package(...)` where relevant
-- record any remaining deltas as blockers, not as “future nice-to-haves”
-
-Definition of done:
-
-- parity report exists and all remaining deltas are either fixed or explicitly blocking release
-
-Suggested commit title:
-
-- `Expand parity validation across representative ROS 2 workspaces`
 
 ### Slice 21: Release Gate
 

@@ -78,15 +78,65 @@ Assessment:
 - ROS package discovery now works for the validated minimal case
 - remaining differences are concentrated in metadata fidelity and shell-family parity
 
+### `dependency_chain` with `--merge-install`
+
+Commands executed:
+
+- `source /opt/ros/jazzy/setup.bash && colcon build --merge-install --base-paths src`
+- `source /opt/ros/jazzy/setup.bash && roc work build --merge-install --base-paths src`
+- `source install/setup.bash && ros2 pkg prefix consumer_node_pkg`
+
+Observed result:
+
+- both tools built the merged workspace successfully
+- both wrote `install/.colcon_install_layout` as `merged`
+- `ros2 pkg prefix consumer_node_pkg` resolved to the merged install root for both builds
+
+### Overlay chaining with underlay + overlay workspaces
+
+Commands executed:
+
+- build underlay `ament_cmake_minimal` with `colcon`
+- build underlay `ament_cmake_minimal` with `roc`
+- source each underlay and build overlay `ament_python_minimal`
+- source underlay + overlay setup files and run:
+  - `ros2 pkg prefix demo_cmake_pkg`
+  - `ros2 pkg prefix demo_python_pkg`
+
+Observed result:
+
+- both tools built the underlay and overlay successfully
+- sourcing the overlay preserved discovery of the underlay package for both builds
+- sourcing the overlay also exposed the overlay package for both builds
+
+### Failed build resume on `dependency_chain`
+
+Commands executed:
+
+- break `consumer_node_pkg/CMakeLists.txt`
+- run `colcon build --continue-on-error --base-paths src`
+- run `roc work build --continue-on-error --base-paths src`
+- restore the valid `CMakeLists.txt`
+- rerun both tools with `--packages-select-build-failed`
+- source `install/setup.bash && ros2 pkg prefix consumer_node_pkg`
+
+Observed result:
+
+- both tools returned a failing exit status for the broken build while still preserving successful earlier package output
+- both tools resumed only the failed package on the retry
+- the resumed `consumer_node_pkg` build succeeded for both tools
+- `roc` needed two fixes to reach parity here:
+  - return nonzero after `--continue-on-error` when any package failed
+  - reuse already-installed dependency prefixes during a failed-package retry
+
 ## Current Conclusion
 
-`roc work build` is now close enough to substitute `colcon build` for the validated minimal `ament_cmake` case and the validated minimal `ament_python` case.
+`roc work build` is now validated against isolated `ament_cmake`, isolated `ament_python`, merged install, overlay chaining, and failed-build resume workflows.
 
-It is still not full parity, because larger-workspace validation and resume coverage still lag `colcon`.
+It is still not full parity, because the project has not yet defined and enforced an explicit release gate for making the parity claim.
 
 ## Next Fixes Suggested By Validation
 
-1. Validate against larger real workspaces before claiming parity.
-2. Compare resume behavior after partial and failed builds.
-3. Add broader merged-install and overlay validation cases.
-4. Add end-to-end parity checks for the new build-state selectors against `colcon`.
+1. Add an explicit release gate before claiming full parity.
+2. Keep docs conservative until the gate is green.
+3. Re-run this validation matrix before any release that changes build behavior.

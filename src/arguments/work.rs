@@ -104,24 +104,28 @@ pub fn cmd() -> Command {
             .arg(
                 Arg::new("packages_select_build_failed")
                     .long("packages-select-build-failed")
+                    .conflicts_with("packages_skip_build_finished")
                     .action(clap::ArgAction::SetTrue)
                     .help("Select packages which failed to build in the previous run")
             )
             .arg(
                 Arg::new("packages_select_build_finished")
                     .long("packages-select-build-finished")
+                    .conflicts_with("packages_skip_build_failed")
                     .action(clap::ArgAction::SetTrue)
                     .help("Select packages which finished building in the previous run")
             )
             .arg(
                 Arg::new("packages_skip_build_finished")
                     .long("packages-skip-build-finished")
+                    .conflicts_with("packages_select_build_failed")
                     .action(clap::ArgAction::SetTrue)
                     .help("Skip packages which finished building in the previous run")
             )
             .arg(
                 Arg::new("packages_skip_build_failed")
                     .long("packages-skip-build-failed")
+                    .conflicts_with("packages_select_build_finished")
                     .action(clap::ArgAction::SetTrue)
                     .help("Skip packages which failed to build in the previous run")
             )

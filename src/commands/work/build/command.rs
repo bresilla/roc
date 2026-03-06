@@ -176,8 +176,6 @@ mod tests {
                 "build",
                 "--packages-select-build-failed",
                 "--packages-select-build-finished",
-                "--packages-skip-build-finished",
-                "--packages-skip-build-failed",
             ])
             .unwrap();
         let (_, submatches) = matches.subcommand().unwrap();
@@ -186,7 +184,17 @@ mod tests {
 
         assert!(config.packages_select_build_failed);
         assert!(config.packages_select_build_finished);
-        assert!(config.packages_skip_build_finished);
-        assert!(config.packages_skip_build_failed);
+    }
+
+    #[test]
+    fn config_from_matches_rejects_conflicting_build_state_selectors() {
+        let result = crate::arguments::work::cmd().try_get_matches_from([
+            "work",
+            "build",
+            "--packages-select-build-failed",
+            "--packages-skip-build-finished",
+        ]);
+
+        assert!(result.is_err());
     }
 }

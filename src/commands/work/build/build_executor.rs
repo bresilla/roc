@@ -121,8 +121,13 @@ impl<'a> BuildExecutor<'a> {
 
             // Add dependencies' install paths to environment
             for dep_name in package.build_order_deps() {
-                if let Some(dep_path) = self.install_paths.get(&dep_name) {
-                    package_env_manager.setup_package_environment(&dep_name, dep_path)?;
+                let dep_path = self
+                    .install_paths
+                    .get(&dep_name)
+                    .cloned()
+                    .or_else(|| Self::existing_install_path(self.config, &dep_name));
+                if let Some(dep_path) = dep_path {
+                    package_env_manager.setup_package_environment(&dep_name, &dep_path)?;
                 }
             }
 
@@ -235,6 +240,10 @@ impl<'a> BuildExecutor<'a> {
         // Generate environment setup scripts
         self.generate_setup_scripts(packages)?;
 
+        if failed_builds > 0 {
+            return Err("Some packages failed to build".into());
+        }
+
         Ok(())
     }
 
@@ -344,6 +353,10 @@ impl<'a> BuildExecutor<'a> {
 
         // Generate environment setup scripts
         self.generate_setup_scripts(packages)?;
+
+        if failed_builds > 0 {
+            return Err("Some packages failed to build".into());
+        }
 
         Ok(())
     }
@@ -560,9 +573,13 @@ impl<'a> BuildExecutor<'a> {
         // Add dependencies' install paths to environment
         let install_paths = build_state.install_paths.lock().unwrap();
         for dep_name in package.build_order_deps() {
-            if let Some(dep_path) = install_paths.get(&dep_name) {
+            let dep_path = install_paths
+                .get(&dep_name)
+                .cloned()
+                .or_else(|| Self::existing_install_path(_config, &dep_name));
+            if let Some(dep_path) = dep_path {
                 env_manager
-                    .setup_package_environment(&dep_name, dep_path)
+                    .setup_package_environment(&dep_name, &dep_path)
                     .map_err(|e| format!("Failed to setup dependency environment: {}", e))?;
             }
         }
@@ -1698,6 +1715,30 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
                 .join("share")
                 .join("colcon-core")
                 .join("packages")
+        }
+    }
+
+    fn existing_install_path(config: &BuildConfig, package_name: &str) -> Option<PathBuf> {
+        if config.merge_install {
+            let install_base = config.install_base.clone();
+            let share_dir = install_base.join("share").join(package_name);
+            let metadata_file = install_base
+                .join("share")
+                .join("colcon-core")
+                .join("packages")
+                .join(package_name);
+            if share_dir.exists() || metadata_file.exists() {
+                Some(install_base)
+            } else {
+                None
+            }
+        } else {
+            let package_prefix = config.install_base.join(package_name);
+            if package_prefix.exists() {
+                Some(package_prefix)
+            } else {
+                None
+            }
         }
     }
 
