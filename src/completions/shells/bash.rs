@@ -1,210 +1,126 @@
 use std::path::PathBuf;
 use std::{env, fs};
 
-/// Comprehensive bash completion script
+/// Bash completion script with dynamic completions delegated to `roc _complete`.
 const SCRIPT: &str = r#"
 _roc_completion() {
     local cur prev words cword
     _init_completion || return
 
-    # Helper function to get current arguments for completion
-    local current_args=""
-    for ((i=2; i<cword; i++)); do
-        current_args="$current_args ${words[i]}"
-    done
+    local top="${words[1]}"
 
-    case "${words[1]}" in
+    case "$top" in
+        "")
+            COMPREPLY=($(compgen -W "action topic service param node interface frame run launch work bag daemon middleware completion" -- "$cur"))
+            ;;
         launch)
             case "$cword" in
-                2)
-                    # Complete package names for launch
-                    local packages=$(roc _complete launch "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$packages" -- "$cur"))
-                    ;;
-                3)
-                    # Complete launch files for the given package
-                    local launch_files=$(roc _complete launch "" "" 2 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$launch_files" -- "$cur"))
-                    ;;
+                2) COMPREPLY=($(compgen -W "$(roc _complete launch '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete launch '' '' 2 "${words[2]}" 2>/dev/null)" -- "$cur")) ;;
             esac
             ;;
         run)
             case "$cword" in
-                2)
-                    # Complete package names for run
-                    local packages=$(roc _complete run "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$packages" -- "$cur"))
-                    ;;
-                3)
-                    # Complete executables for the given package
-                    local executables=$(roc _complete run "" "" 2 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$executables" -- "$cur"))
-                    ;;
+                2) COMPREPLY=($(compgen -W "$(roc _complete run '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete run '' '' 2 "${words[2]}" 2>/dev/null)" -- "$cur")) ;;
             esac
             ;;
         topic)
             case "$cword" in
-                2)
-                    # Complete topic subcommands
-                    local subcommands=$(roc _complete topic "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete topic names or message types based on subcommand
-                    local completions=$(roc _complete topic "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$completions" -- "$cur"))
-                    ;;
+                2) COMPREPLY=($(compgen -W "$(roc _complete topic '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete topic "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
                 4)
-                    # Complete message types for pub command
                     if [[ "${words[2]}" == "pub" ]]; then
-                        local msg_types=$(roc _complete topic "${words[2]}" "" 2 $current_args 2>/dev/null || echo "")
-                        COMPREPLY=($(compgen -W "$msg_types" -- "$cur"))
+                        COMPREPLY=($(compgen -W "$(roc _complete topic pub '' 2 "${words[3]}" 2>/dev/null)" -- "$cur"))
                     fi
                     ;;
             esac
             ;;
         service)
             case "$cword" in
-                2)
-                    # Complete service subcommands
-                    local subcommands=$(roc _complete service "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete service names or types
-                    local completions=$(roc _complete service "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$completions" -- "$cur"))
+                2) COMPREPLY=($(compgen -W "$(roc _complete service '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete service "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
+                4)
+                    if [[ "${words[2]}" == "call" ]]; then
+                        COMPREPLY=($(compgen -W "$(roc _complete service call '' 2 "${words[3]}" 2>/dev/null)" -- "$cur"))
+                    fi
                     ;;
             esac
             ;;
         param)
             case "$cword" in
-                2)
-                    # Complete param subcommands
-                    local subcommands=$(roc _complete param "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete parameter names
-                    local params=$(roc _complete param "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$params" -- "$cur"))
+                2) COMPREPLY=($(compgen -W "$(roc _complete param '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete param "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
+                4)
+                    case "${words[2]}" in
+                        get|set|describe|remove)
+                            COMPREPLY=($(compgen -W "$(roc _complete param "${words[2]}" '' 2 "${words[3]}" 2>/dev/null)" -- "$cur"))
+                            ;;
+                    esac
                     ;;
             esac
             ;;
         node)
             case "$cword" in
-                2)
-                    # Complete node subcommands
-                    local subcommands=$(roc _complete node "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete node names
-                    local nodes=$(roc _complete node "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$nodes" -- "$cur"))
-                    ;;
+                2) COMPREPLY=($(compgen -W "$(roc _complete node '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete node "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
             esac
             ;;
         action)
             case "$cword" in
-                2)
-                    # Complete action subcommands
-                    local subcommands=$(roc _complete action "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete action names
-                    local actions=$(roc _complete action "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$actions" -- "$cur"))
+                2) COMPREPLY=($(compgen -W "$(roc _complete action '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete action "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
+                4)
+                    if [[ "${words[2]}" == "goal" ]]; then
+                        COMPREPLY=($(compgen -W "$(roc _complete action goal '' 2 "${words[3]}" 2>/dev/null)" -- "$cur"))
+                    fi
                     ;;
             esac
             ;;
         interface)
             case "$cword" in
-                2)
-                    # Complete interface subcommands
-                    local subcommands=$(roc _complete interface "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete interface names or packages
-                    local completions=$(roc _complete interface "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$completions" -- "$cur"))
-                    ;;
+                2) COMPREPLY=($(compgen -W "$(roc _complete interface '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete interface "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
             esac
             ;;
         bag)
             case "$cword" in
-                2)
-                    # Complete bag subcommands
-                    local subcommands=$(roc _complete bag "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete bag files or topics
-                    local completions=$(roc _complete bag "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$completions" -- "$cur"))
-                    ;;
+                2) COMPREPLY=($(compgen -W "$(roc _complete bag '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete bag "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
             esac
             ;;
         work)
             case "$cword" in
-                2)
-                    # Complete work subcommands
-                    local subcommands=$(roc _complete work "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete package names for build
-                    local completions=$(roc _complete work "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$completions" -- "$cur"))
-                    ;;
+                2) COMPREPLY=($(compgen -W "$(roc _complete work '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete work "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
             esac
             ;;
         frame)
             case "$cword" in
-                2)
-                    # Complete frame subcommands
-                    local subcommands=$(roc _complete frame "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-                3)
-                    # Complete frame names
-                    local frames=$(roc _complete frame "${words[2]}" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$frames" -- "$cur"))
+                2) COMPREPLY=($(compgen -W "$(roc _complete frame '' '' 1 2>/dev/null)" -- "$cur")) ;;
+                3) COMPREPLY=($(compgen -W "$(roc _complete frame "${words[2]}" '' 1 2>/dev/null)" -- "$cur")) ;;
+                4)
+                    if [[ "${words[2]}" == "echo" ]]; then
+                        COMPREPLY=($(compgen -W "$(roc _complete frame echo '' 2 "${words[3]}" 2>/dev/null)" -- "$cur"))
+                    fi
                     ;;
             esac
             ;;
         daemon)
-            case "$cword" in
-                2)
-                    # Complete daemon subcommands
-                    local subcommands=$(roc _complete daemon "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-            esac
+            if [[ "$cword" == 2 ]]; then
+                COMPREPLY=($(compgen -W "$(roc _complete daemon '' '' 1 2>/dev/null)" -- "$cur"))
+            fi
             ;;
         middleware)
-            case "$cword" in
-                2)
-                    # Complete middleware subcommands
-                    local subcommands=$(roc _complete middleware "" "" 1 $current_args 2>/dev/null || echo "")
-                    COMPREPLY=($(compgen -W "$subcommands" -- "$cur"))
-                    ;;
-            esac
+            if [[ "$cword" == 2 ]]; then
+                COMPREPLY=($(compgen -W "$(roc _complete middleware '' '' 1 2>/dev/null)" -- "$cur"))
+            fi
             ;;
         completion)
             case "$cword" in
-                2)
-                    # Complete shell types
-                    COMPREPLY=($(compgen -W "bash zsh fish" -- "$cur"))
-                    ;;
+                2) COMPREPLY=($(compgen -W "bash zsh fish" -- "$cur")) ;;
+                *) COMPREPLY=($(compgen -W "--install" -- "$cur")) ;;
             esac
-            ;;
-        *)
-            # Default completion for top-level commands
-            local commands="action topic service param node interface frame run launch work bag daemon middleware completion"
-            COMPREPLY=($(compgen -W "$commands" -- "$cur"))
             ;;
     esac
 }
@@ -212,12 +128,10 @@ _roc_completion() {
 complete -F _roc_completion roc
 "#;
 
-/// Print bash completions to stdout
 pub fn print_completions() {
     println!("{}", SCRIPT);
 }
 
-/// Install bash completions to a default location
 pub fn install_completion() {
     let install_path = find_install_path(vec![
         Some(PathBuf::from("/usr/share/bash-completion/completions/roc")),
@@ -227,8 +141,7 @@ pub fn install_completion() {
     match install_path {
         Some(path) => {
             println!("Installing bash completions to: {}", path.display());
-            let script = SCRIPT;
-            match fs::write(&path, script) {
+            match fs::write(&path, SCRIPT) {
                 Ok(_) => {
                     println!("✅ Completions installed successfully!");
                     println!("To enable completions, add this to your ~/.bashrc:");
@@ -260,4 +173,20 @@ fn find_install_path(locations: Vec<Option<PathBuf>>) -> Option<PathBuf> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SCRIPT;
+
+    #[test]
+    fn bash_script_uses_kind_not_type() {
+        assert!(SCRIPT.contains("roc _complete topic"));
+        assert!(!SCRIPT.contains("topic \"${words[2]}\" \"\" 1 $current_args"));
+    }
+
+    #[test]
+    fn bash_script_completes_service_call_type_position() {
+        assert!(SCRIPT.contains("roc _complete service call '' 2"));
+    }
 }
