@@ -9,6 +9,7 @@ pub mod list;
 pub mod pub_;
 
 use crate::arguments::topic::CommonTopicArgs;
+use crate::commands::cli::print_error_and_exit;
 use clap::ArgMatches;
 
 pub fn handle(matches: ArgMatches) {
@@ -43,6 +44,6 @@ pub fn handle(matches: ArgMatches) {
         Some(("delay", args)) => {
             delay::handle(args.clone(), common_args);
         }
-        _ => unreachable!("UNREACHABLE"),
+        _ => print_error_and_exit("No topic subcommand selected"),
     }
 }

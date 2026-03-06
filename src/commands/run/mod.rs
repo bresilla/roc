@@ -1,3 +1,4 @@
+use crate::commands::cli::{required_string, run_async_command};
 use crate::utils::{get_ros_workspace_paths, is_executable};
 use clap::ArgMatches;
 use std::env;
@@ -92,8 +93,8 @@ async fn find_executable(
 }
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let package_name = matches.get_one::<String>("package_name").unwrap();
-    let executable_name = matches.get_one::<String>("executable_name").unwrap();
+    let package_name = required_string(&matches, "package_name")?;
+    let executable_name = required_string(&matches, "executable_name")?;
 
     // Find the actual executable file
     let executable_path = find_executable(package_name, executable_name).await?;
@@ -153,6 +154,5 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
 }
 
 pub fn handle(matches: ArgMatches) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches));
+    run_async_command(run_command(matches));
 }

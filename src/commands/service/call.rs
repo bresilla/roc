@@ -1,4 +1,5 @@
 use crate::arguments::service::CommonServiceArgs;
+use crate::commands::cli::{joined_values, required_string, run_async_command};
 use clap::ArgMatches;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -7,8 +8,8 @@ async fn run_command(
     matches: ArgMatches,
     _common_args: CommonServiceArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let service_name = matches.get_one::<String>("service_name").unwrap();
-    let service_type = matches.get_one::<String>("service_type").unwrap();
+    let service_name = required_string(&matches, "service_name")?;
+    let service_type = required_string(&matches, "service_type")?;
 
     let mut cmd = Command::new("ros2");
     cmd.arg("service")
@@ -16,16 +17,8 @@ async fn run_command(
         .arg(service_name)
         .arg(service_type);
 
-    if let Some(values) = matches.get_many::<String>("values") {
-        let payload = values
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>()
-            .join(" ")
-            .trim()
-            .to_string();
-        if !payload.is_empty() {
-            cmd.arg(payload);
-        }
+    if let Some(payload) = joined_values(&matches, "values") {
+        cmd.arg(payload);
     }
 
     if let Some(rate_value) = matches.get_one::<String>("rate") {
@@ -49,6 +42,5 @@ async fn run_command(
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonServiceArgs) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches, common_args));
+    run_async_command(run_command(matches, common_args));
 }

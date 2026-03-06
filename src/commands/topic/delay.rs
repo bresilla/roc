@@ -1,6 +1,7 @@
 use crate::arguments::topic::CommonTopicArgs;
+use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use rclrs::{Context, CreateBasicExecutor, DynamicMessage, MessageTypeName};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -256,7 +257,7 @@ fn parse_duration(duration_str: &str) -> Result<Duration> {
             return Err(anyhow!(
                 "Unknown time unit: {}. Use ms, s, m, or h",
                 unit_part
-            ))
+            ));
         }
     };
 
@@ -264,15 +265,7 @@ fn parse_duration(duration_str: &str) -> Result<Duration> {
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    match rt.block_on(run_command(matches, common_args)) {
-        Ok(()) => {}
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    }
+    run_async_command(run_command(matches, common_args));
 }
 
 async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
@@ -282,9 +275,10 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     let running = Arc::new(AtomicBool::new(true));
     let running_clone = running.clone();
     tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl+c");
+        if let Err(error) = tokio::signal::ctrl_c().await {
+            eprintln!("Failed to listen for ctrl+c: {}", error);
+            return;
+        }
         running_clone.store(false, Ordering::Relaxed);
     });
 

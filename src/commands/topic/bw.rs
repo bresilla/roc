@@ -1,6 +1,7 @@
 use crate::arguments::topic::CommonTopicArgs;
+use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -193,7 +194,9 @@ async fn monitor_topic_bandwidth(
                     average_bw,
                     min_bw,
                     max_bw,
-                    calc.message_sizes.len().min(window_size.as_secs() as usize * 10)
+                    calc.message_sizes
+                        .len()
+                        .min(window_size.as_secs() as usize * 10)
                 );
             }
 
@@ -253,26 +256,19 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     let running_clone = Arc::clone(&running);
 
     tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl+c");
+        if let Err(error) = tokio::signal::ctrl_c().await {
+            eprintln!("Failed to listen for ctrl+c: {}", error);
+            return;
+        }
         running_clone.store(false, Ordering::Relaxed);
     });
 
     // Start monitoring
-    monitor_topic_bandwidth(topic_name, window_duration, running).await
+    monitor_topic_bandwidth(topic_name, window_duration, running).await?;
+    println!("\nBandwidth monitoring stopped.");
+    Ok(())
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    match rt.block_on(run_command(matches, common_args)) {
-        Ok(()) => {
-            println!("\nBandwidth monitoring stopped.");
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    }
+    run_async_command(run_command(matches, common_args));
 }

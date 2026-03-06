@@ -1,4 +1,5 @@
 use crate::arguments::action::CommonActionArgs;
+use crate::commands::cli::{joined_values, required_string, run_async_command};
 use clap::ArgMatches;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -7,8 +8,8 @@ async fn run_command(
     matches: ArgMatches,
     _common_args: CommonActionArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let action_name = matches.get_one::<String>("action_name").unwrap();
-    let action_type = matches.get_one::<String>("action_type").unwrap();
+    let action_name = required_string(&matches, "action_name")?;
+    let action_type = required_string(&matches, "action_type")?;
 
     let mut cmd = Command::new("ros2");
     cmd.arg("action")
@@ -16,14 +17,7 @@ async fn run_command(
         .arg(action_name)
         .arg(action_type);
 
-    let values = matches.get_many::<String>("goal").unwrap();
-    let payload = values
-        .map(|s| s.as_str())
-        .collect::<Vec<_>>()
-        .join(" ")
-        .trim()
-        .to_string();
-    if !payload.is_empty() {
+    if let Some(payload) = joined_values(&matches, "goal") {
         cmd.arg(payload);
     }
 
@@ -48,6 +42,5 @@ async fn run_command(
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonActionArgs) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let _ = rt.block_on(run_command(matches, common_args));
+    run_async_command(run_command(matches, common_args));
 }

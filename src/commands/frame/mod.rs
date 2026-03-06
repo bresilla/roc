@@ -1,3 +1,4 @@
+use crate::commands::cli::print_error_and_exit;
 use clap::ArgMatches;
 
 pub fn handle(matches: ArgMatches) {
@@ -14,7 +15,7 @@ pub fn handle(matches: ArgMatches) {
         Some(("pub", args)) => {
             pub_::handle(args.clone());
         }
-        _ => unreachable!("UNREACHABLE"),
+        _ => print_error_and_exit("No frame subcommand selected"),
     }
 }
 

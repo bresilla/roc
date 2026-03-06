@@ -1,4 +1,5 @@
-use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
+use crate::commands::cli::run_async_command;
+use crate::shared::package_discovery::{BuildType, DiscoveryConfig, discover_packages};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
@@ -147,11 +148,7 @@ pub(crate) async fn run_command_for_tests(
 }
 
 pub fn handle(matches: ArgMatches) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    if let Err(e) = rt.block_on(run_command(matches)) {
-        eprintln!("{}: {}", "Error".red().bold(), e);
-        std::process::exit(1);
-    }
+    run_async_command(run_command(matches));
 }
 
 #[cfg(test)]

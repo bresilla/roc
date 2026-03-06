@@ -1,9 +1,10 @@
 use crate::arguments::topic::CommonTopicArgs;
+use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -725,9 +726,10 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     let running_clone = Arc::clone(&running);
 
     tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl+c");
+        if let Err(error) = tokio::signal::ctrl_c().await {
+            eprintln!("Failed to listen for ctrl+c: {}", error);
+            return;
+        }
         running_clone.store(false, Ordering::Relaxed);
     });
 
@@ -736,15 +738,5 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    match rt.block_on(run_command(matches, common_args)) {
-        Ok(()) => {
-            // Silent exit like ros2 topic echo
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    }
+    run_async_command(run_command(matches, common_args));
 }

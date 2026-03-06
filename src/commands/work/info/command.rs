@@ -1,4 +1,5 @@
-use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
+use crate::commands::cli::{required_string, run_async_command};
+use crate::shared::package_discovery::{BuildType, DiscoveryConfig, discover_packages};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
@@ -112,7 +113,8 @@ async fn run_command_in_workspace(
     matches: ArgMatches,
     workspace_root: std::path::PathBuf,
 ) -> Result<()> {
-    let package_name = matches.get_one::<String>("PACKAGE_NAME").unwrap();
+    let package_name = required_string(&matches, "PACKAGE_NAME")
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     let show_xml = matches.get_flag("xml");
 
     let build_base = workspace_root.join("build");
@@ -297,16 +299,12 @@ pub(crate) async fn run_command_for_tests(
 }
 
 pub fn handle(matches: ArgMatches) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    if let Err(e) = rt.block_on(run_command(matches)) {
-        eprintln!("{}: {}", "Error".red().bold(), e);
-        std::process::exit(1);
-    }
+    run_async_command(run_command(matches));
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{detect_install_layout, has_isolated_install, has_merged_install, InstallLayout};
+    use super::{InstallLayout, detect_install_layout, has_isolated_install, has_merged_install};
     use std::fs;
     use tempfile::tempdir;
 

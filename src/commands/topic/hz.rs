@@ -1,6 +1,7 @@
 use crate::arguments::topic::CommonTopicArgs;
+use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -151,7 +152,7 @@ async fn monitor_topic_rate(
         if stats_print_timer.elapsed() >= stats_print_interval {
             let calc = rate_calc_clone.lock().unwrap();
             let current_rate = calc.get_current_rate();
-            let average_rate = calc.get_average_rate();
+            let _average_rate = calc.get_average_rate();
             let total_msgs = calc.get_total_messages();
 
             if total_msgs > 0 {
@@ -244,26 +245,19 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     let running_clone = Arc::clone(&running);
 
     tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl+c");
+        if let Err(error) = tokio::signal::ctrl_c().await {
+            eprintln!("Failed to listen for ctrl+c: {}", error);
+            return;
+        }
         running_clone.store(false, Ordering::Relaxed);
     });
 
     // Start monitoring
-    monitor_topic_rate(topic_name, window_size, use_wall_time, running).await
+    monitor_topic_rate(topic_name, window_size, use_wall_time, running).await?;
+    println!("\nRate monitoring stopped.");
+    Ok(())
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    match rt.block_on(run_command(matches, common_args)) {
-        Ok(()) => {
-            println!("\nRate monitoring stopped.");
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    }
+    run_async_command(run_command(matches, common_args));
 }

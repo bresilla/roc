@@ -2,13 +2,11 @@ use clap::ArgMatches;
 use std::fs;
 use std::path::Path;
 
+use crate::commands::cli::{handle_boxed_command_result, required_string};
 use crate::commands::work::create::package_templates::*;
 
 pub fn handle(matches: ArgMatches) {
-    if let Err(e) = create_package(matches) {
-        eprintln!("❌ Error creating package: {}", e);
-        std::process::exit(1);
-    }
+    handle_boxed_command_result(create_package(matches));
 }
 
 fn is_valid_identifier(value: &str) -> bool {
@@ -106,7 +104,7 @@ fn validate_inputs(
 }
 
 fn create_package(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
-    let package_name = matches.get_one::<String>("PACKAGE_NAME").unwrap();
+    let package_name = required_string(&matches, "PACKAGE_NAME")?;
 
     // Parse arguments with defaults
     let package_format = matches

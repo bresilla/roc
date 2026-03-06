@@ -1,3 +1,4 @@
+use crate::commands::cli::print_error_and_exit;
 pub mod all;
 pub mod list;
 pub mod model;
@@ -23,6 +24,6 @@ pub fn handle(matches: ArgMatches) {
         Some(("show", args)) => {
             show::handle(args.clone());
         }
-        _ => unreachable!("UNREACHABLE"),
+        _ => print_error_and_exit("No interface subcommand selected"),
     }
 }

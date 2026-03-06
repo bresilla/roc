@@ -1,3 +1,4 @@
+use crate::commands::cli::print_error_and_exit;
 use clap::ArgMatches;
 
 pub fn handle(matches: ArgMatches) {
@@ -14,7 +15,7 @@ pub fn handle(matches: ArgMatches) {
         Some(("build", args)) => {
             build::handle(args.clone());
         }
-        _ => unreachable!("UNREACHABLE"),
+        _ => print_error_and_exit("No work subcommand selected"),
     }
 }
 
@@ -61,11 +62,13 @@ mod tests {
         );
 
         create::command::create_package_for_tests(create_matches).unwrap();
-        assert!(workspace
-            .join("src")
-            .join("demo_pkg")
-            .join("package.xml")
-            .exists());
+        assert!(
+            workspace
+                .join("src")
+                .join("demo_pkg")
+                .join("package.xml")
+                .exists()
+        );
 
         let list_matches =
             get_subcommand_matches(vec!["work".to_string(), "list".to_string()], "list");

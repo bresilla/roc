@@ -4,6 +4,7 @@ pub mod kind;
 pub mod list;
 
 use crate::arguments::service::CommonServiceArgs;
+use crate::commands::cli::print_error_and_exit;
 use clap::ArgMatches;
 
 pub fn handle(matches: ArgMatches) {
@@ -23,6 +24,6 @@ pub fn handle(matches: ArgMatches) {
         Some(("kind", args)) => {
             kind::handle(args.clone(), common_args);
         }
-        _ => unreachable!("UNREACHABLE"),
+        _ => print_error_and_exit("No service subcommand selected"),
     }
 }

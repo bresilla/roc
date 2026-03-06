@@ -2,6 +2,7 @@ pub mod info;
 pub mod list;
 
 use crate::arguments::node::CommonNodeArgs;
+use crate::commands::cli::print_error_and_exit;
 use clap::ArgMatches;
 
 pub fn handle(matches: ArgMatches) {
@@ -15,6 +16,6 @@ pub fn handle(matches: ArgMatches) {
         Some(("list", args)) => {
             list::handle(args.clone(), common_args);
         }
-        _ => unreachable!("UNREACHABLE"),
+        _ => print_error_and_exit("No node subcommand selected"),
     }
 }

@@ -1,5 +1,6 @@
 use crate::arguments::topic::CommonTopicArgs;
-use anyhow::{anyhow, Result};
+use crate::commands::cli::run_async_command;
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use rclrs::{
     Context, CreateBasicExecutor, DynamicMessage, MessageTypeName, SimpleValueMut, ValueMut,
@@ -276,9 +277,5 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    if let Err(e) = rt.block_on(run_command(matches, common_args)) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    run_async_command(run_command(matches, common_args));
 }
