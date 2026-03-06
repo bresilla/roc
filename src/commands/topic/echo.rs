@@ -643,7 +643,7 @@ async fn echo_topic_messages(
                     }
                     let current_time = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap();
+                        .map_err(|error| anyhow!("System clock is before UNIX epoch: {}", error))?;
                     println!(
                         "{},{},\"{}\"",
                         current_time.as_secs(),

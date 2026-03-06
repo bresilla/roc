@@ -162,9 +162,16 @@ impl TopicDelayInterceptor {
                 match subscription.take_message() {
                     Ok(Some(received)) => {
                         let now = Instant::now();
-                        *latest_clone.lock().unwrap() = Some((received.message, now));
+                        let Ok(mut latest) = latest_clone.lock() else {
+                            eprintln!("Topic delay latest-message state poisoned");
+                            break;
+                        };
+                        *latest = Some((received.message, now));
 
-                        let mut stats = stats_clone.lock().unwrap();
+                        let Ok(mut stats) = stats_clone.lock() else {
+                            eprintln!("Topic delay stats state poisoned");
+                            break;
+                        };
                         stats.messages_received += 1;
                         stats.buffer_size = 1;
 
@@ -187,7 +194,10 @@ impl TopicDelayInterceptor {
         while running.load(Ordering::Relaxed) {
             sleep(self.delay_duration).await;
 
-            let latest = latest_msg.lock().unwrap().take();
+            let latest = latest_msg
+                .lock()
+                .map_err(|_| anyhow!("Topic delay latest-message state poisoned"))?
+                .take();
             let Some((msg, received_at)) = latest else {
                 continue;
             };
@@ -203,7 +213,9 @@ impl TopicDelayInterceptor {
                 );
             }
 
-            let mut stats = stats_clone_publisher.lock().unwrap();
+            let mut stats = stats_clone_publisher
+                .lock()
+                .map_err(|_| anyhow!("Topic delay stats state poisoned"))?;
             stats.messages_published += 1;
             stats.buffer_size = 0;
         }
@@ -220,7 +232,11 @@ fn parse_duration(duration_str: &str) -> Result<Duration> {
     }
 
     // Handle different formats: "5s", "1.5m", "300ms", "2h", or just "5" (assume seconds)
-    let (number_part, unit_part) = if duration_str.chars().last().unwrap().is_ascii_digit() {
+    let Some(last_char) = duration_str.chars().next_back() else {
+        return Err(anyhow!("Empty duration string"));
+    };
+
+    let (number_part, unit_part) = if last_char.is_ascii_digit() {
         // No unit specified, assume seconds
         (duration_str, "s")
     } else {

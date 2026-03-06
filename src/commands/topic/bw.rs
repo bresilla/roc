@@ -58,8 +58,10 @@ impl BandwidthCalculator {
         }
 
         let total_size: usize = self.message_sizes.iter().map(|(_, size)| size).sum();
-        let time_span =
-            self.message_sizes.back().unwrap().0 - self.message_sizes.front().unwrap().0;
+        let time_span = match (self.message_sizes.front(), self.message_sizes.back()) {
+            (Some((first, _)), Some((last, _))) => *last - *first,
+            _ => return 0.0,
+        };
 
         if time_span.as_secs_f64() == 0.0 {
             return 0.0;
@@ -130,6 +132,7 @@ async fn monitor_topic_bandwidth(
     let check_interval = Duration::from_millis(10); // High frequency polling for accurate bandwidth measurement
     let mut stats_print_timer = Instant::now();
     let stats_print_interval = Duration::from_millis(100); // Print stats every 100ms
+    let mut last_no_publisher_warning: Option<Instant> = None;
 
     // Main monitoring loop with real message reception
     while running.load(Ordering::Relaxed) {
@@ -142,7 +145,9 @@ async fn monitor_topic_bandwidth(
                 let current_time = Instant::now();
                 let message_size = format!("{:?}", received.message.view()).len();
 
-                let mut calc = bandwidth_calc_clone.lock().unwrap();
+                let mut calc = bandwidth_calc_clone
+                    .lock()
+                    .map_err(|_| anyhow!("Bandwidth calculator state poisoned"))?;
                 calc.add_message(current_time, message_size);
             }
             Ok(None) => {
@@ -155,7 +160,9 @@ async fn monitor_topic_bandwidth(
 
         // Print statistics periodically
         if stats_print_timer.elapsed() >= stats_print_interval {
-            let calc = bandwidth_calc_clone.lock().unwrap();
+            let calc = bandwidth_calc_clone
+                .lock()
+                .map_err(|_| anyhow!("Bandwidth calculator state poisoned"))?;
             let current_bw = calc.get_current_bandwidth();
             let average_bw = calc.get_average_bandwidth();
             let msg_count = calc.get_message_count();
@@ -207,18 +214,15 @@ async fn monitor_topic_bandwidth(
         let current_publisher_count = graph_context.count_publishers(topic_name).unwrap_or(0);
         if current_publisher_count == 0 {
             // Don't spam the warning - the bandwidth display already shows no messages
-            static mut LAST_NO_PUBLISHER_WARNING: Option<Instant> = None;
             let now = Instant::now();
-            unsafe {
-                let should_warn = match LAST_NO_PUBLISHER_WARNING {
-                    Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
-                    None => true,
-                };
+            let should_warn = match last_no_publisher_warning {
+                Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
+                None => true,
+            };
 
-                if should_warn {
-                    println!("No publishers found for topic '{}'", topic_name);
-                    LAST_NO_PUBLISHER_WARNING = Some(now);
-                }
+            if should_warn {
+                println!("No publishers found for topic '{}'", topic_name);
+                last_no_publisher_warning = Some(now);
             }
         }
     }

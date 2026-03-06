@@ -41,11 +41,10 @@ impl RateCalculator {
             return 0.0;
         }
 
-        let time_span = self
-            .timestamps
-            .back()
-            .unwrap()
-            .duration_since(*self.timestamps.front().unwrap());
+        let time_span = match (self.timestamps.front(), self.timestamps.back()) {
+            (Some(first), Some(last)) => last.duration_since(*first),
+            _ => return 0.0,
+        };
 
         if time_span.as_secs_f64() == 0.0 {
             return 0.0;
@@ -117,6 +116,7 @@ async fn monitor_topic_rate(
     let check_interval = Duration::from_millis(10); // High frequency polling for accurate rate measurement
     let mut stats_print_timer = Instant::now();
     let stats_print_interval = Duration::from_millis(100); // Print stats every 100ms
+    let mut last_no_publisher_warning: Option<Instant> = None;
 
     println!("Monitoring topic rate (window size: {})...", window_size);
     println!("Press Ctrl+C to stop");
@@ -137,7 +137,9 @@ async fn monitor_topic_rate(
                     Instant::now()
                 };
 
-                let mut calc = rate_calc_clone.lock().unwrap();
+                let mut calc = rate_calc_clone
+                    .lock()
+                    .map_err(|_| anyhow!("Rate calculator state poisoned"))?;
                 calc.add_message(current_time);
             }
             Ok(None) => {
@@ -150,7 +152,9 @@ async fn monitor_topic_rate(
 
         // Print statistics periodically
         if stats_print_timer.elapsed() >= stats_print_interval {
-            let calc = rate_calc_clone.lock().unwrap();
+            let calc = rate_calc_clone
+                .lock()
+                .map_err(|_| anyhow!("Rate calculator state poisoned"))?;
             let current_rate = calc.get_current_rate();
             let _average_rate = calc.get_average_rate();
             let total_msgs = calc.get_total_messages();
@@ -196,18 +200,15 @@ async fn monitor_topic_rate(
         let current_publisher_count = graph_context.count_publishers(topic_name).unwrap_or(0);
         if current_publisher_count == 0 {
             // Don't spam the warning - the rate display already shows no messages
-            static mut LAST_NO_PUBLISHER_WARNING: Option<Instant> = None;
             let now = Instant::now();
-            unsafe {
-                let should_warn = match LAST_NO_PUBLISHER_WARNING {
-                    Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
-                    None => true,
-                };
+            let should_warn = match last_no_publisher_warning {
+                Some(last_time) => now.duration_since(last_time) > Duration::from_secs(5),
+                None => true,
+            };
 
-                if should_warn {
-                    println!("No publishers found for topic '{}'", topic_name);
-                    LAST_NO_PUBLISHER_WARNING = Some(now);
-                }
+            if should_warn {
+                println!("No publishers found for topic '{}'", topic_name);
+                last_no_publisher_warning = Some(now);
             }
         }
     }
