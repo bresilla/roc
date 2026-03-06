@@ -917,14 +917,6 @@ impl<'a> BuildExecutor<'a> {
         &self,
         packages: &[PackageMeta],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let metadata_dir = self
-            .config
-            .install_base
-            .join("share")
-            .join("colcon-core")
-            .join("packages");
-        fs::create_dir_all(&metadata_dir)?;
-
         let built_packages: HashSet<&str> = self
             .install_paths
             .keys()
@@ -940,7 +932,10 @@ impl<'a> BuildExecutor<'a> {
                 .into_iter()
                 .filter(|dep| built_packages.contains(dep.as_str()))
                 .collect::<Vec<_>>();
-            let metadata_path = metadata_dir.join(&package.name);
+            let metadata_path = self
+                .package_metadata_root(&package.name)
+                .join(&package.name);
+            fs::create_dir_all(metadata_path.parent().unwrap())?;
             let metadata_contents = runtime_deps.join("\n");
             fs::write(metadata_path, metadata_contents)?;
         }
@@ -1465,7 +1460,39 @@ _colcon_prepend_unique_value() {{
     esac
 }}
 
+_colcon_normalize_path_list() {{
+    var_name="$1"
+    eval current_value="\${{${{var_name}}:-}}"
+    if [ -z "$current_value" ]; then
+        return
+    fi
+
+    old_ifs="$IFS"
+    IFS=':'
+    normalized=""
+    for entry in $current_value; do
+        if [ -z "$entry" ]; then
+            continue
+        fi
+        if [ -z "$normalized" ]; then
+            normalized="$entry"
+        else
+            normalized="$normalized:$entry"
+        fi
+    done
+    IFS="$old_ifs"
+    unset old_ifs
+
+    if [ -n "$normalized" ]; then
+        eval export "$var_name=$normalized"
+    else
+        unset "$var_name"
+    fi
+}}
+
 _colcon_workspace_prefix="{install_prefix}"
+_colcon_previous_prefixes="${{COLCON_PREFIX_PATH:-}}"
+_colcon_normalize_path_list COLCON_PREFIX_PATH
 _colcon_previous_prefixes="${{COLCON_PREFIX_PATH:-}}"
 
 if [ -n "$_colcon_previous_prefixes" ]; then
@@ -1482,6 +1509,7 @@ fi
 
 _colcon_prefix_chain_source_script "{local_setup}"
 _colcon_prepend_unique_value COLCON_PREFIX_PATH "$_colcon_workspace_prefix"
+_colcon_normalize_path_list COLCON_PREFIX_PATH
 unset _colcon_workspace_prefix
 unset _colcon_previous_prefixes
 unset _colcon_prefix
@@ -1489,6 +1517,25 @@ unset _colcon_prefix
             install_prefix = install_dir.display(),
             local_setup = install_dir.join("local_setup.sh").display(),
         )
+    }
+
+    fn package_metadata_root(&self, package_name: &str) -> PathBuf {
+        if self.config.merge_install {
+            self.config
+                .install_base
+                .join("share")
+                .join("colcon-core")
+                .join("packages")
+        } else if let Some(package_prefix) = self.install_paths.get(package_name) {
+            package_prefix.join("share").join("colcon-core").join("packages")
+        } else {
+            self.config
+                .install_base
+                .join(package_name)
+                .join("share")
+                .join("colcon-core")
+                .join("packages")
+        }
     }
 
     fn scan_installed_artifacts(prefix: &Path) -> InstalledArtifacts {
@@ -1998,7 +2045,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_package_metadata_files_writes_workspace_runtime_dependencies() {
+    fn generate_package_metadata_files_writes_isolated_runtime_dependencies_to_package_prefixes() {
         let temp = tempdir().unwrap();
         let workspace_root = temp.path().to_path_buf();
         let mut config = BuildConfig::default();
@@ -2040,6 +2087,79 @@ mod tests {
                 build_deps: Vec::new(),
                 buildtool_deps: Vec::new(),
                 build_export_deps: vec!["external_pkg".to_string()],
+                exec_deps: vec!["base_pkg".to_string()],
+                test_deps: Vec::new(),
+            },
+        ];
+
+        executor.generate_package_metadata_files(&packages).unwrap();
+
+        let metadata_root = config
+            .install_base
+            .join("consumer_pkg")
+            .join("share/colcon-core/packages");
+        let base_metadata_root = config
+            .install_base
+            .join("base_pkg")
+            .join("share/colcon-core/packages");
+        assert_eq!(
+            std::fs::read_to_string(base_metadata_root.join("base_pkg")).unwrap(),
+            ""
+        );
+        assert_eq!(
+            std::fs::read_to_string(metadata_root.join("consumer_pkg")).unwrap(),
+            "base_pkg"
+        );
+        assert!(!config
+            .install_base
+            .join("share/colcon-core/packages/consumer_pkg")
+            .exists());
+    }
+
+    #[test]
+    fn generate_package_metadata_files_writes_merged_runtime_dependencies_to_workspace_root() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+        config.merge_install = true;
+        config.isolated = false;
+
+        let mut executor = BuildExecutor::new(&config);
+        executor
+            .install_paths
+            .insert("base_pkg".to_string(), config.install_base.clone());
+        executor
+            .install_paths
+            .insert("consumer_pkg".to_string(), config.install_base.clone());
+
+        let packages = vec![
+            PackageMeta {
+                name: "base_pkg".to_string(),
+                path: PathBuf::from("/tmp/base_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "base".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: Vec::new(),
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
+                exec_deps: Vec::new(),
+                test_deps: Vec::new(),
+            },
+            PackageMeta {
+                name: "consumer_pkg".to_string(),
+                path: PathBuf::from("/tmp/consumer_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "consumer".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: vec!["base_pkg".to_string()],
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
                 exec_deps: vec!["base_pkg".to_string()],
                 test_deps: Vec::new(),
             },
@@ -2207,6 +2327,58 @@ mod tests {
         let setup_sh = std::fs::read_to_string(config.install_base.join("setup.sh")).unwrap();
         assert!(setup_sh.contains("COLCON_PREFIX_PATH"));
         assert!(setup_sh.contains("local_setup.sh"));
+        assert!(setup_sh.contains("_colcon_normalize_path_list"));
+    }
+
+    #[test]
+    fn workspace_setup_normalizes_colcon_prefix_path_without_trailing_separator() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let mut executor = BuildExecutor::new(&config);
+        let package_prefix = config.install_base.join("demo_pkg");
+        executor
+            .install_paths
+            .insert("demo_pkg".to_string(), package_prefix.clone());
+
+        let packages = vec![PackageMeta {
+            name: "demo_pkg".to_string(),
+            path: PathBuf::from("/tmp/demo_pkg"),
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+
+        fs::create_dir_all(package_prefix.join("share/demo_pkg")).unwrap();
+        executor
+            .generate_workspace_setup_scripts(&config.install_base, &packages)
+            .unwrap();
+
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(format!(
+                "COLCON_PREFIX_PATH='{prefix}:' . '{setup}' >/dev/null 2>&1; printf '%s' \"$COLCON_PREFIX_PATH\"",
+                prefix = config.install_base.display(),
+                setup = config.install_base.join("setup.sh").display(),
+            ))
+            .output()
+            .unwrap();
+
+        assert!(output.status.success());
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            config.install_base.display().to_string()
+        );
     }
 
     #[test]

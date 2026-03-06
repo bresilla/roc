@@ -64,13 +64,10 @@ Already implemented:
 
 Known remaining parity gaps from direct validation:
 
-- `ament_python` package registration is still wrong enough that `ros2 pkg prefix` fails
-- isolated Python installs land under `local/lib/.../dist-packages` instead of the expected `lib/pythonX.Y/site-packages`
-- Python package marker and `package.xml` placement still diverge from `colcon`
-- generated hook set is incomplete compared to `colcon`, especially for Python packages
-- `_local_setup_util_*.py` and `.ps1` outputs are missing
-- `share/colcon-core/packages/<pkg>` placement still differs from `colcon`
-- `COLCON_PREFIX_PATH` still has a trailing separator in generated setup
+- root `.ps1` workspace setup wrappers are still incomplete compared to `colcon`
+- `.colcon_install_layout` is still missing
+- selector parity still needs a broader comparison against `colcon`
+- validation coverage still needs to expand beyond the current minimal workspaces
 
 ## Non-Negotiable Constraints
 
@@ -105,6 +102,10 @@ Commit rule:
 - Slice 11: package selection and resume semantics
 - Slice 12: validation against real ROS 2 packages
 - Slice 13: documentation cleanup
+- Slice 14: `ament_python` install layout
+- Slice 15: Python package registration and resource index layout
+- Slice 16: full hook set and helper scripts
+- Slice 17: package metadata placement and prefix chaining edge cases
 
 Those slices got the implementation close. They do **not** finish full parity.
 
@@ -179,28 +180,6 @@ Definition of done:
 Suggested commit title:
 
 - `Generate colcon helper scripts and standard package hooks`
-
-### Slice 17: Fix Metadata Placement and Prefix Chaining Edge Cases
-
-Objective:
-
-- eliminate the remaining metadata-layout and environment mismatches
-
-Tasks:
-
-- align `share/colcon-core/packages/<pkg>` placement with `colcon`
-- remove malformed separators in generated path variables
-- verify `COLCON_PREFIX_PATH`, `AMENT_PREFIX_PATH`, `CMAKE_PREFIX_PATH`, and `PYTHONPATH` against `colcon`
-- tighten isolated vs merged prefix behavior for overlays
-
-Definition of done:
-
-- path variables match `colcon` behavior in validated cases
-- metadata placement no longer differs in a way that affects downstream tooling
-
-Suggested commit title:
-
-- `Align colcon package metadata and prefix chaining behavior`
 
 ### Slice 18: Complete Selector Parity
 
