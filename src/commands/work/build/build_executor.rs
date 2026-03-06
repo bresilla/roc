@@ -19,7 +19,7 @@ pub struct BuildExecutor<'a> {
 }
 
 /// Represents the state of a package during the build process
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PackageState {
     Pending,
     Building,
@@ -32,6 +32,7 @@ pub struct BuildState {
     package_states: Arc<Mutex<HashMap<String, PackageState>>>,
     install_paths: Arc<Mutex<HashMap<String, PathBuf>>>,
     build_count: Arc<Mutex<(usize, usize)>>, // (successful, failed)
+    build_records: Arc<Mutex<HashMap<String, BuildRecord>>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -48,6 +49,13 @@ enum DsvOperation {
     Set { name: String, value: String },
     SetIfUnset { name: String, value: String },
     Source { path: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BuildRecord {
+    status: PackageState,
+    duration_ms: u128,
+    error: Option<String>,
 }
 
 impl<'a> BuildExecutor<'a> {
@@ -91,6 +99,7 @@ impl<'a> BuildExecutor<'a> {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut successful_builds = 0;
         let mut failed_builds = 0;
+        let mut build_records = HashMap::new();
 
         for &pkg_idx in build_order {
             let package = &packages[pkg_idx];
@@ -151,18 +160,36 @@ impl<'a> BuildExecutor<'a> {
                     self.install_paths
                         .insert(package.name.clone(), install_path.clone());
 
+                    build_records.insert(
+                        package.name.clone(),
+                        BuildRecord {
+                            status: PackageState::Completed,
+                            duration_ms: duration.as_millis(),
+                            error: None,
+                        },
+                    );
                     successful_builds += 1;
                 }
                 Err(e) => {
+                    let duration = start_time.elapsed();
                     eprintln!(
                         "{} {} - {}",
                         "Failed <<<".bright_red().bold(),
                         package.name.bright_white().bold(),
                         e.to_string().bright_white()
                     );
+                    build_records.insert(
+                        package.name.clone(),
+                        BuildRecord {
+                            status: PackageState::Failed,
+                            duration_ms: duration.as_millis(),
+                            error: Some(e.to_string()),
+                        },
+                    );
                     failed_builds += 1;
 
                     if !self.config.continue_on_error {
+                        self.write_build_summary(packages, &build_records)?;
                         return Err(
                             format!("Build failed for package {}: {}", package.name, e).into()
                         );
@@ -185,6 +212,8 @@ impl<'a> BuildExecutor<'a> {
             );
         }
 
+        self.write_build_summary(packages, &build_records)?;
+
         // Generate environment setup scripts
         self.generate_setup_scripts(packages)?;
 
@@ -201,6 +230,7 @@ impl<'a> BuildExecutor<'a> {
             package_states: Arc::new(Mutex::new(HashMap::new())),
             install_paths: Arc::new(Mutex::new(HashMap::new())),
             build_count: Arc::new(Mutex::new((0, 0))),
+            build_records: Arc::new(Mutex::new(HashMap::new())),
         };
 
         // Initialize package states
@@ -219,13 +249,7 @@ impl<'a> BuildExecutor<'a> {
             let deps: HashSet<String> = package
                 .build_order_deps()
                 .into_iter()
-                .filter(|dep| {
-                    build_state
-                        .package_states
-                        .lock()
-                        .unwrap()
-                        .contains_key(dep)
-                })
+                .filter(|dep| build_state.package_states.lock().unwrap().contains_key(dep))
                 .collect();
             pkg_dependencies.insert(package.name.clone(), deps);
         }
@@ -241,6 +265,7 @@ impl<'a> BuildExecutor<'a> {
                 package_states: Arc::clone(&build_state.package_states),
                 install_paths: Arc::clone(&build_state.install_paths),
                 build_count: Arc::clone(&build_state.build_count),
+                build_records: Arc::clone(&build_state.build_records),
             };
             let packages_clone = Arc::clone(&packages_arc);
             let dependencies_clone = Arc::clone(&dependencies_arc);
@@ -269,6 +294,10 @@ impl<'a> BuildExecutor<'a> {
         {
             let shared_paths = build_state.install_paths.lock().unwrap();
             self.install_paths.extend(shared_paths.clone());
+        }
+        {
+            let records = build_state.build_records.lock().unwrap();
+            self.write_build_summary(packages, &records)?;
         }
 
         // Print summary
@@ -412,6 +441,17 @@ impl<'a> BuildExecutor<'a> {
                                     let mut counts = build_state.build_count.lock().unwrap();
                                     counts.0 += 1;
                                 }
+                                {
+                                    let mut records = build_state.build_records.lock().unwrap();
+                                    records.insert(
+                                        package.name.clone(),
+                                        BuildRecord {
+                                            status: PackageState::Completed,
+                                            duration_ms: duration.as_millis(),
+                                            error: None,
+                                        },
+                                    );
+                                }
                             }
                             Err(e) => {
                                 eprintln!(
@@ -432,6 +472,17 @@ impl<'a> BuildExecutor<'a> {
                                 {
                                     let mut counts = build_state.build_count.lock().unwrap();
                                     counts.1 += 1;
+                                }
+                                {
+                                    let mut records = build_state.build_records.lock().unwrap();
+                                    records.insert(
+                                        package.name.clone(),
+                                        BuildRecord {
+                                            status: PackageState::Failed,
+                                            duration_ms: duration.as_millis(),
+                                            error: Some(e.to_string()),
+                                        },
+                                    );
                                 }
 
                                 if !config.continue_on_error {
@@ -538,7 +589,11 @@ impl<'a> BuildExecutor<'a> {
         configure_cmd.envs(env_manager.get_env_vars());
 
         println!("  {}", "Configuring with CMake...".bright_blue());
-        Self::run_command_checked(configure_cmd, "CMake configure")?;
+        Self::run_command_checked(
+            configure_cmd,
+            "CMake configure",
+            &Self::phase_log_path(config, &package.name, "configure"),
+        )?;
         println!("  {}", "CMake configure succeeded".bright_green());
 
         let mut build_cmd = Command::new("cmake");
@@ -550,7 +605,11 @@ impl<'a> BuildExecutor<'a> {
         build_cmd.envs(env_manager.get_env_vars());
 
         println!("  {}", "Building with CMake...".bright_blue());
-        Self::run_command_checked(build_cmd, "CMake build")?;
+        Self::run_command_checked(
+            build_cmd,
+            "CMake build",
+            &Self::phase_log_path(config, &package.name, "build"),
+        )?;
         println!("  {}", "CMake build succeeded".bright_green());
 
         let mut install_cmd = Command::new("cmake");
@@ -558,7 +617,11 @@ impl<'a> BuildExecutor<'a> {
         install_cmd.envs(env_manager.get_env_vars());
 
         println!("  {}", "Installing with CMake...".bright_blue());
-        Self::run_command_checked(install_cmd, "CMake install")?;
+        Self::run_command_checked(
+            install_cmd,
+            "CMake install",
+            &Self::phase_log_path(config, &package.name, "install"),
+        )?;
         println!("  {}", "CMake install succeeded".bright_green());
 
         Ok(())
@@ -585,14 +648,22 @@ impl<'a> BuildExecutor<'a> {
             .args(Self::python_build_args(&build_dir))
             .current_dir(&package.path)
             .envs(env_manager.get_env_vars());
-        Self::run_command_checked(build_cmd, "Python build")?;
+        Self::run_command_checked(
+            build_cmd,
+            "Python build",
+            &Self::phase_log_path(config, &package.name, "build"),
+        )?;
 
         let mut install_cmd = Command::new("python3");
         install_cmd
             .args(Self::python_install_args(&build_dir, &install_prefix))
             .current_dir(&package.path)
             .envs(env_manager.get_env_vars());
-        Self::run_command_checked(install_cmd, "Python install")?;
+        Self::run_command_checked(
+            install_cmd,
+            "Python install",
+            &Self::phase_log_path(config, &package.name, "install"),
+        )?;
 
         if config.symlink_install {
             Self::apply_python_symlink_install(package, &build_dir, &install_prefix)
@@ -608,7 +679,8 @@ impl<'a> BuildExecutor<'a> {
         install_prefix: &Path,
     ) -> Result<(), io::Error> {
         let source_package_dir = package.path.join(&package.name);
-        let install_package_dir = Self::find_python_package_install_dir(install_prefix, &package.name);
+        let install_package_dir =
+            Self::find_python_package_install_dir(install_prefix, &package.name);
 
         if let Some(install_dir) = install_package_dir {
             Self::replace_with_symlink(&install_dir, &source_package_dir)?;
@@ -690,10 +762,7 @@ impl<'a> BuildExecutor<'a> {
                 &package_bash,
                 self.render_shell_wrapper("bash", &package_sh),
             )?;
-            fs::write(
-                &package_zsh,
-                self.render_shell_wrapper("zsh", &package_sh),
-            )?;
+            fs::write(&package_zsh, self.render_shell_wrapper("zsh", &package_sh))?;
 
             Self::make_executable_if_unix(&local_setup_sh)?;
             Self::make_executable_if_unix(&local_setup_bash)?;
@@ -718,7 +787,11 @@ impl<'a> BuildExecutor<'a> {
             .join("packages");
         fs::create_dir_all(&metadata_dir)?;
 
-        let built_packages: HashSet<&str> = self.install_paths.keys().map(|name| name.as_str()).collect();
+        let built_packages: HashSet<&str> = self
+            .install_paths
+            .keys()
+            .map(|name| name.as_str())
+            .collect();
         for package in packages {
             if !self.install_paths.contains_key(&package.name) {
                 continue;
@@ -801,6 +874,56 @@ impl<'a> BuildExecutor<'a> {
         Ok(())
     }
 
+    fn package_log_dir(config: &BuildConfig, package_name: &str) -> PathBuf {
+        config.log_base.join("latest").join(package_name)
+    }
+
+    fn phase_log_path(config: &BuildConfig, package_name: &str, phase_name: &str) -> PathBuf {
+        Self::package_log_dir(config, package_name).join(format!("{phase_name}.log"))
+    }
+
+    fn write_build_summary(
+        &self,
+        packages: &[PackageMeta],
+        records: &HashMap<String, BuildRecord>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut summary = String::from("# roc build summary\n");
+        for package in packages {
+            let Some(record) = records.get(&package.name) else {
+                continue;
+            };
+
+            let status = match record.status {
+                PackageState::Pending => "pending",
+                PackageState::Building => "building",
+                PackageState::Completed => "completed",
+                PackageState::Failed => "failed",
+            };
+            summary.push_str(&format!(
+                "{package}: status={status} duration_ms={duration}\n",
+                package = package.name,
+                duration = record.duration_ms,
+            ));
+            summary.push_str(&format!(
+                "logs={log_dir}\n",
+                log_dir = Self::package_log_dir(self.config, &package.name).display()
+            ));
+            if let Some(error) = &record.error {
+                summary.push_str(&format!("error={error}\n"));
+            }
+            summary.push('\n');
+        }
+
+        fs::write(
+            self.config
+                .log_base
+                .join("latest")
+                .join("build_summary.log"),
+            summary,
+        )?;
+        Ok(())
+    }
+
     fn render_local_setup_sh(&self, package_name: &str, prefix: &Path) -> String {
         let prefix_str = prefix.display();
         let artifacts = Self::scan_installed_artifacts(prefix);
@@ -830,15 +953,17 @@ _colcon_prepend_unique_value AMENT_PREFIX_PATH "{prefix_str}"
 
 {path_exports}
 {hook_exports}
-"#
-            ,
+"#,
             path_exports = Self::render_artifact_exports(&artifacts),
             hook_exports = hook_exports,
         )
     }
 
     fn render_package_sh(&self, package_name: &str, prefix: &Path) -> String {
-        let local_setup_path = prefix.join("share").join(package_name).join("local_setup.sh");
+        let local_setup_path = prefix
+            .join("share")
+            .join(package_name)
+            .join("local_setup.sh");
         format!(
             r#"#!/bin/sh
 # Generated package setup script for package {package_name}
@@ -1110,12 +1235,10 @@ unset _colcon_prefix
                 name: first,
                 value: second,
             }),
-            "prepend-non-duplicate-if-exists" => {
-                Some(DsvOperation::PrependNonDuplicateIfExists {
-                    name: first,
-                    value: second,
-                })
-            }
+            "prepend-non-duplicate-if-exists" => Some(DsvOperation::PrependNonDuplicateIfExists {
+                name: first,
+                value: second,
+            }),
             "set" => Some(DsvOperation::Set {
                 name: first,
                 value: second,
@@ -1149,7 +1272,11 @@ unset _colcon_prefix
             }
             DsvOperation::Set { name, value } => {
                 let resolved = Self::resolve_set_value(prefix, value);
-                format!("export {name}=\"{resolved}\"\n", name = name, resolved = resolved)
+                format!(
+                    "export {name}=\"{resolved}\"\n",
+                    name = name,
+                    resolved = resolved
+                )
             }
             DsvOperation::SetIfUnset { name, value } => {
                 let resolved = Self::resolve_set_value(prefix, value);
@@ -1191,7 +1318,10 @@ unset _colcon_prefix
         }
     }
 
-    fn find_python_package_install_dir(install_prefix: &Path, package_name: &str) -> Option<PathBuf> {
+    fn find_python_package_install_dir(
+        install_prefix: &Path,
+        package_name: &str,
+    ) -> Option<PathBuf> {
         for base in [
             install_prefix.join("lib"),
             install_prefix.join("local").join("lib"),
@@ -1336,7 +1466,11 @@ unset _colcon_prefix
         ]
     }
 
-    fn run_command_checked(mut command: Command, label: &str) -> Result<(), String> {
+    fn run_command_checked(
+        mut command: Command,
+        label: &str,
+        log_path: &Path,
+    ) -> Result<(), String> {
         let program = command.get_program().to_string_lossy().to_string();
         let args = command
             .get_args()
@@ -1346,16 +1480,24 @@ unset _colcon_prefix
         let output = command
             .output()
             .map_err(|e| format!("{label} failed to start: {e}"))?;
-        if output.status.success() {
-            return Ok(());
-        }
-
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let command_line = std::iter::once(program)
             .chain(args.into_iter())
             .collect::<Vec<_>>()
             .join(" ");
+        Self::write_command_log(
+            log_path,
+            label,
+            &command_line,
+            output.status.code(),
+            &stdout,
+            &stderr,
+        )
+        .map_err(|e| format!("Failed to write {label} log: {e}"))?;
+        if output.status.success() {
+            return Ok(());
+        }
 
         let mut message = format!("{label} failed.\nCommand: {command_line}");
         if !stdout.is_empty() {
@@ -1366,6 +1508,38 @@ unset _colcon_prefix
         }
 
         Err(message)
+    }
+
+    fn write_command_log(
+        log_path: &Path,
+        label: &str,
+        command_line: &str,
+        exit_code: Option<i32>,
+        stdout: &str,
+        stderr: &str,
+    ) -> Result<(), io::Error> {
+        if let Some(parent) = log_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let mut content = format!(
+            "[{label}]\ncommand={command_line}\nexit_code={exit_code}\n\n",
+            exit_code = exit_code
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "signal".to_string())
+        );
+        if !stdout.is_empty() {
+            content.push_str("[stdout]\n");
+            content.push_str(stdout);
+            content.push_str("\n\n");
+        }
+        if !stderr.is_empty() {
+            content.push_str("[stderr]\n");
+            content.push_str(stderr);
+            content.push('\n');
+        }
+
+        fs::write(log_path, content)
     }
 
     fn make_executable_if_unix(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -1387,10 +1561,12 @@ unset _colcon_prefix
 
 #[cfg(test)]
 mod tests {
-    use super::{BuildExecutor, DsvOperation, InstalledArtifacts};
+    use super::{BuildExecutor, BuildRecord, DsvOperation, InstalledArtifacts, PackageState};
     use crate::commands::work::build::{BuildConfig, BuildType, PackageMeta};
+    use std::collections::HashMap;
     use std::fs;
     use std::path::PathBuf;
+    use std::process::Command;
     use tempfile::tempdir;
 
     #[test]
@@ -1413,7 +1589,11 @@ mod tests {
         assert!(config.build_base.join("COLCON_IGNORE").exists());
         assert!(config.install_base.join("COLCON_IGNORE").exists());
         assert!(config.log_base.join("COLCON_IGNORE").exists());
-        assert!(config.log_base.join("latest").join("COLCON_IGNORE").exists());
+        assert!(config
+            .log_base
+            .join("latest")
+            .join("COLCON_IGNORE")
+            .exists());
     }
 
     #[test]
@@ -1555,7 +1735,9 @@ mod tests {
             test_deps: Vec::new(),
         }];
 
-        executor.generate_workspace_setup_scripts(&config.install_base, &packages).unwrap();
+        executor
+            .generate_workspace_setup_scripts(&config.install_base, &packages)
+            .unwrap();
 
         assert!(config.install_base.join("local_setup.sh").exists());
         assert!(config.install_base.join("local_setup.bash").exists());
@@ -1564,7 +1746,8 @@ mod tests {
         assert!(config.install_base.join("setup.bash").exists());
         assert!(config.install_base.join("setup.zsh").exists());
 
-        let local_setup = std::fs::read_to_string(config.install_base.join("local_setup.sh")).unwrap();
+        let local_setup =
+            std::fs::read_to_string(config.install_base.join("local_setup.sh")).unwrap();
         assert!(local_setup.contains("package.sh"));
         assert!(local_setup.contains("COLCON_CURRENT_PREFIX"));
 
@@ -1687,15 +1870,20 @@ mod tests {
         fs::write(&source_package_xml, "<package />\n").unwrap();
 
         let install_prefix = temp.path().join("install/demo_python_pkg");
-        let installed_module_dir = install_prefix.join("lib/python3.12/site-packages/demo_python_pkg");
-        let installed_resource_marker = install_prefix
-            .join("share/ament_index/resource_index/packages/demo_python_pkg");
+        let installed_module_dir =
+            install_prefix.join("lib/python3.12/site-packages/demo_python_pkg");
+        let installed_resource_marker =
+            install_prefix.join("share/ament_index/resource_index/packages/demo_python_pkg");
         let installed_package_xml = install_prefix.join("share/demo_python_pkg/package.xml");
         fs::create_dir_all(installed_module_dir.parent().unwrap()).unwrap();
         fs::create_dir_all(installed_resource_marker.parent().unwrap()).unwrap();
         fs::create_dir_all(installed_package_xml.parent().unwrap()).unwrap();
         fs::create_dir_all(&installed_module_dir).unwrap();
-        fs::write(installed_module_dir.join("__init__.py"), "# installed module\n").unwrap();
+        fs::write(
+            installed_module_dir.join("__init__.py"),
+            "# installed module\n",
+        )
+        .unwrap();
         fs::write(&installed_resource_marker, "").unwrap();
         fs::write(&installed_package_xml, "<package />\n").unwrap();
 
@@ -1714,7 +1902,8 @@ mod tests {
             test_deps: Vec::new(),
         };
 
-        BuildExecutor::apply_python_symlink_install(&package, temp.path(), &install_prefix).unwrap();
+        BuildExecutor::apply_python_symlink_install(&package, temp.path(), &install_prefix)
+            .unwrap();
 
         let module_meta = fs::symlink_metadata(&installed_module_dir).unwrap();
         let marker_meta = fs::symlink_metadata(&installed_resource_marker).unwrap();
@@ -1757,7 +1946,12 @@ mod tests {
         );
         assert_eq!(
             install,
-            vec!["--install", "/ws/build/demo_pkg", "--prefix", "/ws/install/demo_pkg"]
+            vec![
+                "--install",
+                "/ws/build/demo_pkg",
+                "--prefix",
+                "/ws/install/demo_pkg"
+            ]
         );
     }
 
@@ -1772,5 +1966,65 @@ mod tests {
         assert!(args.contains(&"--single-version-externally-managed".to_string()));
         assert!(args.contains(&"--record".to_string()));
         assert!(args.contains(&"/ws/build/demo_python_pkg/install-record.txt".to_string()));
+    }
+
+    #[test]
+    fn run_command_checked_writes_phase_log() {
+        let temp = tempdir().unwrap();
+        let log_path = temp.path().join("latest/demo_pkg/build.log");
+
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf 'hello stdout'; printf 'oops stderr' >&2"]);
+
+        BuildExecutor::run_command_checked(command, "Fixture command", &log_path).unwrap();
+
+        let log = fs::read_to_string(log_path).unwrap();
+        assert!(log.contains("[Fixture command]"));
+        assert!(log.contains("exit_code=0"));
+        assert!(log.contains("[stdout]"));
+        assert!(log.contains("hello stdout"));
+        assert!(log.contains("[stderr]"));
+        assert!(log.contains("oops stderr"));
+    }
+
+    #[test]
+    fn write_build_summary_persists_package_statuses_and_log_paths() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.log_base = workspace_root.join("log");
+        fs::create_dir_all(config.log_base.join("latest")).unwrap();
+
+        let executor = BuildExecutor::new(&config);
+        let packages = vec![PackageMeta {
+            name: "demo_pkg".to_string(),
+            path: PathBuf::from("/tmp/demo_pkg"),
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+        let records = HashMap::from([(
+            "demo_pkg".to_string(),
+            BuildRecord {
+                status: PackageState::Completed,
+                duration_ms: 42,
+                error: None,
+            },
+        )]);
+
+        executor.write_build_summary(&packages, &records).unwrap();
+
+        let summary = fs::read_to_string(config.log_base.join("latest/build_summary.log")).unwrap();
+        assert!(summary.contains("demo_pkg: status=completed duration_ms=42"));
+        assert!(summary.contains("logs="));
+        assert!(summary.contains("log/latest/demo_pkg"));
     }
 }
