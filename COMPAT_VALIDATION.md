@@ -66,10 +66,9 @@ Observed result:
 
 Observed tree deltas:
 
-- `colcon` installed Python payloads to `install/<pkg>/lib/python3.12/site-packages`
-- `roc` installed Python payloads to `install/<pkg>/local/lib/python3.12/dist-packages`
+- `colcon` and `roc` now both install Python payloads under `install/<pkg>/lib/python3.12/site-packages`
 - `colcon` installed the package marker and `package.xml` under `install/<pkg>/share/...`
-- `roc` installed those artifacts under `install/<pkg>/local/share/...`
+- `roc` still installs those artifacts under `install/<pkg>/local/share/...`
 - `colcon` generated package hook files like `ament_prefix_path.*`, `pythonpath.*`, and `package.dsv`
 - `roc` generated shell setup wrappers, but not the same package hook set
 
@@ -87,8 +86,7 @@ It is not yet a full `colcon` replacement for `ament_python` packages, because t
 
 ## Next Fixes Suggested By Validation
 
-1. Make isolated Python installs land under `install/<pkg>/lib/pythonX.Y/site-packages` instead of `local/lib/.../dist-packages`.
-2. Install the ament resource marker and `package.xml` under `install/<pkg>/share/...` for isolated Python packages.
-3. Generate the missing `ament_prefix_path`, `pythonpath`, and `package.dsv` hook set for Python packages.
-4. Move or mirror `share/colcon-core/packages/<pkg>` to the package-prefix layout that `colcon` uses.
-5. Trim the trailing separator from generated `COLCON_PREFIX_PATH`.
+1. Install the ament resource marker and `package.xml` under `install/<pkg>/share/...` for isolated Python packages.
+2. Generate the missing `ament_prefix_path`, `pythonpath`, and `package.dsv` hook set for Python packages.
+3. Move or mirror `share/colcon-core/packages/<pkg>` to the package-prefix layout that `colcon` uses.
+4. Trim the trailing separator from generated `COLCON_PREFIX_PATH`.

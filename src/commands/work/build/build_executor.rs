@@ -693,6 +693,9 @@ impl<'a> BuildExecutor<'a> {
             &Self::phase_log_path(config, &package.name, "install"),
         )?;
 
+        Self::normalize_python_install_layout(&install_prefix)
+            .map_err(|e| format!("Failed to normalize Python install layout: {}", e))?;
+
         if config.symlink_install {
             Self::apply_python_symlink_install(package, &build_dir, &install_prefix)
                 .map_err(|e| format!("Failed to apply symlink install: {}", e))?;
@@ -734,6 +737,87 @@ impl<'a> BuildExecutor<'a> {
             Self::replace_with_symlink(&install_package_xml, &source_package_xml)?;
         }
 
+        Ok(())
+    }
+
+    fn normalize_python_install_layout(install_prefix: &Path) -> Result<(), io::Error> {
+        let local_lib_dir = install_prefix.join("local").join("lib");
+        if !local_lib_dir.is_dir() {
+            return Ok(());
+        }
+
+        let entries = match fs::read_dir(&local_lib_dir) {
+            Ok(entries) => entries,
+            Err(_) => return Ok(()),
+        };
+
+        for entry in entries.flatten() {
+            let local_python_dir = entry.path();
+            if !local_python_dir.is_dir() {
+                continue;
+            }
+            let Some(dir_name) = local_python_dir.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if !dir_name.starts_with("python") {
+                continue;
+            }
+
+            let dist_packages = local_python_dir.join("dist-packages");
+            if !dist_packages.is_dir() {
+                continue;
+            }
+
+            let site_packages = install_prefix
+                .join("lib")
+                .join(dir_name)
+                .join("site-packages");
+            Self::merge_directory_contents(&dist_packages, &site_packages)?;
+            fs::remove_dir_all(&dist_packages)?;
+            Self::remove_empty_parent_chain(&local_python_dir, &install_prefix.join("local"))?;
+        }
+
+        Ok(())
+    }
+
+    fn merge_directory_contents(source: &Path, destination: &Path) -> Result<(), io::Error> {
+        fs::create_dir_all(destination)?;
+
+        for entry in fs::read_dir(source)? {
+            let entry = entry?;
+            let source_path = entry.path();
+            let destination_path = destination.join(entry.file_name());
+
+            if destination_path.exists() {
+                let source_meta = fs::metadata(&source_path)?;
+                let destination_meta = fs::metadata(&destination_path)?;
+                if source_meta.is_dir() && destination_meta.is_dir() {
+                    Self::merge_directory_contents(&source_path, &destination_path)?;
+                    fs::remove_dir_all(&source_path)?;
+                } else {
+                    fs::remove_file(&destination_path)?;
+                    fs::rename(&source_path, &destination_path)?;
+                }
+            } else {
+                fs::rename(&source_path, &destination_path)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn remove_empty_parent_chain(path: &Path, stop_at: &Path) -> Result<(), io::Error> {
+        let mut current = path.to_path_buf();
+        while current.starts_with(stop_at) && current != stop_at {
+            if fs::read_dir(&current)?.next().is_some() {
+                break;
+            }
+            fs::remove_dir(&current)?;
+            let Some(parent) = current.parent() else {
+                break;
+            };
+            current = parent.to_path_buf();
+        }
         Ok(())
     }
 
@@ -1973,6 +2057,36 @@ mod tests {
         assert!(module_meta.file_type().is_symlink());
         assert!(marker_meta.file_type().is_symlink());
         assert!(xml_meta.file_type().is_symlink());
+    }
+
+    #[test]
+    fn normalize_python_install_layout_moves_dist_packages_into_site_packages() {
+        let temp = tempdir().unwrap();
+        let install_prefix = temp.path().join("install/demo_python_pkg");
+        let local_package_dir =
+            install_prefix.join("local/lib/python3.12/dist-packages/demo_python_pkg");
+        let local_egg_info_dir = install_prefix
+            .join("local/lib/python3.12/dist-packages/demo_python_pkg-0.1.0-py3.12.egg-info");
+
+        fs::create_dir_all(&local_package_dir).unwrap();
+        fs::create_dir_all(&local_egg_info_dir).unwrap();
+        fs::write(local_package_dir.join("__init__.py"), "# module\n").unwrap();
+        fs::write(local_egg_info_dir.join("PKG-INFO"), "metadata\n").unwrap();
+
+        BuildExecutor::normalize_python_install_layout(&install_prefix).unwrap();
+
+        let site_packages = install_prefix.join("lib/python3.12/site-packages");
+        assert!(site_packages.join("demo_python_pkg/__init__.py").exists());
+        assert!(
+            site_packages
+                .join("demo_python_pkg-0.1.0-py3.12.egg-info/PKG-INFO")
+                .exists()
+        );
+        assert!(
+            !install_prefix
+                .join("local/lib/python3.12/dist-packages")
+                .exists()
+        );
     }
 
     #[test]
