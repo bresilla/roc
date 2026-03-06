@@ -1,2 +1,2 @@
 #!/bin/bash
-# fixture underlay setup
+. "./setup.sh"

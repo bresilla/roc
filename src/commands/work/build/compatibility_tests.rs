@@ -97,7 +97,12 @@ fn merged_install_fixture_contains_expected_tree_shape() {
     assert_paths_exist(
         &install_root,
         &[
+            "local_setup.sh",
+            "local_setup.bash",
+            "local_setup.zsh",
+            "setup.sh",
             "setup.bash",
+            "setup.zsh",
             "bin",
             "bin/demo_merged_node",
             "lib",
@@ -127,6 +132,8 @@ fn overlay_fixture_contains_underlay_and_overlay_workspace_roots() {
         &[
             "underlay_ws",
             "underlay_ws/install",
+            "underlay_ws/install/local_setup.sh",
+            "underlay_ws/install/setup.sh",
             "underlay_ws/install/setup.bash",
             "underlay_ws/install/share",
             "underlay_ws/install/share/underlay_pkg",
