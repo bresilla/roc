@@ -96,6 +96,18 @@ complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) =
 complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l continue-on-error
 complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l event-handlers
 complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l executor
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l base-paths
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l build-base
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l install-base
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l log-base
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l packages-select
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l packages-ignore
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l packages-skip
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l packages-up-to
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l merge-install
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l continue-on-error
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l ctest-args
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l pytest-args
 
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-profile
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-depth
@@ -203,5 +215,12 @@ mod tests {
     fn fish_script_completes_work_build_flags() {
         assert!(SCRIPT.contains("-l merge-install"));
         assert!(SCRIPT.contains("-l packages-select"));
+    }
+
+    #[test]
+    fn fish_script_completes_work_test_flags() {
+        assert!(SCRIPT.contains("test (__roc_sub_cmd) = test"));
+        assert!(SCRIPT.contains("-l ctest-args"));
+        assert!(SCRIPT.contains("-l pytest-args"));
     }
 }

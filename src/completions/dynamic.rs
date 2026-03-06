@@ -19,7 +19,7 @@ const NODE_SUBCOMMANDS: &[&str] = &["list", "info"];
 const ACTION_SUBCOMMANDS: &[&str] = &["list", "info", "goal"];
 const INTERFACE_SUBCOMMANDS: &[&str] = &["list", "package", "all", "show", "model"];
 const BAG_SUBCOMMANDS: &[&str] = &["record", "play", "info", "list"];
-const WORK_SUBCOMMANDS: &[&str] = &["build", "create", "info", "list"];
+const WORK_SUBCOMMANDS: &[&str] = &["build", "create", "info", "list", "test"];
 const FRAME_SUBCOMMANDS: &[&str] = &["list", "echo", "info", "pub"];
 const DAEMON_SUBCOMMANDS: &[&str] = &["start", "stop", "status"];
 const MIDDLEWARE_SUBCOMMANDS: &[&str] = &["get", "set", "list"];
@@ -129,7 +129,7 @@ fn complete(
         ("bag", Some("play" | "info"), None, 1) => find_bag_files(),
 
         ("work", None, None, 1) => WORK_SUBCOMMANDS.iter().map(|s| s.to_string()).collect(),
-        ("work", Some("build" | "info"), None, 1) => find_packages(),
+        ("work", Some("build" | "info" | "test"), None, 1) => find_packages(),
 
         ("frame", None, None, 1) => FRAME_SUBCOMMANDS.iter().map(|s| s.to_string()).collect(),
         ("frame", Some("echo"), None, 1 | 2) => find_frames(),

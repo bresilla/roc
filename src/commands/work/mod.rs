@@ -15,6 +15,9 @@ pub fn handle(matches: ArgMatches) {
         Some(("build", args)) => {
             build::handle(args.clone());
         }
+        Some(("test", args)) => {
+            test::handle(args.clone());
+        }
         _ => print_error_and_exit("No work subcommand selected"),
     }
 }
@@ -23,6 +26,7 @@ pub mod build;
 pub mod create;
 pub mod info;
 pub mod list;
+pub mod test;
 
 #[cfg(test)]
 mod tests {

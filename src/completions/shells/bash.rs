@@ -10,6 +10,7 @@ _roc_completion() {
     local top="${words[1]}"
     local launch_flags="-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter"
     local work_build_flags="--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor"
+    local work_test_flags="--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --merge-install --continue-on-error --ctest-args --pytest-args"
     local topic_echo_flags="--qos-profile --qos-depth --qos-history --qos-reliability --qos-durability --csv --field -f --full-length -l --truncate-length --no-arr --no-str --flow-style --no-lost-messages --raw --once"
     local topic_hz_flags="-w --window --filter --wall-time"
     local topic_info_flags="-v --verbose"
@@ -29,6 +30,9 @@ _roc_completion() {
             work)
                 if [[ "${words[2]}" == "build" ]]; then
                     COMPREPLY=($(compgen -W "$work_build_flags" -- "$cur"))
+                    return
+                elif [[ "${words[2]}" == "test" ]]; then
+                    COMPREPLY=($(compgen -W "$work_test_flags" -- "$cur"))
                     return
                 fi
                 ;;
@@ -234,6 +238,13 @@ mod tests {
         assert!(SCRIPT.contains("local work_build_flags="));
         assert!(SCRIPT.contains("--merge-install"));
         assert!(SCRIPT.contains("--packages-select"));
+    }
+
+    #[test]
+    fn bash_script_completes_work_test_flags() {
+        assert!(SCRIPT.contains("local work_test_flags="));
+        assert!(SCRIPT.contains("--ctest-args"));
+        assert!(SCRIPT.contains("--pytest-args"));
     }
 
     #[test]
