@@ -1,6 +1,7 @@
 use colored::Colorize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -662,6 +663,46 @@ impl<'a> BuildExecutor<'a> {
             ));
         }
 
+        if config.symlink_install {
+            Self::apply_python_symlink_install(package, &build_dir, &install_prefix)
+                .map_err(|e| format!("Failed to apply symlink install: {}", e))?;
+        }
+
+        Ok(())
+    }
+
+    fn apply_python_symlink_install(
+        package: &PackageMeta,
+        _build_dir: &Path,
+        install_prefix: &Path,
+    ) -> Result<(), io::Error> {
+        let source_package_dir = package.path.join(&package.name);
+        let install_package_dir = Self::find_python_package_install_dir(install_prefix, &package.name);
+
+        if let Some(install_dir) = install_package_dir {
+            Self::replace_with_symlink(&install_dir, &source_package_dir)?;
+        }
+
+        let source_resource_marker = package.path.join("resource").join(&package.name);
+        let install_resource_marker = install_prefix
+            .join("share")
+            .join("ament_index")
+            .join("resource_index")
+            .join("packages")
+            .join(&package.name);
+        if source_resource_marker.exists() && install_resource_marker.exists() {
+            Self::replace_with_symlink(&install_resource_marker, &source_resource_marker)?;
+        }
+
+        let source_package_xml = package.path.join("package.xml");
+        let install_package_xml = install_prefix
+            .join("share")
+            .join(&package.name)
+            .join("package.xml");
+        if source_package_xml.exists() && install_package_xml.exists() {
+            Self::replace_with_symlink(&install_package_xml, &source_package_xml)?;
+        }
+
         Ok(())
     }
 
@@ -1219,6 +1260,80 @@ unset _colcon_prefix
         }
     }
 
+    fn find_python_package_install_dir(install_prefix: &Path, package_name: &str) -> Option<PathBuf> {
+        for base in [
+            install_prefix.join("lib"),
+            install_prefix.join("local").join("lib"),
+        ] {
+            if !base.is_dir() {
+                continue;
+            }
+
+            let entries = match fs::read_dir(&base) {
+                Ok(entries) => entries,
+                Err(_) => continue,
+            };
+
+            for entry in entries.flatten() {
+                let python_dir = entry.path();
+                if !python_dir.is_dir() {
+                    continue;
+                }
+                let Some(dir_name) = python_dir.file_name().and_then(|name| name.to_str()) else {
+                    continue;
+                };
+                if !dir_name.starts_with("python") {
+                    continue;
+                }
+
+                for site_dir_name in ["site-packages", "dist-packages"] {
+                    let candidate = python_dir.join(site_dir_name).join(package_name);
+                    if candidate.exists() {
+                        return Some(candidate);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    fn replace_with_symlink(destination: &Path, source: &Path) -> Result<(), io::Error> {
+        if !destination.exists() {
+            return Ok(());
+        }
+
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let metadata = fs::symlink_metadata(destination)?;
+        if metadata.file_type().is_symlink() {
+            fs::remove_file(destination)?;
+        } else if metadata.is_dir() {
+            fs::remove_dir_all(destination)?;
+        } else {
+            fs::remove_file(destination)?;
+        }
+
+        Self::symlink_path(source, destination)
+    }
+
+    fn symlink_path(source: &Path, destination: &Path) -> Result<(), io::Error> {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(source, destination)
+        }
+        #[cfg(windows)]
+        {
+            if source.is_dir() {
+                std::os::windows::fs::symlink_dir(source, destination)
+            } else {
+                std::os::windows::fs::symlink_file(source, destination)
+            }
+        }
+    }
+
     fn make_executable_if_unix(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(unix)]
         {
@@ -1522,5 +1637,56 @@ mod tests {
         assert!(script.contains("PYTHONPATH"));
         assert!(script.contains("rmw_fastrtps_cpp"));
         assert!(script.contains("20-extra.sh"));
+    }
+
+    #[test]
+    fn apply_python_symlink_install_replaces_installed_python_artifacts_with_symlinks() {
+        let temp = tempdir().unwrap();
+        let package_root = temp.path().join("src/demo_python_pkg");
+        let source_module_dir = package_root.join("demo_python_pkg");
+        let source_resource_marker = package_root.join("resource/demo_python_pkg");
+        let source_package_xml = package_root.join("package.xml");
+        fs::create_dir_all(&source_module_dir).unwrap();
+        fs::create_dir_all(source_resource_marker.parent().unwrap()).unwrap();
+        fs::write(source_module_dir.join("__init__.py"), "# source module\n").unwrap();
+        fs::write(&source_resource_marker, "").unwrap();
+        fs::write(&source_package_xml, "<package />\n").unwrap();
+
+        let install_prefix = temp.path().join("install/demo_python_pkg");
+        let installed_module_dir = install_prefix.join("lib/python3.12/site-packages/demo_python_pkg");
+        let installed_resource_marker = install_prefix
+            .join("share/ament_index/resource_index/packages/demo_python_pkg");
+        let installed_package_xml = install_prefix.join("share/demo_python_pkg/package.xml");
+        fs::create_dir_all(installed_module_dir.parent().unwrap()).unwrap();
+        fs::create_dir_all(installed_resource_marker.parent().unwrap()).unwrap();
+        fs::create_dir_all(installed_package_xml.parent().unwrap()).unwrap();
+        fs::create_dir_all(&installed_module_dir).unwrap();
+        fs::write(installed_module_dir.join("__init__.py"), "# installed module\n").unwrap();
+        fs::write(&installed_resource_marker, "").unwrap();
+        fs::write(&installed_package_xml, "<package />\n").unwrap();
+
+        let package = PackageMeta {
+            name: "demo_python_pkg".to_string(),
+            path: package_root.clone(),
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        BuildExecutor::apply_python_symlink_install(&package, temp.path(), &install_prefix).unwrap();
+
+        let module_meta = fs::symlink_metadata(&installed_module_dir).unwrap();
+        let marker_meta = fs::symlink_metadata(&installed_resource_marker).unwrap();
+        let xml_meta = fs::symlink_metadata(&installed_package_xml).unwrap();
+        assert!(module_meta.file_type().is_symlink());
+        assert!(marker_meta.file_type().is_symlink());
+        assert!(xml_meta.file_type().is_symlink());
     }
 }
