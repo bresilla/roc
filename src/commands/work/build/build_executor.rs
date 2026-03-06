@@ -526,85 +526,40 @@ impl<'a> BuildExecutor<'a> {
         fs::create_dir_all(&build_dir)
             .map_err(|e| format!("Failed to create build directory: {}", e))?;
 
-        // Configure
         let mut configure_cmd = Command::new("cmake");
-        configure_cmd
-            .arg("-S")
-            .arg(&package.path)
-            .arg("-B")
-            .arg(&build_dir)
-            .arg(format!(
-                "-DCMAKE_INSTALL_PREFIX={}",
-                install_prefix.display()
-            ));
+        configure_cmd.args(Self::cmake_configure_args(
+            &package.path,
+            &build_dir,
+            &install_prefix,
+            config.symlink_install,
+            &config.cmake_args,
+        ));
 
-        if config.symlink_install {
-            configure_cmd.arg("-DCMAKE_INSTALL_MODE=ABS_SYMLINK_FILES");
-        }
-
-        // Add user-provided cmake args
-        configure_cmd.args(&config.cmake_args);
-
-        // Set environment
         configure_cmd.envs(env_manager.get_env_vars());
 
         println!("  {}", "Configuring with CMake...".bright_blue());
-        let configure_output = configure_cmd
-            .output()
-            .map_err(|e| format!("Failed to run cmake configure: {}", e))?;
-        if !configure_output.status.success() {
-            println!("  {}", "CMake configure failed".bright_red().bold());
-            println!(
-                "  stdout: {}",
-                String::from_utf8_lossy(&configure_output.stdout)
-            );
-            println!(
-                "  stderr: {}",
-                String::from_utf8_lossy(&configure_output.stderr)
-            );
-            return Err(format!(
-                "CMake configure failed:\n{}",
-                String::from_utf8_lossy(&configure_output.stderr)
-            ));
-        }
+        Self::run_command_checked(configure_cmd, "CMake configure")?;
         println!("  {}", "CMake configure succeeded".bright_green());
 
-        // Build and install
         let mut build_cmd = Command::new("cmake");
-        build_cmd.arg("--build").arg(&build_dir).arg("--target");
-
-        if let Some(ref target) = config.cmake_target {
-            build_cmd.arg(target);
-        } else {
-            build_cmd.arg("install");
-        }
-
-        build_cmd
-            .arg("--")
-            .arg(format!("-j{}", config.parallel_workers));
-
+        build_cmd.args(Self::cmake_build_args(
+            &build_dir,
+            config.parallel_workers,
+            config.cmake_target.as_deref(),
+        ));
         build_cmd.envs(env_manager.get_env_vars());
 
-        println!("  {}", "Building and installing...".bright_blue());
-        let build_output = build_cmd
-            .output()
-            .map_err(|e| format!("Failed to run cmake build: {}", e))?;
-        if !build_output.status.success() {
-            println!("  {}", "CMake build failed".bright_red().bold());
-            println!(
-                "  stdout: {}",
-                String::from_utf8_lossy(&build_output.stdout)
-            );
-            println!(
-                "  stderr: {}",
-                String::from_utf8_lossy(&build_output.stderr)
-            );
-            return Err(format!(
-                "CMake build failed:\n{}",
-                String::from_utf8_lossy(&build_output.stderr)
-            ));
-        }
-        println!("  {}", "Build and install succeeded".bright_green());
+        println!("  {}", "Building with CMake...".bright_blue());
+        Self::run_command_checked(build_cmd, "CMake build")?;
+        println!("  {}", "CMake build succeeded".bright_green());
+
+        let mut install_cmd = Command::new("cmake");
+        install_cmd.args(Self::cmake_install_args(&build_dir, &install_prefix));
+        install_cmd.envs(env_manager.get_env_vars());
+
+        println!("  {}", "Installing with CMake...".bright_blue());
+        Self::run_command_checked(install_cmd, "CMake install")?;
+        println!("  {}", "CMake install succeeded".bright_green());
 
         Ok(())
     }
@@ -625,43 +580,19 @@ impl<'a> BuildExecutor<'a> {
         fs::create_dir_all(&build_dir)
             .map_err(|e| format!("Failed to create build directory: {}", e))?;
 
-        // Build
-        let build_output = Command::new("python3")
-            .arg("setup.py")
-            .arg("build")
-            .arg("--build-base")
-            .arg(&build_dir)
+        let mut build_cmd = Command::new("python3");
+        build_cmd
+            .args(Self::python_build_args(&build_dir))
             .current_dir(&package.path)
-            .envs(env_manager.get_env_vars())
-            .output()
-            .map_err(|e| format!("Failed to run python build: {}", e))?;
+            .envs(env_manager.get_env_vars());
+        Self::run_command_checked(build_cmd, "Python build")?;
 
-        if !build_output.status.success() {
-            return Err(format!(
-                "Python build failed:\n{}",
-                String::from_utf8_lossy(&build_output.stderr)
-            ));
-        }
-
-        // Install
-        let install_output = Command::new("python3")
-            .arg("setup.py")
-            .arg("install")
-            .arg("--prefix")
-            .arg("")
-            .arg("--root")
-            .arg(&install_prefix)
+        let mut install_cmd = Command::new("python3");
+        install_cmd
+            .args(Self::python_install_args(&build_dir, &install_prefix))
             .current_dir(&package.path)
-            .envs(env_manager.get_env_vars())
-            .output()
-            .map_err(|e| format!("Failed to run python install: {}", e))?;
-
-        if !install_output.status.success() {
-            return Err(format!(
-                "Python install failed:\n{}",
-                String::from_utf8_lossy(&install_output.stderr)
-            ));
-        }
+            .envs(env_manager.get_env_vars());
+        Self::run_command_checked(install_cmd, "Python install")?;
 
         if config.symlink_install {
             Self::apply_python_symlink_install(package, &build_dir, &install_prefix)
@@ -1334,6 +1265,109 @@ unset _colcon_prefix
         }
     }
 
+    fn cmake_configure_args(
+        package_path: &Path,
+        build_dir: &Path,
+        install_prefix: &Path,
+        symlink_install: bool,
+        cmake_args: &[String],
+    ) -> Vec<String> {
+        let mut args = vec![
+            "-S".to_string(),
+            package_path.display().to_string(),
+            "-B".to_string(),
+            build_dir.display().to_string(),
+            format!("-DCMAKE_INSTALL_PREFIX={}", install_prefix.display()),
+        ];
+        if symlink_install {
+            args.push("-DCMAKE_INSTALL_MODE=ABS_SYMLINK_FILES".to_string());
+        }
+        args.extend(cmake_args.iter().cloned());
+        args
+    }
+
+    fn cmake_build_args(
+        build_dir: &Path,
+        parallel_workers: u32,
+        cmake_target: Option<&str>,
+    ) -> Vec<String> {
+        let mut args = vec![
+            "--build".to_string(),
+            build_dir.display().to_string(),
+            "--parallel".to_string(),
+            parallel_workers.to_string(),
+        ];
+        if let Some(target) = cmake_target {
+            args.push("--target".to_string());
+            args.push(target.to_string());
+        }
+        args
+    }
+
+    fn cmake_install_args(build_dir: &Path, install_prefix: &Path) -> Vec<String> {
+        vec![
+            "--install".to_string(),
+            build_dir.display().to_string(),
+            "--prefix".to_string(),
+            install_prefix.display().to_string(),
+        ]
+    }
+
+    fn python_build_args(build_dir: &Path) -> Vec<String> {
+        vec![
+            "setup.py".to_string(),
+            "build".to_string(),
+            "--build-base".to_string(),
+            build_dir.display().to_string(),
+        ]
+    }
+
+    fn python_install_args(build_dir: &Path, install_prefix: &Path) -> Vec<String> {
+        vec![
+            "setup.py".to_string(),
+            "install".to_string(),
+            "--prefix".to_string(),
+            "".to_string(),
+            "--root".to_string(),
+            install_prefix.display().to_string(),
+            "--single-version-externally-managed".to_string(),
+            "--record".to_string(),
+            build_dir.join("install-record.txt").display().to_string(),
+        ]
+    }
+
+    fn run_command_checked(mut command: Command, label: &str) -> Result<(), String> {
+        let program = command.get_program().to_string_lossy().to_string();
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+
+        let output = command
+            .output()
+            .map_err(|e| format!("{label} failed to start: {e}"))?;
+        if output.status.success() {
+            return Ok(());
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let command_line = std::iter::once(program)
+            .chain(args.into_iter())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let mut message = format!("{label} failed.\nCommand: {command_line}");
+        if !stdout.is_empty() {
+            message.push_str(&format!("\nstdout:\n{stdout}"));
+        }
+        if !stderr.is_empty() {
+            message.push_str(&format!("\nstderr:\n{stderr}"));
+        }
+
+        Err(message)
+    }
+
     fn make_executable_if_unix(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(unix)]
         {
@@ -1688,5 +1722,55 @@ mod tests {
         assert!(module_meta.file_type().is_symlink());
         assert!(marker_meta.file_type().is_symlink());
         assert!(xml_meta.file_type().is_symlink());
+    }
+
+    #[test]
+    fn cmake_command_args_are_split_into_configure_build_and_install_phases() {
+        let package_path = PathBuf::from("/ws/src/demo_pkg");
+        let build_dir = PathBuf::from("/ws/build/demo_pkg");
+        let install_prefix = PathBuf::from("/ws/install/demo_pkg");
+
+        let configure = BuildExecutor::cmake_configure_args(
+            &package_path,
+            &build_dir,
+            &install_prefix,
+            true,
+            &["-DCMAKE_BUILD_TYPE=RelWithDebInfo".to_string()],
+        );
+        let build = BuildExecutor::cmake_build_args(&build_dir, 8, Some("demo_target"));
+        let install = BuildExecutor::cmake_install_args(&build_dir, &install_prefix);
+
+        assert!(configure.contains(&"-S".to_string()));
+        assert!(configure.contains(&"-B".to_string()));
+        assert!(configure.contains(&"-DCMAKE_INSTALL_MODE=ABS_SYMLINK_FILES".to_string()));
+        assert!(configure.contains(&"-DCMAKE_BUILD_TYPE=RelWithDebInfo".to_string()));
+        assert_eq!(
+            build,
+            vec![
+                "--build",
+                "/ws/build/demo_pkg",
+                "--parallel",
+                "8",
+                "--target",
+                "demo_target"
+            ]
+        );
+        assert_eq!(
+            install,
+            vec!["--install", "/ws/build/demo_pkg", "--prefix", "/ws/install/demo_pkg"]
+        );
+    }
+
+    #[test]
+    fn python_install_args_request_single_version_install_record() {
+        let build_dir = PathBuf::from("/ws/build/demo_python_pkg");
+        let install_prefix = PathBuf::from("/ws/install/demo_python_pkg");
+
+        let args = BuildExecutor::python_install_args(&build_dir, &install_prefix);
+
+        assert_eq!(args[0], "setup.py");
+        assert!(args.contains(&"--single-version-externally-managed".to_string()));
+        assert!(args.contains(&"--record".to_string()));
+        assert!(args.contains(&"/ws/build/demo_python_pkg/install-record.txt".to_string()));
     }
 }
