@@ -18,7 +18,7 @@ roc aims to be a tool that will completely be written in RUST and at some point 
 ## Features
 
 - Generate ROS2 packages with a template system
-- Build ROS2 packages (colcon at the moment) but will be replaced by a custom build system
+- Build ROS2 packages with a native workspace builder that is aiming to replace `colcon build`
 - Adding missing feature that IMO ros2 cli should have like:
     - `roc frame` to work with tf frames, cordination systems and transformations
     - `roc bridge` to bridge topics between different ROS2 instances

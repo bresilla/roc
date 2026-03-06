@@ -5,6 +5,7 @@
 ROC is a ROS 2 command-line tool implemented in Rust. It implements many ROS 2 workflows directly and uses command naming close to the `ros2` CLI.
 
 For detailed command-by-command implementation status, see `COMPAT.md`.
+For workspace-build validation results against `colcon`, see `COMPAT_VALIDATION.md`.
 
 ## Installation
 
@@ -58,7 +59,12 @@ roc topic pub --help
 - `roc work create` - scaffold packages (`ament_cmake`, `ament_python`, `cmake`)
 - `roc work list` - list discovered packages and build state
 - `roc work info <package>` - print package metadata
-- `roc work build` - build workspace packages with dependency ordering
+- `roc work build` - build workspace packages with dependency ordering and colcon-like setup generation
+
+Current validation status for `roc work build`:
+
+- validated against a minimal `ament_cmake` workspace: build and `ros2 pkg prefix` worked
+- validated against a minimal `ament_python` workspace: build and Python import worked, but package registration is still incomplete
 
 Examples:
 
@@ -108,6 +114,7 @@ The project is organized into command modules under `src/commands` and argument 
 Refer to:
 
 - `COMPAT.md` for feature status
+- `COMPAT_VALIDATION.md` for direct `colcon` vs `roc` build results
 - `FEATURES.md` for high-level feature notes
 - `book/` for extended project documentation
 

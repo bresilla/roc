@@ -37,7 +37,7 @@ Source of truth for command-by-command compatibility:
 - Dynamic topic tools: `echo`, `pub`, `hz`, `bw`, `delay` are implemented natively using `rclrs` dynamic subscriptions/publishers.
 - TF tooling: subscribes to `/tf` and `/tf_static`, builds a TF graph, resolves multi-hop transforms.
 - Bag tooling: records serialized CDR bytes into MCAP; plays MCAP back to ROS topics.
-- Workspace tooling: package discovery, dependency resolution, and colcon-like builds.
+- Workspace tooling: package discovery, dependency resolution, and a native colcon-like builder. Minimal `ament_cmake` validation is in place; `ament_python` still has known compatibility gaps.
 
 ## Near-Term Priorities
 

@@ -1,12 +1,12 @@
 # Build System Architecture
 
-ROC's build system is designed as a high-performance, parallel replacement for colcon. This chapter details the internal architecture and implementation of the build system.
+ROC's build system is a high-performance native builder that is converging on `colcon build` compatibility. This chapter documents the internal architecture, not a claim of full behavioral parity.
 
 ## Core Components
 
 ### 1. Build Configuration (`BuildConfig`)
 
-The build system is driven by a comprehensive configuration structure that mirrors colcon's options:
+The build system is driven by a configuration structure that tracks the currently implemented subset of `colcon`-style options:
 
 ```rust
 pub struct BuildConfig {
@@ -14,6 +14,8 @@ pub struct BuildConfig {
     pub packages_select: Option<Vec<String>>, // Build only selected packages
     pub packages_ignore: Option<Vec<String>>, // Ignore specific packages
     pub packages_up_to: Option<Vec<String>>,  // Build up to specified packages
+    pub packages_select_build_failed: bool,   // Rebuild previously failed packages
+    pub packages_skip_build_finished: bool,   // Skip previously completed packages
     pub parallel_workers: u32,               // Number of parallel build workers
     pub merge_install: bool,                 // Use merged vs isolated install
     pub symlink_install: bool,               // Use symlinks for installs
@@ -23,6 +25,7 @@ pub struct BuildConfig {
     pub workspace_root: PathBuf,             // Root of workspace
     pub install_base: PathBuf,               // Install directory
     pub build_base: PathBuf,                 // Build directory
+    pub log_base: PathBuf,                   // Log directory
     pub isolated: bool,                      // Isolated vs merged installs
 }
 ```
@@ -70,9 +73,10 @@ pub struct BuildState {
     package_states: Arc<Mutex<HashMap<String, PackageState>>>,
     install_paths: Arc<Mutex<HashMap<String, PathBuf>>>,
     build_count: Arc<Mutex<(usize, usize)>>, // (successful, failed)
+    build_records: Arc<Mutex<HashMap<String, BuildRecord>>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PackageState {
     Pending,    // Waiting for dependencies
     Building,   // Currently being built
@@ -184,7 +188,7 @@ The system supports flexible error handling:
 
 ### I/O Optimization
 - Parallel directory scanning during package discovery
-- Asynchronous log writing
+- Persisted per-package phase logs under `log/latest/<pkg>/`
 - Efficient XML parsing with `roxmltree`
 
 ### Build Efficiency
@@ -211,4 +215,4 @@ The build system includes comprehensive error handling:
 - Maintains build state across invocations
 - Allows selective package rebuilds
 
-This architecture provides a robust, scalable foundation for workspace builds that significantly outperforms traditional Python-based tools while maintaining full compatibility with existing ROS2 workflows.
+This architecture provides a strong foundation for a native ROS 2 workspace builder. For the currently verified compatibility level, refer to `COMPAT_VALIDATION.md` rather than inferring full `colcon` parity from the architecture alone.

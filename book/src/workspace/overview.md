@@ -1,22 +1,22 @@
 # Workspace Management Overview
 
-ROC includes a comprehensive workspace management system that serves as a modern, high-performance replacement for colcon. The `roc work` command provides a complete suite of tools for ROS2 workspace management, including package creation, discovery, dependency resolution, and building.
+ROC includes a native workspace management system that is aiming to replace `colcon build` over time. The `roc work` command provides package creation, discovery, dependency resolution, and building, but compatibility should be judged from validated behavior rather than the long-term goal.
 
 ## Key Features
 
-### Complete Colcon Replacement
-ROC's build system (`roc work build`) is designed as a drop-in replacement for `colcon build` with the following advantages:
+### Native Workspace Builder
+`roc work build` already covers a substantial part of the `colcon build` workflow, with the following strengths:
 
 - **Native Performance**: Written in Rust for superior performance and memory safety
 - **Parallel Execution**: Multi-threaded builds with intelligent dependency resolution
 - **Environment Isolation**: Clean environment management preventing build contamination
 - **Comprehensive Logging**: Detailed build logs and error reporting
-- **Full Compatibility**: Supports all major colcon command-line options
+- **Growing Compatibility**: supports major `colcon build` options, with validation tracked separately
 
 ### Package Management
 - **Intelligent Discovery**: Automatic workspace scanning and package.xml parsing
 - **Metadata Extraction**: Complete package information including dependencies, maintainers, and build types
-- **Build Type Support**: Full support for ament_cmake, ament_python, and cmake packages
+- **Build Type Support**: native handling for `ament_cmake`, `ament_python`, and plain `cmake` packages
 - **Dependency Validation**: Circular dependency detection and resolution
 
 ### Development Workflow
@@ -41,19 +41,24 @@ roc work <subcommand> [options]
 
 ### Available Subcommands
 
-- `build` - Build packages in the workspace (colcon replacement)
+- `build` - Build packages in the workspace with a native colcon-like builder
 - `create` - Create new ROS2 packages with templates
 - `list` - List and discover packages in the workspace
 - `info` - Display detailed package information
 
 ## Compatibility
 
-ROC's workspace system is designed to be fully compatible with existing ROS2 workflows:
+ROC's workspace system is intended to fit existing ROS 2 workflows, but compatibility is still uneven:
 
-- **Colcon Arguments**: All major colcon build options are supported
+- **Colcon Arguments**: major `colcon build` options are supported
 - **Package Formats**: Supports package.xml formats 2 and 3
 - **Build Systems**: Works with ament_cmake, ament_python, and plain cmake
-- **Environment**: Generates standard ROS2 setup scripts compatible with existing tools
+- **Environment**: Generates standard shell setup scripts, with known differences still documented in `COMPAT_VALIDATION.md`
+
+Current validated status:
+
+- minimal `ament_cmake` workflow: working
+- minimal `ament_python` workflow: partially working, with remaining package-registration gaps
 
 ## Performance Benefits
 

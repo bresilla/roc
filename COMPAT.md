@@ -47,7 +47,7 @@ Legend:
 | `roc work create` | Native Rust | generates package skeletons; `src/commands/work/create/command.rs` |
 | `roc work list` | Native Rust | workspace package discovery; `src/commands/work/list/command.rs` |
 | `roc work info` | Native Rust | package.xml parsing + status; `src/commands/work/info/command.rs` |
-| `roc work build` | Native Rust | colcon-replacement build system; `src/commands/work/build/*` |
+| `roc work build` | Native Rust | Native workspace builder with colcon-like behavior. Validated for a minimal `ament_cmake` workspace; `ament_python` still has package-registration gaps. See `COMPAT_VALIDATION.md`; `src/commands/work/build/*` |
 | `roc idl protobuf` (`proto`, `pb`) | Native Rust | bidirectional `.proto` ↔ `.msg`; `src/commands/idl/protobuf.rs` |
 | `roc idl ros2msg` (`msg`, `ros2`) | Native Rust | `.msg` → `.proto`; `src/commands/idl/ros2msg.rs` |
 | `roc bag record` | Native Rust (MCAP) | Records raw CDR bytes into `.mcap` (multi-topic, optional `--separated`); `src/commands/bag/record.rs`, `src/shared/serialized_transport.rs` |
