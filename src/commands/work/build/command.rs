@@ -39,7 +39,9 @@ fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std:
     }
 
     config.packages_select_build_failed = matches.get_flag("packages_select_build_failed");
+    config.packages_select_build_finished = matches.get_flag("packages_select_build_finished");
     config.packages_skip_build_finished = matches.get_flag("packages_skip_build_finished");
+    config.packages_skip_build_failed = matches.get_flag("packages_skip_build_failed");
 
     if let Some(workers) = matches.get_one::<u32>("parallel_workers") {
         config.parallel_workers = *workers;
@@ -173,7 +175,9 @@ mod tests {
                 "work",
                 "build",
                 "--packages-select-build-failed",
+                "--packages-select-build-finished",
                 "--packages-skip-build-finished",
+                "--packages-skip-build-failed",
             ])
             .unwrap();
         let (_, submatches) = matches.subcommand().unwrap();
@@ -181,6 +185,8 @@ mod tests {
         let config = config_from_matches(submatches).unwrap();
 
         assert!(config.packages_select_build_failed);
+        assert!(config.packages_select_build_finished);
         assert!(config.packages_skip_build_finished);
+        assert!(config.packages_skip_build_failed);
     }
 }

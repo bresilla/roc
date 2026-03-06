@@ -41,7 +41,7 @@ Observed tree deltas:
 - `colcon` and `roc` now both place package metadata below `install/<pkg>/share/colcon-core/packages/<pkg>` for isolated installs
 - `colcon` and `roc` now both normalize `COLCON_PREFIX_PATH` without a trailing separator in the validated case
 - `roc` now also emits root `local_setup.ps1`, `setup.ps1`, and `.colcon_install_layout`
-- remaining deltas are now concentrated in selector coverage and validation breadth, not the validated install tree shape
+- remaining deltas are now concentrated in larger-workspace validation and resume coverage, not the validated install tree shape
 
 Assessment:
 
@@ -70,7 +70,7 @@ Observed tree deltas:
 - `colcon` and `roc` now both install the package marker and `package.xml` under `install/<pkg>/share/...`
 - `colcon` and `roc` now both generate the `ament_prefix_path.*`, `pythonpath.*`, and `package.dsv` hook family for this validated case
 - `roc` also now generates `_local_setup_util_sh.py`, `_local_setup_util_ps1.py`, root `.ps1` setup wrappers, and `.colcon_install_layout`
-- remaining deltas are now concentrated in selector coverage and validation breadth, not the validated install tree shape
+- remaining deltas are now concentrated in larger-workspace validation and resume coverage, not the validated install tree shape
 
 Assessment:
 
@@ -82,11 +82,11 @@ Assessment:
 
 `roc work build` is now close enough to substitute `colcon build` for the validated minimal `ament_cmake` case and the validated minimal `ament_python` case.
 
-It is still not full parity, because selector behavior and validation breadth still lag `colcon`.
+It is still not full parity, because larger-workspace validation and resume coverage still lag `colcon`.
 
 ## Next Fixes Suggested By Validation
 
-1. Expand selector validation against `colcon`.
-2. Validate against larger real workspaces before claiming parity.
-3. Compare resume behavior after partial and failed builds.
-4. Add broader merged-install and overlay validation cases.
+1. Validate against larger real workspaces before claiming parity.
+2. Compare resume behavior after partial and failed builds.
+3. Add broader merged-install and overlay validation cases.
+4. Add end-to-end parity checks for the new build-state selectors against `colcon`.

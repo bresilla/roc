@@ -64,8 +64,8 @@ Already implemented:
 
 Known remaining parity gaps from direct validation:
 
-- selector parity still needs a broader comparison against `colcon`
 - validation coverage still needs to expand beyond the current minimal workspaces
+- resume behavior still needs broader comparison against `colcon` on larger workspaces
 
 ## Non-Negotiable Constraints
 
@@ -104,6 +104,7 @@ Commit rule:
 - Slice 15: Python package registration and resource index layout
 - Slice 16: full hook set and helper scripts
 - Slice 17: package metadata placement and prefix chaining edge cases
+- Slice 18: selector and build-state parity
 - Slice 19: PowerShell and install-layout metadata parity
 
 Those slices got the implementation close. They do **not** finish full parity.
@@ -179,33 +180,6 @@ Definition of done:
 Suggested commit title:
 
 - `Generate colcon helper scripts and standard package hooks`
-
-### Slice 18: Complete Selector Parity
-
-Objective:
-
-- match the remaining `colcon` selection and resume workflows
-
-Tasks:
-
-- verify discovery-time semantics for:
-  - `--packages-ignore`
-  - `--packages-skip`
-  - `--packages-up-to`
-- add remaining high-value selectors if needed for parity:
-  - `--packages-select-build-finished`
-  - `--packages-skip-build-failed`
-  - dependency-based resume selectors if validation shows they matter
-- verify selectors combine exactly as `colcon` documents
-
-Definition of done:
-
-- selector behavior matches `colcon` in targeted parity tests
-- resume workflows behave predictably after failed builds
-
-Suggested commit title:
-
-- `Finish colcon package selection parity`
 
 ### Slice 20: Real Workspace Parity Matrix
 

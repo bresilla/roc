@@ -27,7 +27,9 @@ pub struct BuildConfig {
     pub packages_ignore: Option<Vec<String>>,
     pub packages_up_to: Option<Vec<String>>,
     pub packages_select_build_failed: bool,
+    pub packages_select_build_finished: bool,
     pub packages_skip_build_finished: bool,
+    pub packages_skip_build_failed: bool,
     pub parallel_workers: u32,
     pub merge_install: bool,
     pub symlink_install: bool,
@@ -50,7 +52,9 @@ impl Default for BuildConfig {
             packages_ignore: None,
             packages_up_to: None,
             packages_select_build_failed: false,
+            packages_select_build_finished: false,
             packages_skip_build_finished: false,
+            packages_skip_build_failed: false,
             parallel_workers: num_cpus::get() as u32,
             merge_install: false,
             symlink_install: false,
@@ -148,6 +152,7 @@ impl ColconBuilder {
 
     fn apply_package_filters(&mut self) {
         let mut selected_names: Option<HashSet<String>> = None;
+        let previous_state = self.load_previous_build_state();
 
         if let Some(selected) = &self.config.packages_select {
             let names = selected.iter().cloned().collect::<HashSet<_>>();
@@ -166,14 +171,29 @@ impl ColconBuilder {
         }
 
         if self.config.packages_select_build_failed {
-            let names = self
-                .load_previous_build_state()
-                .into_iter()
-                .filter_map(
-                    |(name, status)| {
-                        if status == "failed" { Some(name) } else { None }
-                    },
-                )
+            let names = previous_state
+                .iter()
+                .filter_map(|(name, status)| {
+                    if status == "failed" {
+                        Some(name.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashSet<_>>();
+            Self::intersect_selected_names(&mut selected_names, names);
+        }
+
+        if self.config.packages_select_build_finished {
+            let names = previous_state
+                .iter()
+                .filter_map(|(name, status)| {
+                    if status == "completed" {
+                        Some(name.clone())
+                    } else {
+                        None
+                    }
+                })
                 .collect::<HashSet<_>>();
             Self::intersect_selected_names(&mut selected_names, names);
         }
@@ -184,11 +204,19 @@ impl ColconBuilder {
         }
 
         if self.config.packages_skip_build_finished {
-            let previous_state = self.load_previous_build_state();
             self.packages.retain(|pkg| {
                 previous_state
                     .get(&pkg.name)
                     .map(|status| status != "completed")
+                    .unwrap_or(true)
+            });
+        }
+
+        if self.config.packages_skip_build_failed {
+            self.packages.retain(|pkg| {
+                previous_state
+                    .get(&pkg.name)
+                    .map(|status| status != "failed")
                     .unwrap_or(true)
             });
         }
@@ -349,5 +377,69 @@ mod tests {
             .map(|pkg| pkg.name.as_str())
             .collect::<Vec<_>>();
         assert_eq!(selected, vec!["consumer", "fresh"]);
+    }
+
+    #[test]
+    fn package_filters_can_select_only_previously_completed_packages() {
+        let temp = tempdir().unwrap();
+        let mut config = BuildConfig::default();
+        config.log_base = temp.path().join("log");
+        config.packages_select_build_finished = true;
+        fs::create_dir_all(config.log_base.join("latest/base")).unwrap();
+        fs::write(
+            config.log_base.join("latest/base/status.txt"),
+            "status=completed\n",
+        )
+        .unwrap();
+        fs::create_dir_all(config.log_base.join("latest/consumer")).unwrap();
+        fs::write(
+            config.log_base.join("latest/consumer/status.txt"),
+            "status=failed\n",
+        )
+        .unwrap();
+
+        let mut builder = ColconBuilder::new(config);
+        builder.packages = vec![pkg("base", &[]), pkg("consumer", &[]), pkg("fresh", &[])];
+
+        builder.apply_package_filters();
+
+        let selected = builder
+            .packages
+            .iter()
+            .map(|pkg| pkg.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(selected, vec!["base"]);
+    }
+
+    #[test]
+    fn package_filters_can_skip_previously_failed_packages() {
+        let temp = tempdir().unwrap();
+        let mut config = BuildConfig::default();
+        config.log_base = temp.path().join("log");
+        config.packages_skip_build_failed = true;
+        fs::create_dir_all(config.log_base.join("latest/base")).unwrap();
+        fs::write(
+            config.log_base.join("latest/base/status.txt"),
+            "status=completed\n",
+        )
+        .unwrap();
+        fs::create_dir_all(config.log_base.join("latest/consumer")).unwrap();
+        fs::write(
+            config.log_base.join("latest/consumer/status.txt"),
+            "status=failed\n",
+        )
+        .unwrap();
+
+        let mut builder = ColconBuilder::new(config);
+        builder.packages = vec![pkg("base", &[]), pkg("consumer", &[]), pkg("fresh", &[])];
+
+        builder.apply_package_filters();
+
+        let selected = builder
+            .packages
+            .iter()
+            .map(|pkg| pkg.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(selected, vec!["base", "fresh"]);
     }
 }
