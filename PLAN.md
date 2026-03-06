@@ -1,57 +1,83 @@
-# ROC Colcon Replacement Plan
+# ROC Full Colcon Parity Plan
 
 ## Goal
 
-Turn `roc work build` into a practical replacement for `colcon build` for standard ROS 2 workspaces while preserving compatibility with existing `ament_cmake`, `ament_python`, and plain `cmake` packages.
+Achieve full practical parity for `roc work build` with `colcon build` for standard ROS 2 workspaces on Linux first.
 
-This plan does **not** attempt to replace `ament` itself. It replaces the workspace orchestrator layer currently provided by `colcon`.
+“Full parity” here means:
 
-## Non-Goals
+- the same workspace inputs produce install trees close enough that standard ROS 2 tools behave the same
+- standard `ament_cmake` and `ament_python` packages work without package-specific hacks
+- sourcing `install/setup.*` yields equivalent downstream discovery behavior
+- common `colcon` package-selection and resume workflows behave the same
 
-- Replacing `ament_cmake` macros or `ament_python` package conventions
-- Supporting every historical `colcon` extension from day one
-- Supporting ROS 1 / catkin in the first implementation
-- Rewriting package build systems that already work through CMake or setuptools
+This plan still does **not** replace `ament` itself. It replaces the workspace orchestration, environment setup, and install metadata behavior normally provided by `colcon`.
 
-## Success Criteria
+## Upstream Parity References
 
-`roc work build` should be considered a viable `colcon build` replacement when:
+This plan is anchored to upstream `colcon` and ROS 2 behavior, not local guesses.
 
-- standard `ament_cmake` packages build and install correctly
-- standard `ament_python` packages build and install correctly
-- isolated and merged install modes behave correctly
-- workspace setup scripts can be sourced and used as expected
-- downstream packages can discover upstream packages through normal ROS 2 mechanisms
-- overlays behave correctly enough for common developer workflows
-- compatibility is validated against fixture workspaces and real packages
+Primary references:
 
-## Current State Summary
+- `colcon build` and package selection arguments:
+  - https://colcon.readthedocs.io/en/released/reference/package-selection-arguments.html
+  - https://colcon.readthedocs.io/en/main/reference/verb/build.html
+- `colcon` environment setup model:
+  - https://colcon.readthedocs.io/en/released/developer/environment.html
+  - https://colcon.readthedocs.io/en/released/user/isolated-vs-merged-workspaces.html
+- ROS 2 / ament package expectations:
+  - https://docs.ros.org/en/rolling/How-To-Guides/Ament-CMake-Documentation.html
+  - https://docs.ros.org/en/rolling/How-To-Guides/Ament-CMake-Python-Documentation.html
 
-The current implementation already has:
+Important consequences from those docs:
 
-- package discovery from `package.xml`
-- basic dependency ordering
-- CMake and Python build invocation
-- parallel execution
-- coarse workspace setup generation
+- package-selection arguments combine with logical `AND`
+- `--packages-ignore` / `--packages-skip` semantics must match `colcon`
+- setup generation is driven by package metadata, package hooks, and helper scripts like `_local_setup_util_sh.py`
+- standard ROS Python packages must register through the ament resource index and install `package.xml` in the expected `share/...` location
+- isolated and merged installs are both first-class behaviors, not approximations
 
-The current implementation is still missing or incomplete in the following critical areas:
+## Hard Success Criteria
 
-- colcon-style package metadata output
-- package-level setup scripts
-- workspace `local_setup.*` / `setup.*` chaining
-- `.dsv` and environment hook behavior
-- accurate dependency semantics for runtime/setup ordering
-- real `--symlink-install`
-- colcon-compatible logging and state layout
-- compatibility tests against actual ament package behavior
+`roc work build` should not be called parity-complete until all of the following are true:
 
-## Constraints
+- `ros2 pkg prefix <pkg>` works after `roc` builds for both minimal `ament_cmake` and minimal `ament_python`
+- package imports, CMake downstream discovery, and overlay sourcing behave the same as `colcon`
+- install layout matches `colcon` closely enough that only non-functional differences remain
+- package hooks and `.dsv` processing match `colcon` ordering and effect
+- workspace setup scripts produce the same practical environment variables without malformed separators
+- package selectors and resume selectors behave the same as `colcon`
+- validation passes against representative real workspaces, not just synthetic fixtures
 
-- Keep `ament_cmake` and `ament_python` packages unchanged
-- Prefer matching `colcon` output layout and sourcing behavior rather than inventing a new one
-- Use installed artifacts and package hooks as the source of truth
-- Preserve cross-platform structure where practical, but prioritize Linux first
+## Current State
+
+Already implemented:
+
+- fixture workspaces and compatibility tests
+- configurable `build`, `install`, and `log` bases
+- richer dependency parsing
+- package setup and workspace setup script generation
+- artifact scanning and `.dsv` support
+- package logs and machine-readable build state
+- some build-state selectors
+- direct validation against real minimal `ament_cmake` and `ament_python` workspaces
+
+Known remaining parity gaps from direct validation:
+
+- `ament_python` package registration is still wrong enough that `ros2 pkg prefix` fails
+- isolated Python installs land under `local/lib/.../dist-packages` instead of the expected `lib/pythonX.Y/site-packages`
+- Python package marker and `package.xml` placement still diverge from `colcon`
+- generated hook set is incomplete compared to `colcon`, especially for Python packages
+- `_local_setup_util_*.py` and `.ps1` outputs are missing
+- `share/colcon-core/packages/<pkg>` placement still differs from `colcon`
+- `COLCON_PREFIX_PATH` still has a trailing separator in generated setup
+
+## Non-Negotiable Constraints
+
+- keep `ament_cmake` and `ament_python` packages unchanged
+- prefer exact `colcon` behavior over internal elegance
+- treat real downstream behavior as the source of truth
+- validate Linux first before widening platform claims
 
 ## Delivery Rule
 
@@ -63,392 +89,255 @@ Commit rule:
 - commit message title only
 - no commit body
 
-Examples:
+## Completed Slices
 
-- `Implement package metadata generation for workspace installs`
-- `Add package-level local_setup and package scripts`
-- `Support merged and isolated install environment chaining`
+- Slice 0: baseline and compatibility fixtures
+- Slice 1: configurable build/install/log base paths
+- Slice 2: richer package metadata model
+- Slice 3: colcon package metadata generation
+- Slice 4: package-level setup scripts
+- Slice 5: workspace setup chaining
+- Slice 6: installed artifact scanning
+- Slice 7: environment hooks and `.dsv`
+- Slice 8: `--symlink-install`
+- Slice 9: build execution fidelity
+- Slice 10: logging and build state
+- Slice 11: package selection and resume semantics
+- Slice 12: validation against real ROS 2 packages
+- Slice 13: documentation cleanup
 
-## Work Slices
+Those slices got the implementation close. They do **not** finish full parity.
 
-### Slice 0: Baseline and Compatibility Fixtures
+## Remaining Slices For Full Parity
+
+### Slice 14: Fix `ament_python` Install Layout
 
 Objective:
 
-- establish a repeatable way to compare `roc work build` against `colcon build`
+- make isolated Python package installs match `colcon` and ament expectations
 
 Tasks:
 
-- create fixture workspaces for:
-  - minimal `ament_cmake` package
-  - minimal `ament_python` package
-  - two-package dependency chain
-  - merged-install workspace
-  - overlay workspace
-- add test helpers that inspect install trees, setup scripts, and package metadata
-- document expected outputs for each fixture
+- install Python payloads under `install/<pkg>/lib/pythonX.Y/site-packages`
+- stop routing isolated Python payloads through `local/lib/.../dist-packages`
+- confirm merged-install behavior also matches `colcon`
+- validate with direct tree comparisons against `colcon`
 
 Definition of done:
 
-- fixture workspaces exist in-repo
-- tests can assert install-tree invariants
-- tests clearly show current gaps
+- minimal `ament_python` install tree matches `colcon` at the package payload level
+- sourced `PYTHONPATH` points to the expected location
 
 Suggested commit title:
 
-- `Add build compatibility fixtures for ament workspaces`
+- `Align ament python install layout with colcon`
 
-### Slice 1: Build Output Layout and Base Paths
+### Slice 15: Fix Python Package Registration and Resource Index
 
 Objective:
 
-- make workspace path handling match `colcon` more closely
+- make Python packages discoverable through standard ROS 2 mechanisms after a `roc` build
 
 Tasks:
 
-- add explicit support for:
-  - `--build-base`
-  - `--install-base`
-  - `--log-base`
-- ensure `build/`, `install/`, and `log/` layout matches expected conventions
-- create ignore markers where appropriate to prevent recursive rediscovery
-- stop hardcoding path assumptions in command setup
+- install the ament resource marker in the same place `colcon` does
+- install `package.xml` under the expected `share/<pkg>/package.xml` location
+- validate `ros2 pkg prefix <pkg>` for isolated and merged installs
+- compare ament index layout directly against `colcon`
 
 Definition of done:
 
-- build, install, and log base directories are configurable
-- current tests pass with non-default bases
-- workspace scanning does not rediscover generated trees
+- `ros2 pkg prefix demo_python_pkg` works after `roc work build`
+- ament index layout for the validated Python fixture matches `colcon` closely
 
 Suggested commit title:
 
-- `Support configurable build install and log base paths`
+- `Register ament python packages with standard ROS discovery`
 
-### Slice 2: Package Metadata Model
+### Slice 16: Generate Full Hook Set and Helper Scripts
 
 Objective:
 
-- separate build-time, runtime, and environment dependencies correctly
+- match `colcon` setup behavior more exactly instead of relying on shell-only approximations
 
 Tasks:
 
-- extend `package.xml` parsing to include:
-  - `depend`
-  - `build_depend`
-  - `buildtool_depend`
-  - `build_export_depend`
-  - `exec_depend`
-  - `test_depend`
-  - group dependencies where feasible
-  - conditional dependencies where feasible
-- define explicit dependency sets for:
-  - build ordering
-  - runtime/setup ordering
-  - exported downstream usage
-- stop overloading a single dependency list for all phases
+- generate or reuse the expected hook set:
+  - `package.dsv`
+  - `ament_prefix_path.*`
+  - `pythonpath.*`
+  - other standard package hook files where applicable
+- add `_local_setup_util_sh.py`
+- add `_local_setup_util_ps1.py`
+- ensure package and workspace setup use the same chaining model as `colcon`
 
 Definition of done:
 
-- internal package metadata clearly distinguishes dependency roles
-- topological sort uses the right dependency set
-- runtime/setup metadata can be emitted from this model
+- validated fixtures contain the expected helper files and hook family
+- setup script behavior matches `colcon` more closely when diffed and sourced
 
 Suggested commit title:
 
-- `Refine package manifest parsing for build and runtime dependencies`
+- `Generate colcon helper scripts and standard package hooks`
 
-### Slice 3: Colcon Package Metadata Files
+### Slice 17: Fix Metadata Placement and Prefix Chaining Edge Cases
 
 Objective:
 
-- emit workspace metadata required for correct setup chaining
+- eliminate the remaining metadata-layout and environment mismatches
 
 Tasks:
 
-- generate `share/colcon-core/packages/<pkg>` files
-- write runtime dependency information in dependency order
-- ensure metadata is generated for isolated and merged installs
-- make metadata generation part of successful package installation
+- align `share/colcon-core/packages/<pkg>` placement with `colcon`
+- remove malformed separators in generated path variables
+- verify `COLCON_PREFIX_PATH`, `AMENT_PREFIX_PATH`, `CMAKE_PREFIX_PATH`, and `PYTHONPATH` against `colcon`
+- tighten isolated vs merged prefix behavior for overlays
 
 Definition of done:
 
-- installed workspace contains package metadata files for every built package
-- runtime dependency chain can be reconstructed from generated metadata
+- path variables match `colcon` behavior in validated cases
+- metadata placement no longer differs in a way that affects downstream tooling
 
 Suggested commit title:
 
-- `Generate colcon package metadata for installed packages`
+- `Align colcon package metadata and prefix chaining behavior`
 
-### Slice 4: Package-Level Setup Scripts
-
-Objective:
-
-- generate package-scoped setup entry points compatible with colcon-style sourcing
-
-Tasks:
-
-- generate package-level scripts such as:
-  - `share/<pkg>/package.sh`
-  - `share/<pkg>/package.bash`
-  - `share/<pkg>/package.zsh`
-  - `share/<pkg>/local_setup.sh`
-- source package-provided hooks when present
-- ensure scripts are generated from package metadata and installed artifacts
-
-Definition of done:
-
-- every built package installs its own setup entry points
-- package scripts can be sourced directly and update the environment correctly
-
-Suggested commit title:
-
-- `Add package-level setup and local setup scripts`
-
-### Slice 5: Workspace Setup Pipeline
+### Slice 18: Complete Selector Parity
 
 Objective:
 
-- replace the current coarse environment dump with real workspace sourcing logic
+- match the remaining `colcon` selection and resume workflows
 
 Tasks:
 
-- generate workspace-level:
-  - `local_setup.sh`
-  - `setup.sh`
-  - `setup.bash`
-  - `setup.zsh`
-- chain package setup in dependency order
-- preserve overlay behavior using prefix chaining conventions
-- stop exporting a static snapshot of the parent shell as the main environment strategy
-
-Definition of done:
-
-- `source install/setup.bash` works for fixture workspaces
-- overlays source underlays correctly in supported workflows
-- the old environment-dump model is removed or relegated to a fallback
-
-Suggested commit title:
-
-- `Implement workspace setup chaining for installed packages`
-
-### Slice 6: Installed Artifact Scanning and Environment Heuristics
-
-Objective:
-
-- derive environment changes from installed outputs instead of assumptions
-
-Tasks:
-
-- inspect installed package prefixes for:
-  - `bin`
-  - `lib`
-  - `lib/pkgconfig`
-  - Python site-packages
-  - CMake package config files
-  - resource index markers
-- use discovered artifacts to generate environment modifications
-- support both isolated and merged installs
-
-Definition of done:
-
-- setup generation is driven by actual installed contents
-- downstream package discovery works in fixture workspaces
-
-Suggested commit title:
-
-- `Generate environment entries from installed package artifacts`
-
-### Slice 7: Environment Hooks and DSV Support
-
-Objective:
-
-- support standard package-provided environment customization
-
-Tasks:
-
-- detect and source installed environment hooks
-- support `.dsv` processing or an equivalent normalized internal representation
-- ensure package hooks are applied in dependency order
-- define deterministic precedence when multiple hooks modify the same variables
-
-Definition of done:
-
-- package hooks are honored during workspace sourcing
-- common ament hook-based packages behave correctly in fixture tests
-
-Suggested commit title:
-
-- `Support package environment hooks and dsv processing`
-
-### Slice 8: True `--symlink-install`
-
-Objective:
-
-- implement real symlink install behavior instead of a flag placeholder
-
-Tasks:
-
-- for supported package types, install symlinks where colcon would
-- preserve expected behavior for Python modules, scripts, and shared resources
-- define fallbacks for unsupported files or platforms
-
-Definition of done:
-
-- fixture workspaces validate symlink behavior
-- user-facing docs clearly describe platform-specific caveats
-
-Suggested commit title:
-
-- `Implement symlink install mode for workspace builds`
-
-### Slice 9: Build Execution Fidelity
-
-Objective:
-
-- tighten build invocation behavior so more packages succeed without special handling
-
-Tasks:
-
-- review and align CMake invocation flags with common colcon behavior
-- support more accurate per-package environment construction
-- improve handling for custom CMake targets
-- review Python package build/install invocation for current ROS 2 expectations
-- capture and expose exact subprocess failures
-
-Definition of done:
-
-- fixtures and representative packages build without manual intervention
-- execution behavior is documented and test-covered
-
-Suggested commit title:
-
-- `Align package build execution with colcon behavior`
-
-### Slice 10: Logging and Build State
-
-Objective:
-
-- make the build output debuggable and script-friendly
-
-Tasks:
-
-- write logs under `log/latest/...`
-- store per-package stdout/stderr
-- emit a clear end-of-build summary
-- keep machine-readable state where useful for future selectors and tooling
-
-Definition of done:
-
-- each package has persisted logs
-- failures can be diagnosed without rerunning interactively
-
-Suggested commit title:
-
-- `Add colcon-style logging and per-package build output`
-
-### Slice 11: Package Selection Semantics
-
-Objective:
-
-- improve selector behavior until it matches common `colcon` workflows
-
-Tasks:
-
-- review and align semantics for:
-  - `--packages-select`
+- verify discovery-time semantics for:
   - `--packages-ignore`
+  - `--packages-skip`
   - `--packages-up-to`
-- add support for additional selectors only if justified by user demand
-- ensure selectors combine predictably
+- add remaining high-value selectors if needed for parity:
+  - `--packages-select-build-finished`
+  - `--packages-skip-build-failed`
+  - dependency-based resume selectors if validation shows they matter
+- verify selectors combine exactly as `colcon` documents
 
 Definition of done:
 
-- selector behavior is covered by tests
-- behavior is documented and stable
+- selector behavior matches `colcon` in targeted parity tests
+- resume workflows behave predictably after failed builds
 
 Suggested commit title:
 
-- `Align package selection behavior with colcon semantics`
+- `Finish colcon package selection parity`
 
-### Slice 12: Compatibility Validation Against Real Workspaces
+### Slice 19: PowerShell and Cross-Shell Parity
 
 Objective:
 
-- prove the implementation against real ROS 2 usage, not just synthetic tests
+- stop treating non-POSIX setup outputs as optional
 
 Tasks:
 
-- build one or more representative real ROS 2 workspaces with `roc`
-- compare install tree, setup behavior, and downstream discovery against `colcon`
-- record gaps and either fix them or explicitly defer them
+- generate `.ps1` outputs where `colcon` does
+- verify `.sh`, `.bash`, `.zsh`, and `.ps1` outputs all exist in the expected locations
+- ensure shell wrappers call the same helper structure across package and workspace scopes
 
 Definition of done:
 
-- compatibility report exists in-repo
-- major blocking incompatibilities are either resolved or documented
+- validated install trees include the standard shell families from `colcon`
+- shell-output differences are reduced to clearly non-blocking details
 
 Suggested commit title:
 
-- `Validate roc workspace builds against real ROS 2 packages`
+- `Add powershell and full shell setup parity`
 
-### Slice 13: Documentation and Positioning Cleanup
+### Slice 20: Real Workspace Parity Matrix
 
 Objective:
 
-- make project claims accurate and keep docs aligned with reality
+- prove parity against more than toy examples
 
 Tasks:
 
-- update README, book, and compatibility docs
-- remove exaggerated “fully functional” claims until verified
-- document supported and unsupported behaviors explicitly
+- validate at least these workspace classes against `colcon`:
+  - minimal `ament_cmake`
+  - minimal `ament_python`
+  - mixed C++ and Python workspace
+  - dependency chain workspace
+  - overlay workspace
+- for each workspace compare:
+  - install tree
+  - setup files
+  - `ros2 pkg prefix`
+  - Python import
+  - downstream `find_package(...)` where relevant
+- record any remaining deltas as blockers, not as “future nice-to-haves”
 
 Definition of done:
 
-- docs match actual implementation
-- users can tell what is safe to rely on
+- parity report exists and all remaining deltas are either fixed or explicitly blocking release
 
 Suggested commit title:
 
-- `Update build documentation for verified colcon replacement support`
+- `Expand parity validation across representative ROS 2 workspaces`
 
-## Suggested Execution Order
+### Slice 21: Release Gate
 
-Recommended order:
+Objective:
 
-1. Slice 0
-2. Slice 1
-3. Slice 2
-4. Slice 3
-5. Slice 4
-6. Slice 5
-7. Slice 6
-8. Slice 7
-9. Slice 8
-10. Slice 9
-11. Slice 10
-12. Slice 11
-13. Slice 12
-14. Slice 13
+- define a hard stop before calling `roc work build` a full `colcon` replacement
 
-## Rules for Each Slice
+Tasks:
+
+- create a checklist that must pass before making the claim:
+  - `ament_cmake` parity
+  - `ament_python` parity
+  - selector parity
+  - setup-script parity
+  - real workspace validation
+- keep the docs conservative until all items are green
+- only then update docs to say full replacement
+
+Definition of done:
+
+- the project has an explicit parity gate
+- “full parity” is a tested claim, not a goal statement
+
+Suggested commit title:
+
+- `Add release gate for full colcon parity`
+
+## Execution Order
+
+Recommended order from here:
+
+1. Slice 14
+2. Slice 15
+3. Slice 16
+4. Slice 17
+5. Slice 18
+6. Slice 19
+7. Slice 20
+8. Slice 21
+
+## Rules For Each Remaining Slice
 
 Before coding:
 
-- identify the exact fixture or compatibility case the slice should satisfy
-- define the install-tree or runtime behavior expected at the end
+- identify the exact upstream `colcon` behavior being matched
+- define the expected install-tree and runtime behavior
+- add a direct comparison case if one does not already exist
 
 During implementation:
 
-- keep each slice narrowly scoped
-- add or extend tests with the implementation
-- avoid mixing unrelated cleanup into the same change
+- keep each slice narrow
+- use `colcon` output as the baseline for parity-sensitive files
+- do not accept “close enough” if downstream behavior still differs
 
 Before committing:
 
 - run targeted tests first
-- run the broadest practical validation available in the current environment
-- ensure docs reflect any user-visible behavior changes
+- run the ignored real-workspace validator when the slice affects parity-sensitive behavior
+- update `COMPAT_VALIDATION.md` whenever observed behavior changes
 
 Commit:
 
@@ -458,10 +347,10 @@ Commit:
 
 ## Immediate Next Step
 
-Start with Slice 0.
+Start with Slice 14.
 
 Reason:
 
-- the project currently lacks a strong compatibility harness
-- without fixture-based comparison, later “colcon replacement” work will drift or regress
-- the next slices depend on being able to verify install trees and setup behavior quickly
+- the remaining blocker to a full replacement claim is still `ament_python`
+- direct validation already shows the first hard failure: `ros2 pkg prefix` breaks after a `roc` Python build
+- until Python install layout and registration match `colcon`, the parity claim is false
