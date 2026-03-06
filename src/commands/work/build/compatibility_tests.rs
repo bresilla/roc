@@ -107,6 +107,12 @@ fn merged_install_fixture_contains_expected_tree_shape() {
             "share/colcon-core/packages",
             "share/colcon-core/packages/demo_merged_pkg",
             "share/demo_merged_pkg",
+            "share/demo_merged_pkg/package.sh",
+            "share/demo_merged_pkg/package.bash",
+            "share/demo_merged_pkg/package.zsh",
+            "share/demo_merged_pkg/local_setup.sh",
+            "share/demo_merged_pkg/local_setup.bash",
+            "share/demo_merged_pkg/local_setup.zsh",
             "share/demo_merged_pkg/package.xml",
         ],
     );

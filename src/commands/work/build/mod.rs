@@ -136,32 +136,7 @@ impl ColconBuilder {
     pub fn build_packages(&self) -> Result<(), Box<dyn std::error::Error>> {
         let mut executor = build_executor::BuildExecutor::new(&self.config);
         executor.build_all(&self.packages, &self.build_order)?;
-        
-        // Generate setup scripts
-        self.generate_setup_scripts()?;
-        
-        Ok(())
-    }
-    
-    /// Generate setup scripts for the workspace
-    pub fn generate_setup_scripts(&self) -> Result<(), Box<dyn std::error::Error>> {
-        use crate::commands::work::build::environment_manager::EnvironmentManager;
-        
-        let env_manager = EnvironmentManager::new(
-            self.config.install_base.clone(),
-            self.config.isolated
-        );
-        
-        // Generate main setup script
-        let setup_bash_path = self.config.install_base.join("setup.bash");
-        env_manager.generate_setup_script(&setup_bash_path)?;
-        
-        println!(
-            "{} {}",
-            "Generated setup script:".bright_green().bold(),
-            setup_bash_path.display().to_string().bright_white()
-        );
-        
+
         Ok(())
     }
 

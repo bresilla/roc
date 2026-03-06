@@ -654,6 +654,7 @@ impl<'a> BuildExecutor<'a> {
         packages: &[PackageMeta],
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.generate_package_metadata_files(packages)?;
+        self.generate_package_setup_scripts(packages)?;
 
         let install_dir = self.config.install_base.clone();
 
@@ -661,6 +662,62 @@ impl<'a> BuildExecutor<'a> {
             self.generate_merged_setup_scripts(&install_dir)?;
         } else {
             self.generate_isolated_setup_scripts(&install_dir, packages)?;
+        }
+
+        Ok(())
+    }
+
+    fn generate_package_setup_scripts(
+        &self,
+        packages: &[PackageMeta],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for package in packages {
+            let Some(pkg_install_path) = self.install_paths.get(&package.name) else {
+                continue;
+            };
+
+            let package_share_dir = pkg_install_path.join("share").join(&package.name);
+            fs::create_dir_all(&package_share_dir)?;
+
+            let package_sh = package_share_dir.join("package.sh");
+            let package_bash = package_share_dir.join("package.bash");
+            let package_zsh = package_share_dir.join("package.zsh");
+            let local_setup_sh = package_share_dir.join("local_setup.sh");
+            let local_setup_bash = package_share_dir.join("local_setup.bash");
+            let local_setup_zsh = package_share_dir.join("local_setup.zsh");
+
+            fs::write(
+                &local_setup_sh,
+                self.render_local_setup_sh(&package.name, pkg_install_path),
+            )?;
+            fs::write(
+                &local_setup_bash,
+                self.render_shell_wrapper("bash", &local_setup_sh),
+            )?;
+            fs::write(
+                &local_setup_zsh,
+                self.render_shell_wrapper("zsh", &local_setup_sh),
+            )?;
+
+            fs::write(
+                &package_sh,
+                self.render_package_sh(&package.name, pkg_install_path),
+            )?;
+            fs::write(
+                &package_bash,
+                self.render_shell_wrapper("bash", &package_sh),
+            )?;
+            fs::write(
+                &package_zsh,
+                self.render_shell_wrapper("zsh", &package_sh),
+            )?;
+
+            Self::make_executable_if_unix(&local_setup_sh)?;
+            Self::make_executable_if_unix(&local_setup_bash)?;
+            Self::make_executable_if_unix(&local_setup_zsh)?;
+            Self::make_executable_if_unix(&package_sh)?;
+            Self::make_executable_if_unix(&package_bash)?;
+            Self::make_executable_if_unix(&package_zsh)?;
         }
 
         Ok(())
@@ -740,15 +797,7 @@ fi
         );
 
         fs::write(&setup_bash, setup_content)?;
-
-        // Make executable on Unix systems
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&setup_bash)?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&setup_bash, perms)?;
-        }
+        Self::make_executable_if_unix(&setup_bash)?;
 
         Ok(())
     }
@@ -758,41 +807,6 @@ fi
         install_dir: &Path,
         packages: &[PackageMeta],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Generate individual package setup scripts
-        for package in packages {
-            if let Some(pkg_install_path) = self.install_paths.get(&package.name) {
-                let package_dir = pkg_install_path.join("share").join(&package.name);
-                fs::create_dir_all(&package_dir)?;
-
-                let package_setup = package_dir.join("package.bash");
-                let package_setup_content = format!(
-                    r#"#!/bin/bash
-# Generated setup script for package {}
-
-export CMAKE_PREFIX_PATH="{}:${{CMAKE_PREFIX_PATH}}"
-export AMENT_PREFIX_PATH="{}:${{AMENT_PREFIX_PATH}}"
-
-if [ -d "{}/bin" ]; then
-    export PATH="{}/bin:${{PATH}}"
-fi
-
-if [ -d "{}/lib" ]; then
-    export LD_LIBRARY_PATH="{}/lib:${{LD_LIBRARY_PATH}}"
-fi
-"#,
-                    package.name,
-                    pkg_install_path.display(),
-                    pkg_install_path.display(),
-                    pkg_install_path.display(),
-                    pkg_install_path.display(),
-                    pkg_install_path.display(),
-                    pkg_install_path.display()
-                );
-
-                fs::write(&package_setup, package_setup_content)?;
-            }
-        }
-
         // Generate workspace setup script
         let setup_bash = install_dir.join("setup.bash");
         let mut setup_content = String::from(
@@ -834,15 +848,7 @@ fi
 
         let final_content = setup_content.replace("{}", &install_dir.display().to_string());
         fs::write(&setup_bash, final_content)?;
-
-        // Make executable on Unix systems
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&setup_bash)?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&setup_bash, perms)?;
-        }
+        Self::make_executable_if_unix(&setup_bash)?;
 
         Ok(())
     }
@@ -868,6 +874,99 @@ fi
 
     fn write_colcon_ignore(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         fs::write(dir.join("COLCON_IGNORE"), "")?;
+        Ok(())
+    }
+
+    fn render_local_setup_sh(&self, package_name: &str, prefix: &Path) -> String {
+        let prefix_str = prefix.display();
+        format!(
+            r#"#!/bin/sh
+# Generated local setup script for package {package_name}
+
+_colcon_prepend_unique_value() {{
+    var_name="$1"
+    value="$2"
+
+    eval current_value="\${{${{var_name}}:-}}"
+    case ":$current_value:" in
+        *":$value:"*) ;;
+        "")
+            eval export "$var_name=$value"
+            ;;
+        *)
+            eval export "$var_name=$value:$current_value"
+            ;;
+    esac
+}}
+
+_colcon_prepend_unique_value CMAKE_PREFIX_PATH "{prefix_str}"
+_colcon_prepend_unique_value AMENT_PREFIX_PATH "{prefix_str}"
+
+if [ -d "{prefix_str}/bin" ]; then
+    _colcon_prepend_unique_value PATH "{prefix_str}/bin"
+fi
+
+if [ -d "{prefix_str}/lib" ]; then
+    _colcon_prepend_unique_value LD_LIBRARY_PATH "{prefix_str}/lib"
+fi
+
+if [ -d "{prefix_str}/lib/python3.10/site-packages" ]; then
+    _colcon_prepend_unique_value PYTHONPATH "{prefix_str}/lib/python3.10/site-packages"
+fi
+"#
+        )
+    }
+
+    fn render_package_sh(&self, package_name: &str, prefix: &Path) -> String {
+        let local_setup_path = prefix.join("share").join(package_name).join("local_setup.sh");
+        format!(
+            r#"#!/bin/sh
+# Generated package setup script for package {package_name}
+
+_colcon_package_old_prefix="${{COLCON_CURRENT_PREFIX:-}}"
+export COLCON_CURRENT_PREFIX="{prefix}"
+
+if [ -f "{local_setup}" ]; then
+    . "{local_setup}"
+fi
+
+if [ -n "$_colcon_package_old_prefix" ]; then
+    export COLCON_CURRENT_PREFIX="$_colcon_package_old_prefix"
+else
+    unset COLCON_CURRENT_PREFIX
+fi
+unset _colcon_package_old_prefix
+"#,
+            prefix = prefix.display(),
+            local_setup = local_setup_path.display(),
+        )
+    }
+
+    fn render_shell_wrapper(&self, shell_name: &str, target_path: &Path) -> String {
+        let shebang = match shell_name {
+            "sh" => "#!/bin/sh",
+            "bash" => "#!/bin/bash",
+            "zsh" => "#!/bin/zsh",
+            _ => "#!/bin/sh",
+        };
+
+        format!(
+            r#"{shebang}
+. "{target}"
+"#,
+            target = target_path.display(),
+        )
+    }
+
+    fn make_executable_if_unix(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(path)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(path, perms)?;
+        }
+
         Ok(())
     }
 
@@ -965,5 +1064,54 @@ mod tests {
             std::fs::read_to_string(metadata_root.join("consumer_pkg")).unwrap(),
             "base_pkg"
         );
+    }
+
+    #[test]
+    fn generate_package_setup_scripts_writes_package_and_local_setup_files() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let mut executor = BuildExecutor::new(&config);
+        let package_prefix = config.install_base.join("demo_pkg");
+        executor
+            .install_paths
+            .insert("demo_pkg".to_string(), package_prefix.clone());
+
+        let packages = vec![PackageMeta {
+            name: "demo_pkg".to_string(),
+            path: PathBuf::from("/tmp/demo_pkg"),
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+
+        executor.generate_package_setup_scripts(&packages).unwrap();
+
+        let share_dir = package_prefix.join("share").join("demo_pkg");
+        assert!(share_dir.join("package.sh").exists());
+        assert!(share_dir.join("package.bash").exists());
+        assert!(share_dir.join("package.zsh").exists());
+        assert!(share_dir.join("local_setup.sh").exists());
+        assert!(share_dir.join("local_setup.bash").exists());
+        assert!(share_dir.join("local_setup.zsh").exists());
+
+        let package_sh = std::fs::read_to_string(share_dir.join("package.sh")).unwrap();
+        assert!(package_sh.contains("COLCON_CURRENT_PREFIX"));
+        assert!(package_sh.contains("local_setup.sh"));
+
+        let local_setup_sh = std::fs::read_to_string(share_dir.join("local_setup.sh")).unwrap();
+        assert!(local_setup_sh.contains("CMAKE_PREFIX_PATH"));
+        assert!(local_setup_sh.contains("AMENT_PREFIX_PATH"));
+        assert!(local_setup_sh.contains(&package_prefix.display().to_string()));
     }
 }
