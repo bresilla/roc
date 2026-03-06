@@ -67,24 +67,25 @@ Observed tree deltas:
 
 - `colcon` and `roc` now both install Python payloads under `install/<pkg>/lib/python3.12/site-packages`
 - `colcon` and `roc` now both install the package marker and `package.xml` under `install/<pkg>/share/...`
-- `colcon` generated package hook files like `ament_prefix_path.*`, `pythonpath.*`, and `package.dsv`
-- `roc` generated shell setup wrappers, but not the same package hook set
+- `colcon` and `roc` now both generate the `ament_prefix_path.*`, `pythonpath.*`, and `package.dsv` hook family for this validated case
+- `roc` also now generates `_local_setup_util_sh.py` and `_local_setup_util_ps1.py`
+- remaining file-level deltas are concentrated in root `.ps1` setup outputs, `.colcon_install_layout`, and package-metadata placement
 
 Assessment:
 
 - runtime Python import works
 - ROS package discovery now works for the validated minimal case
-- remaining differences are concentrated in hook generation and metadata fidelity
+- remaining differences are concentrated in metadata fidelity and shell-family parity
 
 ## Current Conclusion
 
 `roc work build` is now close enough to substitute `colcon build` for the validated minimal `ament_cmake` case and the validated minimal `ament_python` case.
 
-It is still not full parity, because helper-script generation, hook fidelity, metadata placement, and shell-family coverage still differ from `colcon`.
+It is still not full parity, because metadata placement and shell-family coverage still differ from `colcon`.
 
 ## Next Fixes Suggested By Validation
 
-1. Generate the missing `ament_prefix_path`, `pythonpath`, and `package.dsv` hook set for Python packages.
-2. Move or mirror `share/colcon-core/packages/<pkg>` to the package-prefix layout that `colcon` uses.
-3. Trim the trailing separator from generated `COLCON_PREFIX_PATH`.
-4. Add `_local_setup_util_*.py` and `.ps1` parity where `colcon` emits them.
+1. Move or mirror `share/colcon-core/packages/<pkg>` to the package-prefix layout that `colcon` uses.
+2. Trim the trailing separator from generated `COLCON_PREFIX_PATH`.
+3. Add root `.ps1` setup outputs where `colcon` emits them.
+4. Add `.colcon_install_layout` and any other remaining workspace metadata files needed for parity.

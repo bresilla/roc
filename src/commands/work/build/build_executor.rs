@@ -837,6 +837,7 @@ impl<'a> BuildExecutor<'a> {
 
         let install_dir = self.config.install_base.clone();
         self.generate_workspace_setup_scripts(&install_dir, packages)?;
+        self.generate_workspace_helper_scripts(&install_dir)?;
 
         Ok(())
     }
@@ -856,9 +857,15 @@ impl<'a> BuildExecutor<'a> {
             let package_sh = package_share_dir.join("package.sh");
             let package_bash = package_share_dir.join("package.bash");
             let package_zsh = package_share_dir.join("package.zsh");
+            let package_ps1 = package_share_dir.join("package.ps1");
+            let package_dsv = package_share_dir.join("package.dsv");
             let local_setup_sh = package_share_dir.join("local_setup.sh");
             let local_setup_bash = package_share_dir.join("local_setup.bash");
             let local_setup_zsh = package_share_dir.join("local_setup.zsh");
+            let hook_dir = package_share_dir.join("hook");
+            fs::create_dir_all(&hook_dir)?;
+
+            self.generate_package_hook_files(package, pkg_install_path, &hook_dir)?;
 
             fs::write(
                 &local_setup_sh,
@@ -882,6 +889,17 @@ impl<'a> BuildExecutor<'a> {
                 self.render_shell_wrapper("bash", &package_sh),
             )?;
             fs::write(&package_zsh, self.render_shell_wrapper("zsh", &package_sh))?;
+            fs::write(
+                &package_ps1,
+                self.render_package_ps1(&package.name, pkg_install_path),
+            )?;
+            fs::write(
+                &package_dsv,
+                self.render_package_dsv(
+                    &package.name,
+                    &self.package_hook_names(package, pkg_install_path),
+                ),
+            )?;
 
             Self::make_executable_if_unix(&local_setup_sh)?;
             Self::make_executable_if_unix(&local_setup_bash)?;
@@ -889,6 +907,7 @@ impl<'a> BuildExecutor<'a> {
             Self::make_executable_if_unix(&package_sh)?;
             Self::make_executable_if_unix(&package_bash)?;
             Self::make_executable_if_unix(&package_zsh)?;
+            Self::make_executable_if_unix(&package_ps1)?;
         }
 
         Ok(())
@@ -966,6 +985,21 @@ impl<'a> BuildExecutor<'a> {
         Self::make_executable_if_unix(&setup_bash)?;
         Self::make_executable_if_unix(&setup_zsh)?;
 
+        Ok(())
+    }
+
+    fn generate_workspace_helper_scripts(
+        &self,
+        install_dir: &Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        fs::write(
+            install_dir.join("_local_setup_util_sh.py"),
+            self.render_workspace_helper_script(false),
+        )?;
+        fs::write(
+            install_dir.join("_local_setup_util_ps1.py"),
+            self.render_workspace_helper_script(true),
+        )?;
         Ok(())
     }
 
@@ -1136,6 +1170,44 @@ unset _colcon_package_old_prefix
         )
     }
 
+    fn render_package_ps1(&self, package_name: &str, prefix: &Path) -> String {
+        let hook_names = self.package_hook_names_for_ps1_path(package_name, prefix);
+        let mut content = format!(
+            r#"# Generated package setup script for package {package_name}
+
+$env:COLCON_CURRENT_PREFIX="{prefix}"
+
+"#,
+            prefix = prefix.display(),
+        );
+        for hook_name in hook_names {
+            let hook_path = prefix
+                .join("share")
+                .join(package_name)
+                .join("hook")
+                .join(hook_name);
+            content.push_str(&format!(
+                "if (Test-Path \"{hook}\") {{\n    . \"{hook}\"\n}}\n",
+                hook = hook_path.display()
+            ));
+        }
+        content.push_str("Remove-Item Env:\\COLCON_CURRENT_PREFIX -ErrorAction SilentlyContinue\n");
+        content
+    }
+
+    fn render_package_dsv(&self, package_name: &str, hook_names: &[String]) -> String {
+        let mut content = String::new();
+        for hook_name in hook_names {
+            if hook_name.ends_with(".ps1")
+                || hook_name.ends_with(".dsv")
+                || hook_name.ends_with(".sh")
+            {
+                content.push_str(&format!("source;share/{package_name}/hook/{hook_name}\n"));
+            }
+        }
+        content
+    }
+
     fn render_shell_wrapper(&self, shell_name: &str, target_path: &Path) -> String {
         let shebang = match shell_name {
             "sh" => "#!/bin/sh",
@@ -1149,6 +1221,184 @@ unset _colcon_package_old_prefix
 . "{target}"
 "#,
             target = target_path.display(),
+        )
+    }
+
+    fn generate_package_hook_files(
+        &self,
+        package: &PackageMeta,
+        prefix: &Path,
+        hook_dir: &Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let artifacts = Self::scan_installed_artifacts(prefix);
+        fs::write(
+            hook_dir.join("ament_prefix_path.dsv"),
+            "prepend-non-duplicate;AMENT_PREFIX_PATH;\n",
+        )?;
+        fs::write(
+            hook_dir.join("ament_prefix_path.sh"),
+            "# generated by roc\n\n_colcon_prepend_unique_value AMENT_PREFIX_PATH \"$COLCON_CURRENT_PREFIX\"\n",
+        )?;
+        fs::write(
+            hook_dir.join("ament_prefix_path.ps1"),
+            "# generated by roc\n\ncolcon_prepend_unique_value AMENT_PREFIX_PATH \"$env:COLCON_CURRENT_PREFIX\"\n",
+        )?;
+
+        if let Some(python_dir) = artifacts.python_dirs.first() {
+            if let Ok(relative_python_dir) = python_dir.strip_prefix(prefix) {
+                let rel = relative_python_dir.to_string_lossy().replace('\\', "/");
+                fs::write(
+                    hook_dir.join("pythonpath.dsv"),
+                    format!("prepend-non-duplicate;PYTHONPATH;{rel}\n"),
+                )?;
+                fs::write(
+                    hook_dir.join("pythonpath.sh"),
+                    format!(
+                        "# generated by roc\n\n_colcon_prepend_unique_value PYTHONPATH \"$COLCON_CURRENT_PREFIX/{rel}\"\n"
+                    ),
+                )?;
+                fs::write(
+                    hook_dir.join("pythonpath.ps1"),
+                    format!(
+                        "# generated by roc\n\ncolcon_prepend_unique_value PYTHONPATH \"$env:COLCON_CURRENT_PREFIX\\{}\"\n",
+                        rel.replace('/', "\\")
+                    ),
+                )?;
+            }
+        }
+
+        if matches!(package.build_type, BuildType::AmentCmake | BuildType::Cmake) {
+            fs::write(
+                hook_dir.join("cmake_prefix_path.dsv"),
+                "prepend-non-duplicate;CMAKE_PREFIX_PATH;\n",
+            )?;
+            fs::write(
+                hook_dir.join("cmake_prefix_path.sh"),
+                "# generated by roc\n\n_colcon_prepend_unique_value CMAKE_PREFIX_PATH \"$COLCON_CURRENT_PREFIX\"\n",
+            )?;
+            fs::write(
+                hook_dir.join("cmake_prefix_path.ps1"),
+                "# generated by roc\n\ncolcon_prepend_unique_value CMAKE_PREFIX_PATH \"$env:COLCON_CURRENT_PREFIX\"\n",
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn package_hook_names(&self, package: &PackageMeta, prefix: &Path) -> Vec<String> {
+        let artifacts = Self::scan_installed_artifacts(prefix);
+        let mut names = Vec::new();
+        if !artifacts.python_dirs.is_empty() {
+            names.extend([
+                "pythonpath.ps1".to_string(),
+                "pythonpath.dsv".to_string(),
+                "pythonpath.sh".to_string(),
+            ]);
+        }
+        names.extend([
+            "ament_prefix_path.ps1".to_string(),
+            "ament_prefix_path.dsv".to_string(),
+            "ament_prefix_path.sh".to_string(),
+        ]);
+        if matches!(package.build_type, BuildType::AmentCmake | BuildType::Cmake) {
+            names.extend([
+                "cmake_prefix_path.ps1".to_string(),
+                "cmake_prefix_path.dsv".to_string(),
+                "cmake_prefix_path.sh".to_string(),
+            ]);
+        }
+        names
+    }
+
+    fn package_hook_names_for_ps1_path(&self, package_name: &str, prefix: &Path) -> Vec<String> {
+        let hook_dir = prefix.join("share").join(package_name).join("hook");
+        let mut names = match fs::read_dir(hook_dir) {
+            Ok(entries) => entries
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.file_name().to_string_lossy().to_string())
+                .filter(|name| name.ends_with(".ps1"))
+                .collect::<Vec<_>>(),
+            Err(_) => Vec::new(),
+        };
+        names.sort();
+        names
+    }
+
+    fn render_workspace_helper_script(&self, powershell: bool) -> String {
+        let invoke = if powershell {
+            "_colcon_prefix_powershell_source_script"
+        } else {
+            "_colcon_prefix_sh_source_script"
+        };
+        format!(
+            r#"#!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+
+
+def read_packages(prefix):
+    packages = {{}}
+    root_index = prefix / "share" / "colcon-core" / "packages"
+    if root_index.is_dir():
+        for path in root_index.iterdir():
+            if path.is_file() and not path.name.startswith('.'):
+                packages[path.name] = parse_dependencies(path.read_text())
+
+    for child in prefix.iterdir():
+        package_index = child / "share" / "colcon-core" / "packages" / child.name
+        if package_index.is_file():
+            packages[child.name] = parse_dependencies(package_index.read_text())
+    return packages
+
+
+def parse_dependencies(text):
+    deps = []
+    for item in text.replace(os.pathsep, "\n").splitlines():
+        item = item.strip()
+        if item:
+            deps.append(item)
+    return deps
+
+
+def topo(packages):
+    ordered = []
+    visited = set()
+
+    def visit(name):
+        if name in visited:
+            return
+        visited.add(name)
+        for dep in packages.get(name, []):
+            if dep in packages:
+                visit(dep)
+        ordered.append(name)
+
+    for name in sorted(packages):
+        visit(name)
+    return ordered
+
+
+def main():
+    prefix = Path(__file__).resolve().parent
+    ext = "ps1" if len(sys.argv) > 1 and sys.argv[1] == "ps1" else "sh"
+    packages = read_packages(prefix)
+    for package in topo(packages):
+        package_prefix = prefix / package
+        if not package_prefix.is_dir():
+            package_prefix = prefix
+        script = package_prefix / "share" / package / f"package.{{ext}}"
+        if script.is_file():
+            if ext == "ps1":
+                print(f'$env:COLCON_CURRENT_PREFIX="{{{{package_prefix}}}}"')
+                print(f'{invoke} "{{{{script}}}}"')
+            else:
+                print(f'COLCON_CURRENT_PREFIX="{{{{package_prefix}}}}" {invoke} "{{{{script}}}}"')
+
+
+if __name__ == "__main__":
+    main()
+"#
         )
     }
 
@@ -1843,6 +2093,8 @@ mod tests {
         assert!(share_dir.join("package.sh").exists());
         assert!(share_dir.join("package.bash").exists());
         assert!(share_dir.join("package.zsh").exists());
+        assert!(share_dir.join("package.ps1").exists());
+        assert!(share_dir.join("package.dsv").exists());
         assert!(share_dir.join("local_setup.sh").exists());
         assert!(share_dir.join("local_setup.bash").exists());
         assert!(share_dir.join("local_setup.zsh").exists());
@@ -1855,6 +2107,56 @@ mod tests {
         assert!(local_setup_sh.contains("CMAKE_PREFIX_PATH"));
         assert!(local_setup_sh.contains("AMENT_PREFIX_PATH"));
         assert!(local_setup_sh.contains(&package_prefix.display().to_string()));
+    }
+
+    #[test]
+    fn generate_package_setup_scripts_writes_standard_hook_files_for_python_packages() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let mut executor = BuildExecutor::new(&config);
+        let package_prefix = config.install_base.join("demo_python_pkg");
+        fs::create_dir_all(package_prefix.join("lib/python3.12/site-packages")).unwrap();
+        executor
+            .install_paths
+            .insert("demo_python_pkg".to_string(), package_prefix.clone());
+
+        let packages = vec![PackageMeta {
+            name: "demo_python_pkg".to_string(),
+            path: PathBuf::from("/tmp/demo_python_pkg"),
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+
+        executor.generate_package_setup_scripts(&packages).unwrap();
+
+        let share_dir = package_prefix.join("share").join("demo_python_pkg");
+        let hook_dir = share_dir.join("hook");
+        assert!(hook_dir.join("ament_prefix_path.dsv").exists());
+        assert!(hook_dir.join("ament_prefix_path.sh").exists());
+        assert!(hook_dir.join("ament_prefix_path.ps1").exists());
+        assert!(hook_dir.join("pythonpath.dsv").exists());
+        assert!(hook_dir.join("pythonpath.sh").exists());
+        assert!(hook_dir.join("pythonpath.ps1").exists());
+
+        let package_dsv = fs::read_to_string(share_dir.join("package.dsv")).unwrap();
+        assert!(package_dsv.contains("source;share/demo_python_pkg/hook/pythonpath.dsv"));
+        assert!(package_dsv.contains("source;share/demo_python_pkg/hook/ament_prefix_path.dsv"));
+
+        let package_ps1 = fs::read_to_string(share_dir.join("package.ps1")).unwrap();
+        assert!(package_ps1.contains("pythonpath.ps1"));
+        assert!(package_ps1.contains("ament_prefix_path.ps1"));
     }
 
     #[test]
@@ -1905,6 +2207,29 @@ mod tests {
         let setup_sh = std::fs::read_to_string(config.install_base.join("setup.sh")).unwrap();
         assert!(setup_sh.contains("COLCON_PREFIX_PATH"));
         assert!(setup_sh.contains("local_setup.sh"));
+    }
+
+    #[test]
+    fn generate_workspace_helper_scripts_writes_local_setup_util_helpers() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let executor = BuildExecutor::new(&config);
+        fs::create_dir_all(&config.install_base).unwrap();
+        executor
+            .generate_workspace_helper_scripts(&config.install_base)
+            .unwrap();
+
+        let sh_helper =
+            fs::read_to_string(config.install_base.join("_local_setup_util_sh.py")).unwrap();
+        let ps1_helper =
+            fs::read_to_string(config.install_base.join("_local_setup_util_ps1.py")).unwrap();
+        assert!(sh_helper.contains("def read_packages(prefix):"));
+        assert!(sh_helper.contains("_colcon_prefix_sh_source_script"));
+        assert!(ps1_helper.contains("_colcon_prefix_powershell_source_script"));
     }
 
     #[test]
