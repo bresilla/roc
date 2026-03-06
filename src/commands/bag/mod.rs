@@ -1,3 +1,4 @@
+use crate::commands::cli::print_error_and_exit;
 use clap::ArgMatches;
 
 pub fn handle(matches: ArgMatches) {
@@ -14,10 +15,7 @@ pub fn handle(matches: ArgMatches) {
         Some(("list", args)) => {
             list::handle(args.clone());
         }
-        _ => {
-            println!("ROSbag functionality is currently work in progress.");
-            println!("Available subcommands: record, play, info, list");
-        }
+        _ => print_error_and_exit("No bag subcommand selected"),
     }
 }
 

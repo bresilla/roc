@@ -1,4 +1,5 @@
-use anyhow::{anyhow, Result};
+use crate::commands::cli::handle_anyhow_result;
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use colored::*;
 use std::collections::BTreeMap;
@@ -7,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use memmap2::Mmap;
 
-use crate::shared::serialized_transport::{sleep_short, SerializedSender};
+use crate::shared::serialized_transport::{SerializedSender, sleep_short};
 
 #[derive(Debug, Clone)]
 struct McapMessage {
@@ -120,7 +121,10 @@ fn run_command(matches: ArgMatches) -> Result<()> {
                 let pub_ = SerializedSender::new(&m.topic, &m.msg_type)?;
                 pubs.insert(key.clone(), pub_);
             }
-            pubs.get_mut(&key).unwrap().publish(&m.data)?;
+            let publisher = pubs.get_mut(&key).ok_or_else(|| {
+                anyhow!("Missing publisher for topic '{}' [{}]", m.topic, m.msg_type)
+            })?;
+            publisher.publish(&m.data)?;
         }
 
         if !loop_play {
@@ -132,13 +136,5 @@ fn run_command(matches: ArgMatches) -> Result<()> {
 }
 
 pub fn handle(matches: ArgMatches) {
-    if let Err(e) = run_command(matches) {
-        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
-            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
-                return;
-            }
-        }
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    handle_anyhow_result(run_command(matches));
 }

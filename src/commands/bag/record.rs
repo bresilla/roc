@@ -1,4 +1,5 @@
-use anyhow::{anyhow, Result};
+use crate::commands::cli::handle_anyhow_result;
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use colored::*;
 use std::collections::BTreeMap;
@@ -11,7 +12,7 @@ use mcap::records::MessageHeader;
 use mcap::{WriteOptions, Writer};
 
 use crate::graph::RclGraphContext;
-use crate::shared::serialized_transport::{sleep_short, SerializedReceiver};
+use crate::shared::serialized_transport::{SerializedReceiver, sleep_short};
 
 fn now_nanos() -> u64 {
     let dur = SystemTime::now()
@@ -98,7 +99,10 @@ fn run_command(matches: ArgMatches) -> Result<()> {
         let base = PathBuf::from(&output);
         let base_is_dir = base.is_dir();
         for t in &topics_to_record {
-            let ty = topic_types.get(t).unwrap().clone();
+            let ty = topic_types
+                .get(t)
+                .cloned()
+                .ok_or_else(|| anyhow!("Missing type for topic '{}'", t))?;
             let filename = if base_is_dir {
                 let safe = t.trim_start_matches('/').replace('/', "__");
                 base.join(format!("{}.mcap", safe))
@@ -148,7 +152,10 @@ fn run_command(matches: ArgMatches) -> Result<()> {
 
     let mut receivers: Vec<(String, String, SerializedReceiver)> = Vec::new();
     for t in &topics_to_record {
-        let ty = topic_types.get(t).unwrap().clone();
+        let ty = topic_types
+            .get(t)
+            .cloned()
+            .ok_or_else(|| anyhow!("Missing type for topic '{}'", t))?;
         receivers.push((t.clone(), ty.clone(), SerializedReceiver::new(t, &ty)?));
     }
 
@@ -176,8 +183,12 @@ fn run_command(matches: ArgMatches) -> Result<()> {
                     )?;
                     *seq = seq.wrapping_add(1);
                 } else if let Some((writer, channel_ids, seqs)) = shared_writer.as_mut() {
-                    let cid = *channel_ids.get(topic).unwrap();
-                    let s = seqs.get_mut(topic).unwrap();
+                    let cid = *channel_ids
+                        .get(topic)
+                        .ok_or_else(|| anyhow!("Missing channel id for topic '{}'", topic))?;
+                    let s = seqs
+                        .get_mut(topic)
+                        .ok_or_else(|| anyhow!("Missing sequence counter for topic '{}'", topic))?;
                     writer.write_to_known_channel(
                         &MessageHeader {
                             channel_id: cid,
@@ -206,8 +217,5 @@ fn run_command(matches: ArgMatches) -> Result<()> {
 }
 
 pub fn handle(matches: ArgMatches) {
-    if let Err(e) = run_command(matches) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    handle_anyhow_result(run_command(matches));
 }

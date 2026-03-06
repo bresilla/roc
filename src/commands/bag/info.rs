@@ -1,4 +1,5 @@
-use anyhow::{anyhow, Result};
+use crate::commands::cli::handle_anyhow_result;
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use colored::*;
 use std::path::PathBuf;
@@ -81,13 +82,5 @@ fn run_command(matches: ArgMatches) -> Result<()> {
 }
 
 pub fn handle(matches: ArgMatches) {
-    if let Err(e) = run_command(matches) {
-        if let Some(ioe) = e.downcast_ref::<std::io::Error>() {
-            if ioe.kind() == std::io::ErrorKind::BrokenPipe {
-                return;
-            }
-        }
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    handle_anyhow_result(run_command(matches));
 }

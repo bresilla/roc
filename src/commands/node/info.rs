@@ -1,4 +1,5 @@
-use anyhow::{anyhow, Result};
+use crate::commands::cli::handle_anyhow_result;
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 
 use crate::arguments::node::CommonNodeArgs;
@@ -107,8 +108,5 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonNodeArgs) {
-    if let Err(e) = run_command(matches, common_args) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    handle_anyhow_result(run_command(matches, common_args));
 }
