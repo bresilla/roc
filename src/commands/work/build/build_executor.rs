@@ -33,6 +33,13 @@ pub struct BuildState {
     build_count: Arc<Mutex<(usize, usize)>>, // (successful, failed)
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct InstalledArtifacts {
+    bin_dirs: Vec<PathBuf>,
+    lib_dirs: Vec<PathBuf>,
+    python_dirs: Vec<PathBuf>,
+}
+
 impl<'a> BuildExecutor<'a> {
     pub fn new(config: &'a BuildConfig) -> Self {
         let env_manager = EnvironmentManager::new(config.install_base.clone(), config.isolated);
@@ -815,6 +822,7 @@ impl<'a> BuildExecutor<'a> {
 
     fn render_local_setup_sh(&self, package_name: &str, prefix: &Path) -> String {
         let prefix_str = prefix.display();
+        let artifacts = Self::scan_installed_artifacts(prefix);
         format!(
             r#"#!/bin/sh
 # Generated local setup script for package {package_name}
@@ -838,18 +846,10 @@ _colcon_prepend_unique_value() {{
 _colcon_prepend_unique_value CMAKE_PREFIX_PATH "{prefix_str}"
 _colcon_prepend_unique_value AMENT_PREFIX_PATH "{prefix_str}"
 
-if [ -d "{prefix_str}/bin" ]; then
-    _colcon_prepend_unique_value PATH "{prefix_str}/bin"
-fi
-
-if [ -d "{prefix_str}/lib" ]; then
-    _colcon_prepend_unique_value LD_LIBRARY_PATH "{prefix_str}/lib"
-fi
-
-if [ -d "{prefix_str}/lib/python3.10/site-packages" ]; then
-    _colcon_prepend_unique_value PYTHONPATH "{prefix_str}/lib/python3.10/site-packages"
-fi
+{path_exports}
 "#
+            ,
+            path_exports = Self::render_artifact_exports(&artifacts)
         )
     }
 
@@ -983,6 +983,85 @@ unset _colcon_prefix
         )
     }
 
+    fn scan_installed_artifacts(prefix: &Path) -> InstalledArtifacts {
+        let mut artifacts = InstalledArtifacts::default();
+
+        let bin_dir = prefix.join("bin");
+        if bin_dir.is_dir() {
+            artifacts.bin_dirs.push(bin_dir);
+        }
+
+        let lib_dir = prefix.join("lib");
+        if lib_dir.is_dir() {
+            artifacts.lib_dirs.push(lib_dir.clone());
+        }
+
+        let local_lib_dir = prefix.join("local").join("lib");
+        if local_lib_dir.is_dir() {
+            artifacts.lib_dirs.push(local_lib_dir.clone());
+        }
+
+        for base in [&lib_dir, &local_lib_dir] {
+            if !base.is_dir() {
+                continue;
+            }
+
+            if let Ok(entries) = fs::read_dir(base) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        continue;
+                    }
+                    let Some(dir_name) = path.file_name().and_then(|name| name.to_str()) else {
+                        continue;
+                    };
+                    if !dir_name.starts_with("python") {
+                        continue;
+                    }
+
+                    let site_packages = path.join("site-packages");
+                    if site_packages.is_dir() {
+                        artifacts.python_dirs.push(site_packages);
+                    }
+
+                    let dist_packages = path.join("dist-packages");
+                    if dist_packages.is_dir() {
+                        artifacts.python_dirs.push(dist_packages);
+                    }
+                }
+            }
+        }
+
+        artifacts
+    }
+
+    fn render_artifact_exports(artifacts: &InstalledArtifacts) -> String {
+        let mut content = String::new();
+
+        for bin_dir in &artifacts.bin_dirs {
+            content.push_str(&format!(
+                "if [ -d \"{path}\" ]; then\n    _colcon_prepend_unique_value PATH \"{path}\"\nfi\n\n",
+                path = bin_dir.display()
+            ));
+        }
+
+        for lib_dir in &artifacts.lib_dirs {
+            content.push_str(&format!(
+                "if [ -d \"{path}\" ]; then\n    _colcon_prepend_unique_value LD_LIBRARY_PATH \"{path}\"\nfi\n\n",
+                path = lib_dir.display()
+            ));
+        }
+
+        for python_dir in &artifacts.python_dirs {
+            content.push_str(&format!(
+                "if [ -d \"{path}\" ]; then\n    _colcon_prepend_unique_value PYTHONPATH \"{path}\"\nfi\n\n",
+                path = python_dir.display()
+            ));
+        }
+
+        content
+    }
+
     fn make_executable_if_unix(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(unix)]
         {
@@ -1002,8 +1081,9 @@ unset _colcon_prefix
 
 #[cfg(test)]
 mod tests {
-    use super::BuildExecutor;
+    use super::{BuildExecutor, InstalledArtifacts};
     use crate::commands::work::build::{BuildConfig, BuildType, PackageMeta};
+    use std::fs;
     use std::path::PathBuf;
     use tempfile::tempdir;
 
@@ -1185,5 +1265,54 @@ mod tests {
         let setup_sh = std::fs::read_to_string(config.install_base.join("setup.sh")).unwrap();
         assert!(setup_sh.contains("COLCON_PREFIX_PATH"));
         assert!(setup_sh.contains("local_setup.sh"));
+    }
+
+    #[test]
+    fn scan_installed_artifacts_detects_dynamic_python_and_runtime_paths() {
+        let temp = tempdir().unwrap();
+        let prefix = temp.path().join("install-prefix");
+        fs::create_dir_all(prefix.join("bin")).unwrap();
+        fs::create_dir_all(prefix.join("lib")).unwrap();
+        fs::create_dir_all(prefix.join("lib/python3.12/site-packages")).unwrap();
+        fs::create_dir_all(prefix.join("local/lib/python3.11/dist-packages")).unwrap();
+
+        let artifacts = BuildExecutor::scan_installed_artifacts(&prefix);
+
+        assert_eq!(
+            artifacts,
+            InstalledArtifacts {
+                bin_dirs: vec![prefix.join("bin")],
+                lib_dirs: vec![prefix.join("lib"), prefix.join("local/lib")],
+                python_dirs: vec![
+                    prefix.join("lib/python3.12/site-packages"),
+                    prefix.join("local/lib/python3.11/dist-packages"),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn render_local_setup_sh_uses_detected_artifact_paths() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let executor = BuildExecutor::new(&config);
+        let prefix = config.install_base.join("demo_pkg");
+        fs::create_dir_all(prefix.join("bin")).unwrap();
+        fs::create_dir_all(prefix.join("lib/python3.12/site-packages")).unwrap();
+
+        let script = executor.render_local_setup_sh("demo_pkg", &prefix);
+
+        assert!(script.contains(&prefix.join("bin").display().to_string()));
+        assert!(script.contains(
+            &prefix
+                .join("lib/python3.12/site-packages")
+                .display()
+                .to_string()
+        ));
+        assert!(!script.contains("python3.10"));
     }
 }
