@@ -742,39 +742,46 @@ impl<'a> BuildExecutor<'a> {
 
     fn normalize_python_install_layout(install_prefix: &Path) -> Result<(), io::Error> {
         let local_lib_dir = install_prefix.join("local").join("lib");
-        if !local_lib_dir.is_dir() {
-            return Ok(());
+        if local_lib_dir.is_dir() {
+            let entries = match fs::read_dir(&local_lib_dir) {
+                Ok(entries) => entries,
+                Err(_) => return Ok(()),
+            };
+
+            for entry in entries.flatten() {
+                let local_python_dir = entry.path();
+                if !local_python_dir.is_dir() {
+                    continue;
+                }
+                let Some(dir_name) = local_python_dir.file_name().and_then(|name| name.to_str())
+                else {
+                    continue;
+                };
+                if !dir_name.starts_with("python") {
+                    continue;
+                }
+
+                let dist_packages = local_python_dir.join("dist-packages");
+                if !dist_packages.is_dir() {
+                    continue;
+                }
+
+                let site_packages = install_prefix
+                    .join("lib")
+                    .join(dir_name)
+                    .join("site-packages");
+                Self::merge_directory_contents(&dist_packages, &site_packages)?;
+                fs::remove_dir_all(&dist_packages)?;
+                Self::remove_empty_parent_chain(&local_python_dir, &install_prefix.join("local"))?;
+            }
         }
 
-        let entries = match fs::read_dir(&local_lib_dir) {
-            Ok(entries) => entries,
-            Err(_) => return Ok(()),
-        };
-
-        for entry in entries.flatten() {
-            let local_python_dir = entry.path();
-            if !local_python_dir.is_dir() {
-                continue;
-            }
-            let Some(dir_name) = local_python_dir.file_name().and_then(|name| name.to_str()) else {
-                continue;
-            };
-            if !dir_name.starts_with("python") {
-                continue;
-            }
-
-            let dist_packages = local_python_dir.join("dist-packages");
-            if !dist_packages.is_dir() {
-                continue;
-            }
-
-            let site_packages = install_prefix
-                .join("lib")
-                .join(dir_name)
-                .join("site-packages");
-            Self::merge_directory_contents(&dist_packages, &site_packages)?;
-            fs::remove_dir_all(&dist_packages)?;
-            Self::remove_empty_parent_chain(&local_python_dir, &install_prefix.join("local"))?;
+        let local_share_dir = install_prefix.join("local").join("share");
+        if local_share_dir.is_dir() {
+            let share_dir = install_prefix.join("share");
+            Self::merge_directory_contents(&local_share_dir, &share_dir)?;
+            fs::remove_dir_all(&local_share_dir)?;
+            Self::remove_empty_parent_chain(&install_prefix.join("local"), &install_prefix)?;
         }
 
         Ok(())
@@ -2087,6 +2094,34 @@ mod tests {
                 .join("local/lib/python3.12/dist-packages")
                 .exists()
         );
+    }
+
+    #[test]
+    fn normalize_python_install_layout_moves_local_share_into_standard_share() {
+        let temp = tempdir().unwrap();
+        let install_prefix = temp.path().join("install/demo_python_pkg");
+        let local_marker =
+            install_prefix.join("local/share/ament_index/resource_index/packages/demo_python_pkg");
+        let local_package_xml = install_prefix.join("local/share/demo_python_pkg/package.xml");
+
+        fs::create_dir_all(local_marker.parent().unwrap()).unwrap();
+        fs::create_dir_all(local_package_xml.parent().unwrap()).unwrap();
+        fs::write(&local_marker, "").unwrap();
+        fs::write(&local_package_xml, "<package />\n").unwrap();
+
+        BuildExecutor::normalize_python_install_layout(&install_prefix).unwrap();
+
+        assert!(
+            install_prefix
+                .join("share/ament_index/resource_index/packages/demo_python_pkg")
+                .exists()
+        );
+        assert!(
+            install_prefix
+                .join("share/demo_python_pkg/package.xml")
+                .exists()
+        );
+        assert!(!install_prefix.join("local/share").exists());
     }
 
     #[test]

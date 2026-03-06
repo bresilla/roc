@@ -151,4 +151,19 @@ fn validate_ament_python_workspace_runtime() {
         "source /opt/ros/jazzy/setup.bash && source install/setup.bash && python3 -c \"import demo_python_pkg\"",
     );
     assert_success(roc_import, "roc python import for ament_python fixture");
+
+    let colcon_prefix = run_shell(
+        &colcon_ws,
+        "source /opt/ros/jazzy/setup.bash && source install/setup.bash && ros2 pkg prefix demo_python_pkg",
+    );
+    assert_success(
+        colcon_prefix,
+        "colcon ros2 pkg prefix for ament_python fixture",
+    );
+
+    let roc_prefix = run_shell(
+        &roc_ws,
+        "source /opt/ros/jazzy/setup.bash && source install/setup.bash && ros2 pkg prefix demo_python_pkg",
+    );
+    assert_success(roc_prefix, "roc ros2 pkg prefix for ament_python fixture");
 }

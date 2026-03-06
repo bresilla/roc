@@ -61,32 +61,30 @@ Observed result:
 - `colcon build` succeeded
 - `roc work build` succeeded
 - importing `demo_python_pkg` succeeded for both installs
-- `ros2 pkg prefix demo_python_pkg` succeeded for `colcon`
-- `ros2 pkg prefix demo_python_pkg` failed for `roc`
+- `ros2 pkg prefix demo_python_pkg` succeeded for both installs
 
 Observed tree deltas:
 
 - `colcon` and `roc` now both install Python payloads under `install/<pkg>/lib/python3.12/site-packages`
-- `colcon` installed the package marker and `package.xml` under `install/<pkg>/share/...`
-- `roc` still installs those artifacts under `install/<pkg>/local/share/...`
+- `colcon` and `roc` now both install the package marker and `package.xml` under `install/<pkg>/share/...`
 - `colcon` generated package hook files like `ament_prefix_path.*`, `pythonpath.*`, and `package.dsv`
 - `roc` generated shell setup wrappers, but not the same package hook set
 
 Assessment:
 
 - runtime Python import works
-- package registration is still incomplete for standard ROS discovery
-- this remains a blocking incompatibility for claiming full `ament_python` replacement
+- ROS package discovery now works for the validated minimal case
+- remaining differences are concentrated in hook generation and metadata fidelity
 
 ## Current Conclusion
 
-`roc work build` is now close enough to substitute `colcon build` for the validated minimal `ament_cmake` case.
+`roc work build` is now close enough to substitute `colcon build` for the validated minimal `ament_cmake` case and the validated minimal `ament_python` case.
 
-It is not yet a full `colcon` replacement for `ament_python` packages, because the install layout and marker placement still diverge enough to break `ros2 pkg prefix`.
+It is still not full parity, because helper-script generation, hook fidelity, metadata placement, and shell-family coverage still differ from `colcon`.
 
 ## Next Fixes Suggested By Validation
 
-1. Install the ament resource marker and `package.xml` under `install/<pkg>/share/...` for isolated Python packages.
-2. Generate the missing `ament_prefix_path`, `pythonpath`, and `package.dsv` hook set for Python packages.
-3. Move or mirror `share/colcon-core/packages/<pkg>` to the package-prefix layout that `colcon` uses.
-4. Trim the trailing separator from generated `COLCON_PREFIX_PATH`.
+1. Generate the missing `ament_prefix_path`, `pythonpath`, and `package.dsv` hook set for Python packages.
+2. Move or mirror `share/colcon-core/packages/<pkg>` to the package-prefix layout that `colcon` uses.
+3. Trim the trailing separator from generated `COLCON_PREFIX_PATH`.
+4. Add `_local_setup_util_*.py` and `.ps1` parity where `colcon` emits them.
