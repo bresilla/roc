@@ -127,12 +127,9 @@ impl<'a> BuildExecutor<'a> {
 
                     // Record install path for environment setup
                     let install_path = if self.config.merge_install {
-                        self.config.workspace_root.join("install")
+                        self.config.install_base.clone()
                     } else {
-                        self.config
-                            .workspace_root
-                            .join("install")
-                            .join(&package.name)
+                        self.config.install_base.join(&package.name)
                     };
                     self.install_paths
                         .insert(package.name.clone(), install_path.clone());
@@ -378,9 +375,9 @@ impl<'a> BuildExecutor<'a> {
 
                                 // Record install path
                                 let install_path = if config.merge_install {
-                                    config.workspace_root.join("install")
+                                    config.install_base.clone()
                                 } else {
-                                    config.workspace_root.join("install").join(&package.name)
+                                    config.install_base.join(&package.name)
                                 };
 
                                 {
@@ -503,11 +500,11 @@ impl<'a> BuildExecutor<'a> {
         env_manager: &EnvironmentManager,
         config: &BuildConfig,
     ) -> Result<(), String> {
-        let build_dir = config.workspace_root.join("build").join(&package.name);
+        let build_dir = config.build_base.join(&package.name);
         let install_prefix = if config.merge_install {
-            config.workspace_root.join("install")
+            config.install_base.clone()
         } else {
-            config.workspace_root.join("install").join(&package.name)
+            config.install_base.join(&package.name)
         };
 
         fs::create_dir_all(&build_dir)
@@ -602,11 +599,11 @@ impl<'a> BuildExecutor<'a> {
         env_manager: &EnvironmentManager,
         config: &BuildConfig,
     ) -> Result<(), String> {
-        let build_dir = config.workspace_root.join("build").join(&package.name);
+        let build_dir = config.build_base.join(&package.name);
         let install_prefix = if config.merge_install {
-            config.workspace_root.join("install")
+            config.install_base.clone()
         } else {
-            config.workspace_root.join("install").join(&package.name)
+            config.install_base.join(&package.name)
         };
 
         fs::create_dir_all(&build_dir)
@@ -657,7 +654,7 @@ impl<'a> BuildExecutor<'a> {
         &self,
         packages: &[PackageMeta],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let install_dir = self.config.workspace_root.join("install");
+        let install_dir = self.config.install_base.clone();
 
         if self.config.merge_install {
             self.generate_merged_setup_scripts(&install_dir)?;
@@ -819,18 +816,60 @@ fi
     }
 
     fn create_workspace_directories(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let build_dir = self.config.workspace_root.join("build");
-        let install_dir = self.config.workspace_root.join("install");
-        let log_dir = self.config.workspace_root.join("log");
+        let build_dir = &self.config.build_base;
+        let install_dir = &self.config.install_base;
+        let log_dir = &self.config.log_base;
+        let latest_log_dir = log_dir.join("latest");
 
-        fs::create_dir_all(&build_dir)?;
-        fs::create_dir_all(&install_dir)?;
-        fs::create_dir_all(&log_dir)?;
+        fs::create_dir_all(build_dir)?;
+        fs::create_dir_all(install_dir)?;
+        fs::create_dir_all(log_dir)?;
+        fs::create_dir_all(&latest_log_dir)?;
 
+        Self::write_colcon_ignore(build_dir)?;
+        Self::write_colcon_ignore(install_dir)?;
+        Self::write_colcon_ignore(log_dir)?;
+        Self::write_colcon_ignore(&latest_log_dir)?;
+
+        Ok(())
+    }
+
+    fn write_colcon_ignore(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        fs::write(dir.join("COLCON_IGNORE"), "")?;
         Ok(())
     }
 
     // Legacy unused methods removed to clean up compilation warnings.
     // The active implementation uses *_with_env methods for both sequential
     // and parallel builds to ensure proper environment isolation.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BuildExecutor;
+    use crate::commands::work::build::BuildConfig;
+    use tempfile::tempdir;
+
+    #[test]
+    fn create_workspace_directories_respects_custom_bases_and_ignore_markers() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.build_base = workspace_root.join("artifacts").join("build-tree");
+        config.install_base = workspace_root.join("artifacts").join("install-tree");
+        config.log_base = workspace_root.join("artifacts").join("log-tree");
+
+        let executor = BuildExecutor::new(&config);
+        executor.create_workspace_directories().unwrap();
+
+        assert!(config.build_base.exists());
+        assert!(config.install_base.exists());
+        assert!(config.log_base.exists());
+        assert!(config.log_base.join("latest").exists());
+        assert!(config.build_base.join("COLCON_IGNORE").exists());
+        assert!(config.install_base.join("COLCON_IGNORE").exists());
+        assert!(config.log_base.join("COLCON_IGNORE").exists());
+        assert!(config.log_base.join("latest").join("COLCON_IGNORE").exists());
+    }
 }

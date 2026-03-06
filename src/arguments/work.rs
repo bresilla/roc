@@ -56,6 +56,27 @@ pub fn cmd() -> Command {
                     .help("Base paths for package discovery")
             )
             .arg(
+                Arg::new("build_base")
+                    .long("build-base")
+                    .visible_alias("build_base")
+                    .value_name("BUILD_BASE")
+                    .help("Base path for build artifacts")
+            )
+            .arg(
+                Arg::new("install_base")
+                    .long("install-base")
+                    .visible_alias("install_base")
+                    .value_name("INSTALL_BASE")
+                    .help("Base path for install artifacts")
+            )
+            .arg(
+                Arg::new("log_base")
+                    .long("log-base")
+                    .visible_alias("log_base")
+                    .value_name("LOG_BASE")
+                    .help("Base path for build logs")
+            )
+            .arg(
                 Arg::new("packages_select")
                     .long("packages-select")
                     .visible_alias("packages_select")

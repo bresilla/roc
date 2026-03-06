@@ -33,6 +33,7 @@ pub struct BuildConfig {
     pub workspace_root: PathBuf,
     pub install_base: PathBuf,
     pub build_base: PathBuf,
+    pub log_base: PathBuf,
     pub isolated: bool,
 }
 
@@ -53,6 +54,7 @@ impl Default for BuildConfig {
             workspace_root: workspace_root.clone(),
             install_base: workspace_root.join("install"),
             build_base: workspace_root.join("build"),
+            log_base: workspace_root.join("log"),
             isolated: true,
         }
     }
