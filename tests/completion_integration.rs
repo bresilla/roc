@@ -10,7 +10,7 @@ fn roc_bin() -> &'static str {
 
 fn shell_exists(shell: &str) -> bool {
     Command::new("sh")
-        .arg("-lc")
+        .arg("-c")
         .arg(format!("command -v {shell} >/dev/null 2>&1"))
         .status()
         .map(|status| status.success())
@@ -39,7 +39,10 @@ fn bash_completion_script_handles_work_build_flags_end_to_end() {
     let script = generate_completion_script("bash", temp.path());
     let output = Command::new("bash")
         .env("ROC_BIN", roc_bin())
-        .arg("-lc")
+        .env("ROC_COMPLETION_SCRIPT", &script)
+        .arg("--noprofile")
+        .arg("--norc")
+        .arg("-c")
         .arg(
             r#"
 roc() { "$ROC_BIN" "$@"; }
@@ -50,15 +53,13 @@ _init_completion() {
     words=("${COMP_WORDS[@]}")
     cword=$COMP_CWORD
 }
-source "$1"
+source "$ROC_COMPLETION_SCRIPT"
 COMP_WORDS=(roc work build --)
 COMP_CWORD=3
 _roc_completion
 printf '%s\n' "${COMPREPLY[@]}"
 "#,
         )
-        .arg("bash")
-        .arg(&script)
         .output()
         .expect("failed to execute bash completion test");
 
