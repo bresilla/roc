@@ -1,5 +1,6 @@
 use crate::graph::{RclGraphContext, action_operations, interface_operations};
 use crate::shared::param_operations::ParamClientContext;
+use crate::shared::tf2_subscriber::TfFrameIndex;
 use crate::utils::{get_ros_workspace_paths, is_executable};
 use clap::ArgMatches;
 use std::collections::HashSet;
@@ -540,7 +541,30 @@ fn find_bag_files() -> Vec<String> {
 }
 
 fn find_frames() -> Vec<String> {
-    Vec::new()
+    let Ok(index) = TfFrameIndex::new() else {
+        return Vec::new();
+    };
+
+    // Give /tf_static a brief chance to arrive before we snapshot the index.
+    let start = std::time::Instant::now();
+    while start.elapsed() < std::time::Duration::from_millis(300) {
+        if index.has_any_data() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+
+    let mut frames = HashSet::new();
+    for ((parent, child), _, _) in index.edges() {
+        if !parent.is_empty() {
+            frames.insert(parent);
+        }
+        if !child.is_empty() {
+            frames.insert(child);
+        }
+    }
+
+    sorted(frames)
 }
 
 fn with_graph_context<F>(resolver: F) -> Vec<String>
@@ -589,6 +613,14 @@ mod tests {
         assert_eq!(
             complete("interface", None, None, 1, &[]),
             strings(&["list", "package", "all", "show", "model"])
+        );
+    }
+
+    #[test]
+    fn frame_completions_include_frame_subcommands() {
+        assert_eq!(
+            complete("frame", None, None, 1, &[]),
+            strings(&["list", "echo", "info", "pub"])
         );
     }
 
