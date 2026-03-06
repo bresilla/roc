@@ -111,6 +111,7 @@ impl EnvironmentManager {
         }
     }
 
+    #[allow(dead_code)]
     /// Check if an environment variable is relevant for ROS workspaces
     fn is_ros_relevant_env_var(key: &str) -> bool {
         match key {
@@ -148,6 +149,7 @@ impl EnvironmentManager {
         &self.env_vars
     }
 
+    #[allow(dead_code)]
     /// Generate setup script for the workspace
     pub fn generate_setup_script(
         &self,
@@ -174,6 +176,7 @@ impl EnvironmentManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// Generate bash setup script content
     fn generate_bash_script(&self) -> String {
         let mut script = String::new();
@@ -214,6 +217,7 @@ impl EnvironmentManager {
         script
     }
 
+    #[allow(dead_code)]
     /// Generate Windows batch script content
     fn generate_batch_script(&self) -> String {
         let mut script = String::new();

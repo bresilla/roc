@@ -125,6 +125,7 @@ fn add_tfmessage_edges(
 }
 
 pub struct TfFrameIndex {
+    #[allow(dead_code)]
     frames: Arc<Mutex<BTreeSet<String>>>,
     edges_dynamic: Arc<Mutex<BTreeMap<(String, String), TfEdgeTransform>>>,
     edges_static: Arc<Mutex<BTreeMap<(String, String), TfEdgeTransform>>>,
@@ -180,19 +181,22 @@ impl TfFrameIndex {
         frames: Arc<Mutex<BTreeSet<String>>>,
         edges: Arc<Mutex<BTreeMap<(String, String), TfEdgeTransform>>>,
     ) {
-        std::thread::spawn(move || loop {
-            match sub.take_message() {
-                Ok(Some(msg)) => {
-                    add_tfmessage_edges(&frames, &edges, &msg.message);
+        std::thread::spawn(move || {
+            loop {
+                match sub.take_message() {
+                    Ok(Some(msg)) => {
+                        add_tfmessage_edges(&frames, &edges, &msg.message);
+                    }
+                    Ok(None) => {
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    }
+                    Err(_) => break,
                 }
-                Ok(None) => {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                }
-                Err(_) => break,
             }
         });
     }
 
+    #[allow(dead_code)]
     pub fn frames(&self) -> Vec<String> {
         self.frames.lock().unwrap().iter().cloned().collect()
     }

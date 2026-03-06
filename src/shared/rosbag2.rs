@@ -1,13 +1,7 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-#[derive(Debug, Clone)]
-pub struct Rosbag2Recording {
-    pub path: PathBuf,
-    pub metadata: Rosbag2Metadata,
-}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Rosbag2Metadata {
@@ -19,6 +13,7 @@ pub struct Rosbag2BagfileInformation {
     pub version: u32,
     pub storage_identifier: String,
     pub duration: Rosbag2Duration,
+    #[allow(dead_code)]
     pub starting_time: Rosbag2Time,
 
     pub message_count: u64,
@@ -37,6 +32,7 @@ pub struct Rosbag2Duration {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Rosbag2Time {
+    #[allow(dead_code)]
     pub nanoseconds_since_epoch: u64,
 }
 
@@ -51,6 +47,7 @@ pub struct Rosbag2TopicMetadata {
     pub name: String,
     pub r#type: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub serialization_format: String,
 }
 

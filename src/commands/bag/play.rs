@@ -15,7 +15,6 @@ struct McapMessage {
     topic: String,
     msg_type: String,
     log_time: u64,
-    publish_time: u64,
     data: Vec<u8>,
 }
 
@@ -53,7 +52,6 @@ fn read_messages(path: &str) -> Result<Vec<McapMessage>> {
                     topic,
                     msg_type,
                     log_time: header.log_time,
-                    publish_time: header.publish_time,
                     data: data.into_owned(),
                 });
             }

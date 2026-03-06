@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use rclrs::{Client, Context, CreateBasicExecutor, Executor, Node, RclrsErrorFilter, SpinOptions};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
@@ -22,7 +22,7 @@ const DEFAULT_CALL_TIMEOUT: Duration = Duration::from_secs(8);
 /// This uses the standard ROS 2 parameter service endpoints that every node
 /// provides when it has parameter services enabled.
 pub struct ParamClientContext {
-    pub context: Context,
+    _context: Context,
     pub executor: Executor,
     pub node: Node,
 }
@@ -37,7 +37,7 @@ impl ParamClientContext {
         // show up before we try to wait on readiness.
         std::thread::sleep(Duration::from_millis(300));
         Ok(Self {
-            context,
+            _context: context,
             executor,
             node,
         })

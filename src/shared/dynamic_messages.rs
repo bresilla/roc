@@ -1,11 +1,11 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use rclrs::{
     Context, CreateBasicExecutor, DynamicMessage, IntoPrimitiveOptions, MessageTypeName, Node,
     QoSProfile, SpinOptions,
 };
 use std::{
     fmt,
-    sync::{mpsc, Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
     thread,
 };
 
@@ -15,7 +15,7 @@ use std::{
 /// not derive it.
 pub struct ReceivedDynamicMessage {
     pub message: DynamicMessage,
-    pub info: rclrs::MessageInfo,
+    pub _info: rclrs::MessageInfo,
 }
 
 /// A minimal dynamic subscription helper.
@@ -62,6 +62,7 @@ impl DynamicSubscriber {
         Self::new_with_node_qos(node, executor, topic_name, message_type, qos)
     }
 
+    #[allow(dead_code)]
     /// Create a new dynamic subscription using an existing node.
     ///
     /// This is useful when sharing a graph node across operations.
@@ -99,7 +100,10 @@ impl DynamicSubscriber {
             topic_name.qos(qos),
             move |msg: DynamicMessage, info: rclrs::MessageInfo| {
                 if let Ok(lock) = tx.lock() {
-                    let _ = lock.send(ReceivedDynamicMessage { message: msg, info });
+                    let _ = lock.send(ReceivedDynamicMessage {
+                        message: msg,
+                        _info: info,
+                    });
                 }
             },
         )?;
