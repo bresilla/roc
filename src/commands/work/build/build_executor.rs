@@ -94,9 +94,9 @@ impl<'a> BuildExecutor<'a> {
             package_env_manager.setup_package_environment(&package.name, &package.path)?;
 
             // Add dependencies' install paths to environment
-            for dep_name in &package.build_deps {
-                if let Some(dep_path) = self.install_paths.get(dep_name) {
-                    package_env_manager.setup_package_environment(dep_name, dep_path)?;
+            for dep_name in package.build_order_deps() {
+                if let Some(dep_path) = self.install_paths.get(&dep_name) {
+                    package_env_manager.setup_package_environment(&dep_name, dep_path)?;
                 }
             }
 
@@ -200,16 +200,15 @@ impl<'a> BuildExecutor<'a> {
         for &pkg_idx in build_order {
             let package = &packages[pkg_idx];
             let deps: HashSet<String> = package
-                .build_deps
-                .iter()
+                .build_order_deps()
+                .into_iter()
                 .filter(|dep| {
                     build_state
                         .package_states
                         .lock()
                         .unwrap()
-                        .contains_key(*dep)
+                        .contains_key(dep)
                 })
-                .cloned()
                 .collect();
             pkg_dependencies.insert(package.name.clone(), deps);
         }
@@ -464,10 +463,10 @@ impl<'a> BuildExecutor<'a> {
 
         // Add dependencies' install paths to environment
         let install_paths = build_state.install_paths.lock().unwrap();
-        for dep_name in &package.build_deps {
-            if let Some(dep_path) = install_paths.get(dep_name) {
+        for dep_name in package.build_order_deps() {
+            if let Some(dep_path) = install_paths.get(&dep_name) {
                 env_manager
-                    .setup_package_environment(dep_name, dep_path)
+                    .setup_package_environment(&dep_name, dep_path)
                     .map_err(|e| format!("Failed to setup dependency environment: {}", e))?;
             }
         }

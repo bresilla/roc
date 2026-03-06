@@ -11,10 +11,30 @@ pub struct Package {
     pub version: String,
     pub description: String,
     pub maintainers: Vec<String>,
+    pub depend_deps: Vec<String>,
     pub build_deps: Vec<String>,
     pub buildtool_deps: Vec<String>,
+    pub build_export_deps: Vec<String>,
     pub exec_deps: Vec<String>,
     pub test_deps: Vec<String>,
+}
+
+impl Package {
+    pub fn build_order_deps(&self) -> Vec<String> {
+        dedupe_dependencies([
+            self.depend_deps.as_slice(),
+            self.build_deps.as_slice(),
+            self.buildtool_deps.as_slice(),
+        ])
+    }
+
+    pub fn runtime_deps(&self) -> Vec<String> {
+        dedupe_dependencies([
+            self.depend_deps.as_slice(),
+            self.build_export_deps.as_slice(),
+            self.exec_deps.as_slice(),
+        ])
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -271,34 +291,15 @@ fn parse_package_xml(package_xml_path: &Path) -> Result<Package> {
         .map(|s| s.to_string())
         .collect();
 
-    // Extract dependencies
-    let build_deps: Vec<String> = root
-        .descendants()
-        .filter(|n| n.has_tag_name("build_depend"))
-        .filter_map(|n| n.text())
-        .map(|s| s.to_string())
-        .collect();
-
-    let buildtool_deps: Vec<String> = root
-        .descendants()
-        .filter(|n| n.has_tag_name("buildtool_depend"))
-        .filter_map(|n| n.text())
-        .map(|s| s.to_string())
-        .collect();
-
-    let exec_deps: Vec<String> = root
-        .descendants()
-        .filter(|n| n.has_tag_name("exec_depend") || n.has_tag_name("run_depend"))
-        .filter_map(|n| n.text())
-        .map(|s| s.to_string())
-        .collect();
-
-    let test_deps: Vec<String> = root
-        .descendants()
-        .filter(|n| n.has_tag_name("test_depend"))
-        .filter_map(|n| n.text())
-        .map(|s| s.to_string())
-        .collect();
+    // Extract dependencies by manifest role. `depend` acts as the shorthand for
+    // build + build_export + exec in ROS package.xml semantics, so we keep it
+    // separate from more specific dependency buckets.
+    let depend_deps = extract_dependencies(&root, &["depend"]);
+    let build_deps = extract_dependencies(&root, &["build_depend"]);
+    let buildtool_deps = extract_dependencies(&root, &["buildtool_depend"]);
+    let build_export_deps = extract_dependencies(&root, &["build_export_depend"]);
+    let exec_deps = extract_dependencies(&root, &["exec_depend", "run_depend"]);
+    let test_deps = extract_dependencies(&root, &["test_depend"]);
 
     // Extract build type
     let build_type = root
@@ -316,11 +317,48 @@ fn parse_package_xml(package_xml_path: &Path) -> Result<Package> {
         version,
         description,
         maintainers,
+        depend_deps,
         build_deps,
         buildtool_deps,
+        build_export_deps,
         exec_deps,
         test_deps,
     })
+}
+
+fn extract_dependencies(root: &roxmltree::Node<'_, '_>, tag_names: &[&str]) -> Vec<String> {
+    let mut deps = Vec::new();
+
+    for node in root.descendants() {
+        if tag_names.iter().any(|tag| node.has_tag_name(*tag)) {
+            if let Some(text) = node.text() {
+                let dep = text.trim();
+                if !dep.is_empty() {
+                    deps.push(dep.to_string());
+                }
+            }
+        }
+    }
+
+    dedupe_dependencies([deps.as_slice()])
+}
+
+fn dedupe_dependencies<'a, I>(groups: I) -> Vec<String>
+where
+    I: IntoIterator<Item = &'a [String]>,
+{
+    let mut ordered = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+
+    for group in groups {
+        for dep in group {
+            if seen.insert(dep.clone()) {
+                ordered.push(dep.clone());
+            }
+        }
+    }
+
+    ordered
 }
 
 fn infer_build_type(package_path: &Path) -> BuildType {
@@ -410,8 +448,10 @@ mod tests {
   <description>Test package</description>
   <maintainer email="test@example.com">Test User</maintainer>
   <license>MIT</license>
+  <depend>std_msgs</depend>
   <buildtool_depend>ament_cmake</buildtool_depend>
   <build_depend>rclcpp</build_depend>
+  <build_export_depend>rcutils</build_export_depend>
   <exec_depend>rclcpp</exec_depend>
 </package>"#;
 
@@ -427,5 +467,8 @@ mod tests {
         assert_eq!(packages.len(), 1);
         assert_eq!(packages[0].name, "test_package");
         assert_eq!(packages[0].build_type, BuildType::AmentCmake);
+        assert_eq!(packages[0].depend_deps, vec!["std_msgs".to_string()]);
+        assert_eq!(packages[0].build_order_deps(), vec!["std_msgs", "rclcpp", "ament_cmake"]);
+        assert_eq!(packages[0].runtime_deps(), vec!["std_msgs", "rcutils", "rclcpp"]);
     }
 }

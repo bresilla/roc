@@ -195,11 +195,11 @@ impl ColconBuilder {
 
     fn add_dependencies_recursive(&self, pkg_name: &str, packages_to_build: &mut std::collections::HashSet<String>) {
         if let Some(pkg) = self.packages.iter().find(|p| &p.name == pkg_name) {
-            for dep in &pkg.build_deps {
-                if !packages_to_build.contains(dep) {
-                    if self.packages.iter().any(|p| &p.name == dep) {
+            for dep in pkg.build_order_deps() {
+                if !packages_to_build.contains(&dep) {
+                    if self.packages.iter().any(|p| p.name == dep) {
                         packages_to_build.insert(dep.clone());
-                        self.add_dependencies_recursive(dep, packages_to_build);
+                        self.add_dependencies_recursive(&dep, packages_to_build);
                     }
                 }
             }

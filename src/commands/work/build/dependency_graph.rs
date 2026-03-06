@@ -13,20 +13,12 @@ pub fn topological_sort(packages: &[PackageMeta]) -> Result<Vec<usize>, Box<dyn 
     
     // Build dependency graph
     for (pkg_idx, package) in packages.iter().enumerate() {
-        for dep_name in &package.build_deps {
-            if let Some(&dep_idx) = name_to_index.get(dep_name) {
+        for dep_name in package.build_order_deps() {
+            if let Some(&dep_idx) = name_to_index.get(&dep_name) {
                 graph[dep_idx].push(pkg_idx);
                 in_degree[pkg_idx] += 1;
             }
             // If dependency not found in workspace, assume it's external (already built)
-        }
-        
-        // Also consider buildtool dependencies for ordering
-        for dep_name in &package.buildtool_deps {
-            if let Some(&dep_idx) = name_to_index.get(dep_name) {
-                graph[dep_idx].push(pkg_idx);
-                in_degree[pkg_idx] += 1;
-            }
         }
     }
     
@@ -83,8 +75,10 @@ mod tests {
             version: "1.0.0".to_string(),
             description: "Test package".to_string(),
             maintainers: vec!["test@example.com".to_string()],
+            depend_deps: Vec::new(),
             build_deps: deps.iter().map(|s| s.to_string()).collect(),
             buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
             exec_deps: Vec::new(),
             test_deps: Vec::new(),
         }

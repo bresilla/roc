@@ -201,9 +201,12 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: std::path
     }
     
     // Dependencies
+    print_dependencies(&package.depend_deps, "Generic Dependencies");
     print_dependencies(&package.build_deps, "Build Dependencies");
     print_dependencies(&package.buildtool_deps, "Build Tool Dependencies");
+    print_dependencies(&package.build_export_deps, "Build Export Dependencies");
     print_dependencies(&package.exec_deps, "Execution Dependencies");
+    print_dependencies(&package.runtime_deps(), "Derived Runtime/Setup Dependencies");
     print_dependencies(&package.test_deps, "Test Dependencies");
     
     // Build status
