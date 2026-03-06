@@ -40,6 +40,15 @@ struct InstalledArtifacts {
     python_dirs: Vec<PathBuf>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DsvOperation {
+    PrependNonDuplicate { name: String, value: String },
+    PrependNonDuplicateIfExists { name: String, value: String },
+    Set { name: String, value: String },
+    SetIfUnset { name: String, value: String },
+    Source { path: String },
+}
+
 impl<'a> BuildExecutor<'a> {
     pub fn new(config: &'a BuildConfig) -> Self {
         let env_manager = EnvironmentManager::new(config.install_base.clone(), config.isolated);
@@ -823,6 +832,7 @@ impl<'a> BuildExecutor<'a> {
     fn render_local_setup_sh(&self, package_name: &str, prefix: &Path) -> String {
         let prefix_str = prefix.display();
         let artifacts = Self::scan_installed_artifacts(prefix);
+        let hook_exports = self.render_package_hook_exports(package_name, prefix);
         format!(
             r#"#!/bin/sh
 # Generated local setup script for package {package_name}
@@ -847,9 +857,11 @@ _colcon_prepend_unique_value CMAKE_PREFIX_PATH "{prefix_str}"
 _colcon_prepend_unique_value AMENT_PREFIX_PATH "{prefix_str}"
 
 {path_exports}
+{hook_exports}
 "#
             ,
-            path_exports = Self::render_artifact_exports(&artifacts)
+            path_exports = Self::render_artifact_exports(&artifacts),
+            hook_exports = hook_exports,
         )
     }
 
@@ -1062,6 +1074,151 @@ unset _colcon_prefix
         content
     }
 
+    fn render_package_hook_exports(&self, package_name: &str, prefix: &Path) -> String {
+        let hook_dir = prefix.join("share").join(package_name).join("hook");
+        if !hook_dir.is_dir() {
+            return String::new();
+        }
+
+        let mut entries = match fs::read_dir(&hook_dir) {
+            Ok(entries) => entries.filter_map(|entry| entry.ok()).collect::<Vec<_>>(),
+            Err(_) => return String::new(),
+        };
+        entries.sort_by_key(|entry| entry.file_name());
+
+        let mut content = String::new();
+        for entry in entries {
+            let path = entry.path();
+            match path.extension().and_then(|ext| ext.to_str()) {
+                Some("dsv") => {
+                    content.push_str(&self.render_dsv_file(&path, prefix));
+                }
+                Some("sh") => {
+                    content.push_str(&format!(
+                        "if [ -f \"{path}\" ]; then\n    . \"{path}\"\nfi\n\n",
+                        path = path.display()
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        content
+    }
+
+    fn render_dsv_file(&self, dsv_path: &Path, prefix: &Path) -> String {
+        let Ok(contents) = fs::read_to_string(dsv_path) else {
+            return String::new();
+        };
+
+        let mut rendered = String::new();
+        for line in contents.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            let Some(operation) = Self::parse_dsv_operation(line) else {
+                continue;
+            };
+            rendered.push_str(&Self::render_dsv_operation(&operation, prefix));
+        }
+
+        rendered
+    }
+
+    fn parse_dsv_operation(line: &str) -> Option<DsvOperation> {
+        let mut parts = line.splitn(3, ';');
+        let op = parts.next()?;
+        let first = parts.next()?.to_string();
+        let second = parts.next().unwrap_or_default().to_string();
+
+        match op {
+            "prepend-non-duplicate" => Some(DsvOperation::PrependNonDuplicate {
+                name: first,
+                value: second,
+            }),
+            "prepend-non-duplicate-if-exists" => {
+                Some(DsvOperation::PrependNonDuplicateIfExists {
+                    name: first,
+                    value: second,
+                })
+            }
+            "set" => Some(DsvOperation::Set {
+                name: first,
+                value: second,
+            }),
+            "set-if-unset" => Some(DsvOperation::SetIfUnset {
+                name: first,
+                value: second,
+            }),
+            "source" => Some(DsvOperation::Source { path: first }),
+            _ => None,
+        }
+    }
+
+    fn render_dsv_operation(operation: &DsvOperation, prefix: &Path) -> String {
+        match operation {
+            DsvOperation::PrependNonDuplicate { name, value } => {
+                let resolved = Self::resolve_dsv_value(prefix, value);
+                format!(
+                    "_colcon_prepend_unique_value {name} \"{resolved}\"\n",
+                    name = name,
+                    resolved = resolved.display()
+                )
+            }
+            DsvOperation::PrependNonDuplicateIfExists { name, value } => {
+                let resolved = Self::resolve_dsv_value(prefix, value);
+                format!(
+                    "if [ -e \"{resolved}\" ]; then\n    _colcon_prepend_unique_value {name} \"{resolved}\"\nfi\n",
+                    name = name,
+                    resolved = resolved.display()
+                )
+            }
+            DsvOperation::Set { name, value } => {
+                let resolved = Self::resolve_set_value(prefix, value);
+                format!("export {name}=\"{resolved}\"\n", name = name, resolved = resolved)
+            }
+            DsvOperation::SetIfUnset { name, value } => {
+                let resolved = Self::resolve_set_value(prefix, value);
+                format!(
+                    "if [ -z \"${{{name}:-}}\" ]; then\n    export {name}=\"{resolved}\"\nfi\n",
+                    name = name,
+                    resolved = resolved
+                )
+            }
+            DsvOperation::Source { path } => {
+                let resolved = Self::resolve_dsv_value(prefix, path);
+                format!(
+                    "if [ -f \"{resolved}\" ]; then\n    . \"{resolved}\"\nfi\n",
+                    resolved = resolved.display()
+                )
+            }
+        }
+    }
+
+    fn resolve_dsv_value(prefix: &Path, value: &str) -> PathBuf {
+        if value.is_empty() {
+            return prefix.to_path_buf();
+        }
+
+        let path = PathBuf::from(value);
+        if path.is_absolute() {
+            path
+        } else {
+            prefix.join(path)
+        }
+    }
+
+    fn resolve_set_value(prefix: &Path, value: &str) -> String {
+        let resolved = Self::resolve_dsv_value(prefix, value);
+        if !Path::new(value).is_absolute() && resolved.exists() {
+            resolved.display().to_string()
+        } else {
+            value.to_string()
+        }
+    }
+
     fn make_executable_if_unix(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(unix)]
         {
@@ -1081,7 +1238,7 @@ unset _colcon_prefix
 
 #[cfg(test)]
 mod tests {
-    use super::{BuildExecutor, InstalledArtifacts};
+    use super::{BuildExecutor, DsvOperation, InstalledArtifacts};
     use crate::commands::work::build::{BuildConfig, BuildType, PackageMeta};
     use std::fs;
     use std::path::PathBuf;
@@ -1314,5 +1471,56 @@ mod tests {
                 .to_string()
         ));
         assert!(!script.contains("python3.10"));
+    }
+
+    #[test]
+    fn parse_dsv_operation_supports_standard_colcon_operations() {
+        assert_eq!(
+            BuildExecutor::parse_dsv_operation("prepend-non-duplicate;PATH;bin"),
+            Some(DsvOperation::PrependNonDuplicate {
+                name: "PATH".to_string(),
+                value: "bin".to_string(),
+            })
+        );
+        assert_eq!(
+            BuildExecutor::parse_dsv_operation("set-if-unset;RMW_IMPLEMENTATION;rmw_fastrtps_cpp"),
+            Some(DsvOperation::SetIfUnset {
+                name: "RMW_IMPLEMENTATION".to_string(),
+                value: "rmw_fastrtps_cpp".to_string(),
+            })
+        );
+        assert_eq!(
+            BuildExecutor::parse_dsv_operation("source;share/demo_pkg/hook/custom.sh"),
+            Some(DsvOperation::Source {
+                path: "share/demo_pkg/hook/custom.sh".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn render_local_setup_sh_includes_hook_scripts_and_dsv_effects() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let executor = BuildExecutor::new(&config);
+        let prefix = config.install_base.join("demo_pkg");
+        let hook_dir = prefix.join("share/demo_pkg/hook");
+        fs::create_dir_all(&hook_dir).unwrap();
+        fs::write(
+            hook_dir.join("10-python.dsv"),
+            "prepend-non-duplicate;PYTHONPATH;lib/python3.12/site-packages\nset-if-unset;RMW_IMPLEMENTATION;rmw_fastrtps_cpp\n",
+        )
+        .unwrap();
+        fs::write(hook_dir.join("20-extra.sh"), "export DEMO_HOOK=1\n").unwrap();
+        fs::create_dir_all(prefix.join("lib/python3.12/site-packages")).unwrap();
+
+        let script = executor.render_local_setup_sh("demo_pkg", &prefix);
+
+        assert!(script.contains("PYTHONPATH"));
+        assert!(script.contains("rmw_fastrtps_cpp"));
+        assert!(script.contains("20-extra.sh"));
     }
 }
