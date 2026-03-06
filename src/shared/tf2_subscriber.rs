@@ -112,14 +112,21 @@ fn add_tfmessage_edges(
             continue;
         };
 
+        let Ok(mut frames_guard) = frames.lock() else {
+            return;
+        };
+        let Ok(mut edges_guard) = edges.lock() else {
+            return;
+        };
+
         if !parent.is_empty() {
-            frames.lock().unwrap().insert(parent.clone());
+            frames_guard.insert(parent.clone());
         }
         if !child.is_empty() {
-            frames.lock().unwrap().insert(child.clone());
+            frames_guard.insert(child.clone());
         }
         if !parent.is_empty() && !child.is_empty() {
-            edges.lock().unwrap().insert((parent, child), tf);
+            edges_guard.insert((parent, child), tf);
         }
     }
 }
@@ -172,8 +179,15 @@ impl TfFrameIndex {
     }
 
     pub fn has_any_data(&self) -> bool {
-        !self.edges_dynamic.lock().unwrap().is_empty()
-            || !self.edges_static.lock().unwrap().is_empty()
+        self.edges_dynamic
+            .lock()
+            .map(|edges| !edges.is_empty())
+            .unwrap_or(false)
+            || self
+                .edges_static
+                .lock()
+                .map(|edges| !edges.is_empty())
+                .unwrap_or(false)
     }
 
     fn start_drain_thread(
@@ -198,12 +212,19 @@ impl TfFrameIndex {
 
     #[allow(dead_code)]
     pub fn frames(&self) -> Vec<String> {
-        self.frames.lock().unwrap().iter().cloned().collect()
+        self.frames
+            .lock()
+            .map(|frames| frames.iter().cloned().collect())
+            .unwrap_or_default()
     }
 
     pub fn edges(&self) -> Vec<((String, String), TfEdgeTransform, TfEdgeKind)> {
-        let dyn_edges = self.edges_dynamic.lock().unwrap();
-        let stat_edges = self.edges_static.lock().unwrap();
+        let Ok(dyn_edges) = self.edges_dynamic.lock() else {
+            return Vec::new();
+        };
+        let Ok(stat_edges) = self.edges_static.lock() else {
+            return Vec::new();
+        };
 
         let mut out: BTreeMap<(String, String), (TfEdgeTransform, TfEdgeKind)> = BTreeMap::new();
         for (k, v) in stat_edges.iter() {

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -193,7 +193,7 @@ fn find_interface_file(type_name: &str) -> Result<PathBuf> {
     let re = Regex::new(
         r"^(?P<pkg>[^/]+)/(?P<kind>msg|srv|action)/(?P<name>[^/]+?)(?:\.(?P<ext>msg|srv|action))?$",
     )
-    .unwrap();
+    .map_err(|e| anyhow!("Failed to compile interface type matcher: {}", e))?;
     let caps = re.captures(type_name).ok_or_else(|| {
         anyhow!(
             "Invalid interface type '{}'. Expected pkg/msg/Type",
@@ -201,9 +201,18 @@ fn find_interface_file(type_name: &str) -> Result<PathBuf> {
         )
     })?;
 
-    let pkg = caps.name("pkg").unwrap().as_str();
-    let kind = caps.name("kind").unwrap().as_str();
-    let name = caps.name("name").unwrap().as_str();
+    let pkg = caps
+        .name("pkg")
+        .map(|value| value.as_str())
+        .ok_or_else(|| anyhow!("Invalid interface type '{}': missing package", type_name))?;
+    let kind = caps
+        .name("kind")
+        .map(|value| value.as_str())
+        .ok_or_else(|| anyhow!("Invalid interface type '{}': missing kind", type_name))?;
+    let name = caps
+        .name("name")
+        .map(|value| value.as_str())
+        .ok_or_else(|| anyhow!("Invalid interface type '{}': missing name", type_name))?;
 
     let pkgs = collect_installed_packages();
     let Some(pkg_share) = pkgs.get(pkg) else {

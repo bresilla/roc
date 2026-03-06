@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -227,7 +227,9 @@ pub fn parse_action(current_pkg: &str, text: &str) -> Result<ActionSpec> {
             sections.push(Vec::new());
             continue;
         }
-        sections.last_mut().unwrap().push(line);
+        if let Some(section) = sections.last_mut() {
+            section.push(line);
+        }
     }
     while sections.len() < 3 {
         sections.push(Vec::new());

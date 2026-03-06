@@ -130,7 +130,9 @@ impl ParamClientContext {
         let captured: Arc<Mutex<Option<T::Response>>> = Arc::new(Mutex::new(None));
         let captured_inner = Arc::clone(&captured);
         let promise = client.call_then(request, move |resp: T::Response| {
-            *captured_inner.lock().unwrap() = Some(resp);
+            if let Ok(mut captured) = captured_inner.lock() {
+                *captured = Some(resp);
+            }
         })?;
 
         self.executor
@@ -141,7 +143,10 @@ impl ParamClientContext {
             )
             .first_error()?;
 
-        let result = captured.lock().unwrap().clone();
+        let result = captured
+            .lock()
+            .map_err(|_| anyhow!("Service response capture state poisoned"))?
+            .clone();
         result.ok_or_else(|| {
             anyhow!(
                 "No response captured from service '{}'",

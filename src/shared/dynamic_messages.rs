@@ -124,7 +124,10 @@ impl DynamicSubscriber {
 
     /// Try to receive a message without blocking.
     pub fn try_recv(&self) -> Result<Option<ReceivedDynamicMessage>> {
-        let rx = self.receiver.lock().unwrap();
+        let rx = self
+            .receiver
+            .lock()
+            .map_err(|_| anyhow!("dynamic subscription receiver state poisoned"))?;
         match rx.try_recv() {
             Ok(msg) => Ok(Some(msg)),
             Err(mpsc::TryRecvError::Empty) => Ok(None),

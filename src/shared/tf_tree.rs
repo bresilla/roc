@@ -161,7 +161,9 @@ impl TfGraph {
         let mut composed = TfTransform::identity();
         let mut overall_kind = TfEdgeKind::Static;
         while cur != from {
-            let (p, t_edge, kind) = prev.get(&cur).unwrap().clone();
+            let Some((p, t_edge, kind)) = prev.get(&cur).cloned() else {
+                return None;
+            };
             composed = compose(t_edge, composed);
             if kind == TfEdgeKind::Dynamic {
                 overall_kind = TfEdgeKind::Dynamic;
