@@ -1,4 +1,5 @@
 use crate::graph::{RclGraphContext, action_operations, interface_operations};
+use crate::shared::param_operations::ParamClientContext;
 use crate::utils::{get_ros_workspace_paths, is_executable};
 use clap::ArgMatches;
 use std::collections::HashSet;
@@ -76,7 +77,15 @@ fn complete(
         ("topic", None, None, 1) => TOPIC_SUBCOMMANDS.iter().map(|s| s.to_string()).collect(),
         ("topic", Some("echo" | "hz" | "info" | "kind" | "bw" | "delay"), None, 1) => find_topics(),
         ("topic", Some("pub"), None, 1) => find_topics(),
-        ("topic", Some("pub"), None, 2) => find_message_types(),
+        ("topic", Some("pub"), None, 2) => {
+            let topic_name = current_args.first().map(|s| s.as_str());
+            let topic_types = find_topic_types_for_name(topic_name);
+            if topic_types.is_empty() {
+                find_message_types()
+            } else {
+                topic_types
+            }
+        }
         ("topic", Some("find"), None, 1) => find_message_types(),
 
         ("service", None, None, 1) => SERVICE_SUBCOMMANDS.iter().map(|s| s.to_string()).collect(),
@@ -92,7 +101,10 @@ fn complete(
         ("param", Some("get" | "set" | "list" | "describe" | "remove" | "export"), None, 1) => {
             find_nodes()
         }
-        ("param", Some("get" | "set" | "describe" | "remove"), None, 2) => find_parameters(),
+        ("param", Some("get" | "set" | "describe" | "remove"), None, 2) => {
+            let node_name = current_args.first().map(|s| s.as_str());
+            find_parameters(node_name)
+        }
 
         ("node", None, None, 1) => NODE_SUBCOMMANDS.iter().map(|s| s.to_string()).collect(),
         ("node", Some("info"), None, 1) => find_nodes(),
@@ -410,6 +422,21 @@ fn find_message_types() -> Vec<String> {
     sorted(interfaces.into_iter().collect())
 }
 
+fn find_topic_types_for_name(topic_name: Option<&str>) -> Vec<String> {
+    with_graph_context(|context| {
+        let pairs = context.get_topic_names_and_types().unwrap_or_default();
+        let items: HashSet<String> = match topic_name {
+            Some(name) => pairs
+                .into_iter()
+                .filter(|(topic, _)| topic == name)
+                .map(|(_, ty)| ty)
+                .collect(),
+            None => pairs.into_iter().map(|(_, ty)| ty).collect(),
+        };
+        sorted(items)
+    })
+}
+
 fn find_services() -> Vec<String> {
     with_graph_context(|context| context.get_service_names().unwrap_or_default())
 }
@@ -434,8 +461,29 @@ fn find_service_types_for_name(service_name: Option<&str>) -> Vec<String> {
     })
 }
 
-fn find_parameters() -> Vec<String> {
-    Vec::new()
+fn find_parameters(node_name: Option<&str>) -> Vec<String> {
+    let Some(node_name) = node_name else {
+        return Vec::new();
+    };
+
+    let node_fqn = ParamClientContext::node_fqn(node_name);
+    let mut context = match ParamClientContext::new() {
+        Ok(context) => context,
+        Err(_) => return Vec::new(),
+    };
+
+    context
+        .list_parameters(&node_fqn, Vec::new())
+        .map(|response| {
+            let items: HashSet<String> = response
+                .result
+                .names
+                .into_iter()
+                .map(|name| name.to_string())
+                .collect();
+            sorted(items)
+        })
+        .unwrap_or_default()
 }
 
 fn find_nodes() -> Vec<String> {
