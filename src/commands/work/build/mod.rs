@@ -1,9 +1,9 @@
 // Colcon replacement implementation
 // This module provides functionality to replace colcon build for ROS 2 workspaces
 
+pub mod build_executor;
 pub mod command;
 pub mod dependency_graph;
-pub mod build_executor;
 pub mod environment_manager;
 
 #[cfg(test)]
@@ -13,10 +13,12 @@ mod compatibility_tests;
 pub use command::handle;
 
 use colored::Colorize;
+use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::path::PathBuf;
 
 pub use crate::shared::package_discovery::{BuildType, Package as PackageMeta};
-use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
+use crate::shared::package_discovery::{DiscoveryConfig, discover_packages};
 
 #[derive(Debug, Clone)]
 pub struct BuildConfig {
@@ -24,6 +26,8 @@ pub struct BuildConfig {
     pub packages_select: Option<Vec<String>>,
     pub packages_ignore: Option<Vec<String>>,
     pub packages_up_to: Option<Vec<String>>,
+    pub packages_select_build_failed: bool,
+    pub packages_skip_build_finished: bool,
     pub parallel_workers: u32,
     pub merge_install: bool,
     pub symlink_install: bool,
@@ -45,6 +49,8 @@ impl Default for BuildConfig {
             packages_select: None,
             packages_ignore: None,
             packages_up_to: None,
+            packages_select_build_failed: false,
+            packages_skip_build_finished: false,
             parallel_workers: num_cpus::get() as u32,
             merge_install: false,
             symlink_install: false,
@@ -92,18 +98,18 @@ impl ColconBuilder {
             ],
         };
 
-        self.packages = discover_packages(&discovery_config)
-            .map_err(|e| -> Box<dyn std::error::Error> {
+        self.packages =
+            discover_packages(&discovery_config).map_err(|e| -> Box<dyn std::error::Error> {
                 Box::new(std::io::Error::other(e.to_string()))
             })?;
 
         if self.packages.is_empty() {
             return Err("No ROS packages found in the selected base paths".into());
         }
-        
+
         // Apply package filters
         self.apply_package_filters();
-        
+
         println!(
             "{} {} {}",
             "Discovered".bright_cyan().bold(),
@@ -118,18 +124,18 @@ impl ColconBuilder {
                 format!("({:?})", pkg.build_type).bright_black()
             );
         }
-        
+
         Ok(())
     }
 
     pub fn resolve_dependencies(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.build_order = dependency_graph::topological_sort(&self.packages)?;
-        
+
         println!("{}", "Build order".bright_cyan().bold());
         for &idx in &self.build_order {
             println!("  {}", self.packages[idx].name.bright_white());
         }
-        
+
         Ok(())
     }
 
@@ -141,34 +147,68 @@ impl ColconBuilder {
     }
 
     fn apply_package_filters(&mut self) {
-        // Apply packages_select filter
-        if let Some(ref selected) = self.config.packages_select {
-            self.packages.retain(|pkg| selected.contains(&pkg.name));
+        let mut selected_names: Option<HashSet<String>> = None;
+
+        if let Some(selected) = &self.config.packages_select {
+            let names = selected.iter().cloned().collect::<HashSet<_>>();
+            Self::intersect_selected_names(&mut selected_names, names);
         }
 
-        // Apply packages_ignore filter
-        if let Some(ref ignored) = self.config.packages_ignore {
-            self.packages.retain(|pkg| !ignored.contains(&pkg.name));
-        }
-
-        // Apply packages_up_to filter (build dependencies up to the specified packages)
-        if let Some(ref up_to) = self.config.packages_up_to {
-            let mut packages_to_build = std::collections::HashSet::new();
-            
-            // Add the target packages
+        if let Some(up_to) = &self.config.packages_up_to {
+            let mut names = HashSet::new();
             for target in up_to {
                 if let Some(pkg) = self.packages.iter().find(|p| &p.name == target) {
-                    packages_to_build.insert(pkg.name.clone());
-                    // Add all dependencies recursively
-                    self.add_dependencies_recursive(&pkg.name, &mut packages_to_build);
+                    names.insert(pkg.name.clone());
+                    self.add_dependencies_recursive(&pkg.name, &mut names);
                 }
             }
-            
-            self.packages.retain(|pkg| packages_to_build.contains(&pkg.name));
+            Self::intersect_selected_names(&mut selected_names, names);
+        }
+
+        if self.config.packages_select_build_failed {
+            let names = self
+                .load_previous_build_state()
+                .into_iter()
+                .filter_map(
+                    |(name, status)| {
+                        if status == "failed" { Some(name) } else { None }
+                    },
+                )
+                .collect::<HashSet<_>>();
+            Self::intersect_selected_names(&mut selected_names, names);
+        }
+
+        if let Some(selected_names) = selected_names {
+            self.packages
+                .retain(|pkg| selected_names.contains(&pkg.name));
+        }
+
+        if self.config.packages_skip_build_finished {
+            let previous_state = self.load_previous_build_state();
+            self.packages.retain(|pkg| {
+                previous_state
+                    .get(&pkg.name)
+                    .map(|status| status != "completed")
+                    .unwrap_or(true)
+            });
+        }
+
+        if let Some(ignored) = &self.config.packages_ignore {
+            self.packages.retain(|pkg| !ignored.contains(&pkg.name));
         }
     }
 
-    fn add_dependencies_recursive(&self, pkg_name: &str, packages_to_build: &mut std::collections::HashSet<String>) {
+    fn intersect_selected_names(
+        selected_names: &mut Option<HashSet<String>>,
+        new_names: HashSet<String>,
+    ) {
+        match selected_names {
+            Some(existing) => existing.retain(|name| new_names.contains(name)),
+            None => *selected_names = Some(new_names),
+        }
+    }
+
+    fn add_dependencies_recursive(&self, pkg_name: &str, packages_to_build: &mut HashSet<String>) {
         if let Some(pkg) = self.packages.iter().find(|p| &p.name == pkg_name) {
             for dep in pkg.build_order_deps() {
                 if !packages_to_build.contains(&dep) {
@@ -179,5 +219,135 @@ impl ColconBuilder {
                 }
             }
         }
+    }
+
+    fn load_previous_build_state(&self) -> HashMap<String, String> {
+        let state_root = self.config.log_base.join("latest");
+        let entries = match fs::read_dir(state_root) {
+            Ok(entries) => entries,
+            Err(_) => return HashMap::new(),
+        };
+
+        let mut state = HashMap::new();
+        for entry in entries.flatten() {
+            let package_dir = entry.path();
+            if !package_dir.is_dir() {
+                continue;
+            }
+
+            let package_name = match package_dir.file_name().and_then(|name| name.to_str()) {
+                Some(name) => name.to_string(),
+                None => continue,
+            };
+            let state_file = package_dir.join("status.txt");
+            let contents = match fs::read_to_string(state_file) {
+                Ok(contents) => contents,
+                Err(_) => continue,
+            };
+
+            for line in contents.lines() {
+                if let Some(status) = line.strip_prefix("status=") {
+                    state.insert(package_name.clone(), status.to_string());
+                    break;
+                }
+            }
+        }
+
+        state
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BuildConfig, BuildType, ColconBuilder, PackageMeta};
+    use std::fs;
+    use std::path::PathBuf;
+    use tempfile::tempdir;
+
+    fn pkg(name: &str, deps: &[&str]) -> PackageMeta {
+        PackageMeta {
+            name: name.to_string(),
+            path: PathBuf::from(format!("/tmp/{name}")),
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: "fixture".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: deps.iter().map(|dep| dep.to_string()).collect(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn package_filters_intersect_selection_modes() {
+        let temp = tempdir().unwrap();
+        let mut config = BuildConfig::default();
+        config.log_base = temp.path().join("log");
+        config.packages_select = Some(vec!["consumer".to_string(), "leaf".to_string()]);
+        config.packages_up_to = Some(vec!["consumer".to_string()]);
+        config.packages_select_build_failed = true;
+        fs::create_dir_all(config.log_base.join("latest/consumer")).unwrap();
+        fs::write(
+            config.log_base.join("latest/consumer/status.txt"),
+            "status=failed\n",
+        )
+        .unwrap();
+        fs::create_dir_all(config.log_base.join("latest/leaf")).unwrap();
+        fs::write(
+            config.log_base.join("latest/leaf/status.txt"),
+            "status=failed\n",
+        )
+        .unwrap();
+
+        let mut builder = ColconBuilder::new(config);
+        builder.packages = vec![
+            pkg("base", &[]),
+            pkg("consumer", &["base"]),
+            pkg("leaf", &[]),
+        ];
+
+        builder.apply_package_filters();
+
+        let selected = builder
+            .packages
+            .iter()
+            .map(|pkg| pkg.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(selected, vec!["consumer"]);
+    }
+
+    #[test]
+    fn package_filters_can_skip_previously_completed_packages() {
+        let temp = tempdir().unwrap();
+        let mut config = BuildConfig::default();
+        config.log_base = temp.path().join("log");
+        config.packages_skip_build_finished = true;
+        fs::create_dir_all(config.log_base.join("latest/base")).unwrap();
+        fs::write(
+            config.log_base.join("latest/base/status.txt"),
+            "status=completed\n",
+        )
+        .unwrap();
+        fs::create_dir_all(config.log_base.join("latest/consumer")).unwrap();
+        fs::write(
+            config.log_base.join("latest/consumer/status.txt"),
+            "status=failed\n",
+        )
+        .unwrap();
+
+        let mut builder = ColconBuilder::new(config);
+        builder.packages = vec![pkg("base", &[]), pkg("consumer", &[]), pkg("fresh", &[])];
+
+        builder.apply_package_filters();
+
+        let selected = builder
+            .packages
+            .iter()
+            .map(|pkg| pkg.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(selected, vec!["consumer", "fresh"]);
     }
 }

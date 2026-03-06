@@ -168,6 +168,15 @@ impl<'a> BuildExecutor<'a> {
                             error: None,
                         },
                     );
+                    Self::write_package_state(
+                        self.config,
+                        &package.name,
+                        &BuildRecord {
+                            status: PackageState::Completed,
+                            duration_ms: duration.as_millis(),
+                            error: None,
+                        },
+                    )?;
                     successful_builds += 1;
                 }
                 Err(e) => {
@@ -186,6 +195,15 @@ impl<'a> BuildExecutor<'a> {
                             error: Some(e.to_string()),
                         },
                     );
+                    Self::write_package_state(
+                        self.config,
+                        &package.name,
+                        &BuildRecord {
+                            status: PackageState::Failed,
+                            duration_ms: duration.as_millis(),
+                            error: Some(e.to_string()),
+                        },
+                    )?;
                     failed_builds += 1;
 
                     if !self.config.continue_on_error {
@@ -443,14 +461,19 @@ impl<'a> BuildExecutor<'a> {
                                 }
                                 {
                                     let mut records = build_state.build_records.lock().unwrap();
-                                    records.insert(
-                                        package.name.clone(),
-                                        BuildRecord {
-                                            status: PackageState::Completed,
-                                            duration_ms: duration.as_millis(),
-                                            error: None,
-                                        },
-                                    );
+                                    let record = BuildRecord {
+                                        status: PackageState::Completed,
+                                        duration_ms: duration.as_millis(),
+                                        error: None,
+                                    };
+                                    records.insert(package.name.clone(), record.clone());
+                                    Self::write_package_state(&config, &package.name, &record)
+                                        .map_err(|e| {
+                                            format!(
+                                                "Failed to persist build state for {}: {}",
+                                                package.name, e
+                                            )
+                                        })?;
                                 }
                             }
                             Err(e) => {
@@ -475,14 +498,19 @@ impl<'a> BuildExecutor<'a> {
                                 }
                                 {
                                     let mut records = build_state.build_records.lock().unwrap();
-                                    records.insert(
-                                        package.name.clone(),
-                                        BuildRecord {
-                                            status: PackageState::Failed,
-                                            duration_ms: duration.as_millis(),
-                                            error: Some(e.to_string()),
-                                        },
-                                    );
+                                    let record = BuildRecord {
+                                        status: PackageState::Failed,
+                                        duration_ms: duration.as_millis(),
+                                        error: Some(e.to_string()),
+                                    };
+                                    records.insert(package.name.clone(), record.clone());
+                                    Self::write_package_state(&config, &package.name, &record)
+                                        .map_err(|e| {
+                                            format!(
+                                                "Failed to persist build state for {}: {}",
+                                                package.name, e
+                                            )
+                                        })?;
                                 }
 
                                 if !config.continue_on_error {
@@ -882,6 +910,10 @@ impl<'a> BuildExecutor<'a> {
         Self::package_log_dir(config, package_name).join(format!("{phase_name}.log"))
     }
 
+    fn package_state_path(config: &BuildConfig, package_name: &str) -> PathBuf {
+        Self::package_log_dir(config, package_name).join("status.txt")
+    }
+
     fn write_build_summary(
         &self,
         packages: &[PackageMeta],
@@ -922,6 +954,32 @@ impl<'a> BuildExecutor<'a> {
             summary,
         )?;
         Ok(())
+    }
+
+    fn write_package_state(
+        config: &BuildConfig,
+        package_name: &str,
+        record: &BuildRecord,
+    ) -> Result<(), io::Error> {
+        let status = match record.status {
+            PackageState::Pending => "pending",
+            PackageState::Building => "building",
+            PackageState::Completed => "completed",
+            PackageState::Failed => "failed",
+        };
+        let mut content = format!(
+            "status={status}\nduration_ms={duration}\n",
+            duration = record.duration_ms
+        );
+        if let Some(error) = &record.error {
+            content.push_str(&format!("error={error}\n"));
+        }
+
+        let state_path = Self::package_state_path(config, package_name);
+        if let Some(parent) = state_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(state_path, content)
     }
 
     fn render_local_setup_sh(&self, package_name: &str, prefix: &Path) -> String {
@@ -1589,11 +1647,13 @@ mod tests {
         assert!(config.build_base.join("COLCON_IGNORE").exists());
         assert!(config.install_base.join("COLCON_IGNORE").exists());
         assert!(config.log_base.join("COLCON_IGNORE").exists());
-        assert!(config
-            .log_base
-            .join("latest")
-            .join("COLCON_IGNORE")
-            .exists());
+        assert!(
+            config
+                .log_base
+                .join("latest")
+                .join("COLCON_IGNORE")
+                .exists()
+        );
     }
 
     #[test]
@@ -1796,12 +1856,14 @@ mod tests {
         let script = executor.render_local_setup_sh("demo_pkg", &prefix);
 
         assert!(script.contains(&prefix.join("bin").display().to_string()));
-        assert!(script.contains(
-            &prefix
-                .join("lib/python3.12/site-packages")
-                .display()
-                .to_string()
-        ));
+        assert!(
+            script.contains(
+                &prefix
+                    .join("lib/python3.12/site-packages")
+                    .display()
+                    .to_string()
+            )
+        );
         assert!(!script.contains("python3.10"));
     }
 
@@ -2026,5 +2088,31 @@ mod tests {
         assert!(summary.contains("demo_pkg: status=completed duration_ms=42"));
         assert!(summary.contains("logs="));
         assert!(summary.contains("log/latest/demo_pkg"));
+    }
+
+    #[test]
+    fn write_package_state_persists_machine_readable_status() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.log_base = workspace_root.join("log");
+
+        BuildExecutor::write_package_state(
+            &config,
+            "demo_pkg",
+            &BuildRecord {
+                status: PackageState::Failed,
+                duration_ms: 12,
+                error: Some("compile failed".to_string()),
+            },
+        )
+        .unwrap();
+
+        let status =
+            fs::read_to_string(config.log_base.join("latest/demo_pkg/status.txt")).unwrap();
+        assert!(status.contains("status=failed"));
+        assert!(status.contains("duration_ms=12"));
+        assert!(status.contains("error=compile failed"));
     }
 }

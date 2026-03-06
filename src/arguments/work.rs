@@ -1,4 +1,4 @@
-use clap::{arg, Arg, Command};
+use clap::{Arg, Command, arg};
 
 pub fn cmd() -> Command {
     Command::new("work")
@@ -87,6 +87,7 @@ pub fn cmd() -> Command {
             .arg(
                 Arg::new("packages_ignore")
                     .long("packages-ignore")
+                    .long("packages-skip")
                     .visible_alias("packages_ignore")
                     .num_args(1..)
                     .value_name("PACKAGES")
@@ -99,6 +100,18 @@ pub fn cmd() -> Command {
                     .num_args(1..)
                     .value_name("PACKAGES")
                     .help("Build packages up to and including specified packages")
+            )
+            .arg(
+                Arg::new("packages_select_build_failed")
+                    .long("packages-select-build-failed")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Select packages which failed to build in the previous run")
+            )
+            .arg(
+                Arg::new("packages_skip_build_finished")
+                    .long("packages-skip-build-finished")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Skip packages which finished building in the previous run")
             )
             .arg(
                 Arg::new("parallel_workers")

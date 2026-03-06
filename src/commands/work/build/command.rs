@@ -2,7 +2,7 @@ use clap::ArgMatches;
 use colored::Colorize;
 use std::path::PathBuf;
 
-use crate::commands::work::build::{ColconBuilder, BuildConfig};
+use crate::commands::work::build::{BuildConfig, ColconBuilder};
 
 fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std::error::Error>> {
     let mut config = BuildConfig::default();
@@ -37,6 +37,9 @@ fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std:
     if let Some(packages) = matches.get_many::<String>("packages_up_to") {
         config.packages_up_to = Some(packages.map(|s| s.to_string()).collect());
     }
+
+    config.packages_select_build_failed = matches.get_flag("packages_select_build_failed");
+    config.packages_skip_build_finished = matches.get_flag("packages_skip_build_finished");
 
     if let Some(workers) = matches.get_one::<u32>("parallel_workers") {
         config.parallel_workers = *workers;
@@ -75,8 +78,7 @@ fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std:
         config.base_paths = vec![config.workspace_root.clone()];
         println!(
             "{}",
-            "No 'src' directory found; scanning workspace root for packages"
-                .bright_yellow()
+            "No 'src' directory found; scanning workspace root for packages".bright_yellow()
         );
     }
 
@@ -162,5 +164,23 @@ mod tests {
         assert!(config.build_base.ends_with("out/build-tree"));
         assert!(config.install_base.ends_with("out/install-tree"));
         assert!(config.log_base.ends_with("out/log-tree"));
+    }
+
+    #[test]
+    fn config_from_matches_parses_build_state_selectors() {
+        let matches = crate::arguments::work::cmd()
+            .try_get_matches_from([
+                "work",
+                "build",
+                "--packages-select-build-failed",
+                "--packages-skip-build-finished",
+            ])
+            .unwrap();
+        let (_, submatches) = matches.subcommand().unwrap();
+
+        let config = config_from_matches(submatches).unwrap();
+
+        assert!(config.packages_select_build_failed);
+        assert!(config.packages_skip_build_finished);
     }
 }
