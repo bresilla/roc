@@ -67,6 +67,76 @@ complete -c roc -f -n "__fish_seen_subcommand_from daemon; and not __roc_sub_cmd
 complete -c roc -f -n "__fish_seen_subcommand_from middleware; and not __roc_sub_cmd" -a "(roc _complete middleware '' '' 1 2>/dev/null)"
 complete -c roc -f -n "__fish_seen_subcommand_from completion; and not __roc_sub_cmd" -a "bash zsh fish"
 complete -c roc -f -n "__fish_seen_subcommand_from completion" -l install
+
+complete -c roc -n "__fish_seen_subcommand_from launch" -s n -l noninteractive
+complete -c roc -n "__fish_seen_subcommand_from launch" -s d -l debug
+complete -c roc -n "__fish_seen_subcommand_from launch" -s p -l print
+complete -c roc -n "__fish_seen_subcommand_from launch" -s s -l show_args
+complete -c roc -n "__fish_seen_subcommand_from launch" -s a -l show_all
+complete -c roc -n "__fish_seen_subcommand_from launch" -l launch_prefix
+complete -c roc -n "__fish_seen_subcommand_from launch" -l launch_prefix_filter
+
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l base-paths
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l build-base
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l install-base
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l log-base
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l packages-select
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l packages-ignore
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l packages-skip
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l packages-up-to
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l packages-select-build-failed
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l packages-select-build-finished
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l packages-skip-build-finished
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l packages-skip-build-failed
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l parallel-workers
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l merge-install
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l symlink-install
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l cmake-args
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l cmake-target
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l continue-on-error
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l event-handlers
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l executor
+
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-profile
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-depth
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-history
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-reliability
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-durability
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l csv
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l field
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -s f -l full-length
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -s l -l truncate-length
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l no-arr
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l no-str
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l flow-style
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l no-lost-messages
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l raw
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l once
+
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = hz" -s w -l window
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = hz" -l filter
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = hz" -l wall-time
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = info" -s v -l verbose
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = list" -s t -l show-types
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = list" -s c -l count-topics
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = list" -s a -l include-hidden-topics
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -s r -l rate
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -s p -l print
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l once
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -s t -l times
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l wait-matching-subscriptions
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l keep-alive
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -s n -l node-name
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l qos-profile
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l qos-depth
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l qos-history
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l qos-reliability
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l qos-durability
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = bw" -s w -l window
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = find" -s c -l count-topics
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = find" -s a -l include-hidden-topics
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = delay" -s o -l output
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = delay" -s v -l verbose
 "#;
 
 pub fn print_completions() {
@@ -127,5 +197,11 @@ mod tests {
     #[test]
     fn fish_script_supports_install_flag() {
         assert!(SCRIPT.contains("-l install"));
+    }
+
+    #[test]
+    fn fish_script_completes_work_build_flags() {
+        assert!(SCRIPT.contains("-l merge-install"));
+        assert!(SCRIPT.contains("-l packages-select"));
     }
 }

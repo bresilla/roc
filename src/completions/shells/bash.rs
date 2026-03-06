@@ -8,6 +8,45 @@ _roc_completion() {
     _init_completion || return
 
     local top="${words[1]}"
+    local launch_flags="-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter"
+    local work_build_flags="--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor"
+    local topic_echo_flags="--qos-profile --qos-depth --qos-history --qos-reliability --qos-durability --csv --field -f --full-length -l --truncate-length --no-arr --no-str --flow-style --no-lost-messages --raw --once"
+    local topic_hz_flags="-w --window --filter --wall-time"
+    local topic_info_flags="-v --verbose"
+    local topic_list_flags="-t --show-types -c --count-topics -a --include-hidden-topics"
+    local topic_pub_flags="-r --rate -p --print --once -1 -t --times --wait-matching-subscriptions --keep-alive -n --node-name --qos-profile --qos-depth --qos-history --qos-reliability --qos-durability"
+    local topic_kind_flags=""
+    local topic_bw_flags="-w --window"
+    local topic_find_flags="-c --count-topics -a --include-hidden-topics"
+    local topic_delay_flags="-o --output -v --verbose"
+
+    if [[ "$cur" == -* ]]; then
+        case "$top" in
+            launch)
+                COMPREPLY=($(compgen -W "$launch_flags" -- "$cur"))
+                return
+                ;;
+            work)
+                if [[ "${words[2]}" == "build" ]]; then
+                    COMPREPLY=($(compgen -W "$work_build_flags" -- "$cur"))
+                    return
+                fi
+                ;;
+            topic)
+                case "${words[2]}" in
+                    echo) COMPREPLY=($(compgen -W "$topic_echo_flags" -- "$cur")); return ;;
+                    hz) COMPREPLY=($(compgen -W "$topic_hz_flags" -- "$cur")); return ;;
+                    info) COMPREPLY=($(compgen -W "$topic_info_flags" -- "$cur")); return ;;
+                    list) COMPREPLY=($(compgen -W "$topic_list_flags" -- "$cur")); return ;;
+                    pub) COMPREPLY=($(compgen -W "$topic_pub_flags" -- "$cur")); return ;;
+                    kind) COMPREPLY=($(compgen -W "$topic_kind_flags" -- "$cur")); return ;;
+                    bw) COMPREPLY=($(compgen -W "$topic_bw_flags" -- "$cur")); return ;;
+                    find) COMPREPLY=($(compgen -W "$topic_find_flags" -- "$cur")); return ;;
+                    delay) COMPREPLY=($(compgen -W "$topic_delay_flags" -- "$cur")); return ;;
+                esac
+                ;;
+        esac
+    fi
 
     case "$top" in
         "")
@@ -188,5 +227,19 @@ mod tests {
     #[test]
     fn bash_script_completes_service_call_type_position() {
         assert!(SCRIPT.contains("roc _complete service call '' 2"));
+    }
+
+    #[test]
+    fn bash_script_completes_work_build_flags() {
+        assert!(SCRIPT.contains("local work_build_flags="));
+        assert!(SCRIPT.contains("--merge-install"));
+        assert!(SCRIPT.contains("--packages-select"));
+    }
+
+    #[test]
+    fn bash_script_completes_launch_flags() {
+        assert!(SCRIPT.contains("local launch_flags="));
+        assert!(SCRIPT.contains("--launch_prefix"));
+        assert!(SCRIPT.contains("--show_args"));
     }
 }

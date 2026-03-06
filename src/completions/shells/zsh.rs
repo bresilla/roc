@@ -14,6 +14,41 @@ _roc_dynamic_lines() {
 _roc() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
+    local -a launch_flags work_build_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_bw_flags topic_find_flags topic_delay_flags
+    launch_flags=(-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter)
+    work_build_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor)
+    topic_echo_flags=(--qos-profile --qos-depth --qos-history --qos-reliability --qos-durability --csv --field -f --full-length -l --truncate-length --no-arr --no-str --flow-style --no-lost-messages --raw --once)
+    topic_hz_flags=(-w --window --filter --wall-time)
+    topic_info_flags=(-v --verbose)
+    topic_list_flags=(-t --show-types -c --count-topics -a --include-hidden-topics)
+    topic_pub_flags=(-r --rate -p --print --once -1 -t --times --wait-matching-subscriptions --keep-alive -n --node-name --qos-profile --qos-depth --qos-history --qos-reliability --qos-durability)
+    topic_bw_flags=(-w --window)
+    topic_find_flags=(-c --count-topics -a --include-hidden-topics)
+    topic_delay_flags=(-o --output -v --verbose)
+
+    if [[ "$words[$CURRENT]" == -* ]]; then
+        case "$words[2]" in
+            launch) _describe 'launch flags' launch_flags; return ;;
+            work)
+                if [[ "$words[3]" == "build" ]]; then
+                    _describe 'work build flags' work_build_flags
+                    return
+                fi
+                ;;
+            topic)
+                case "$words[3]" in
+                    echo) _describe 'topic echo flags' topic_echo_flags; return ;;
+                    hz) _describe 'topic hz flags' topic_hz_flags; return ;;
+                    info) _describe 'topic info flags' topic_info_flags; return ;;
+                    list) _describe 'topic list flags' topic_list_flags; return ;;
+                    pub) _describe 'topic pub flags' topic_pub_flags; return ;;
+                    bw) _describe 'topic bw flags' topic_bw_flags; return ;;
+                    find) _describe 'topic find flags' topic_find_flags; return ;;
+                    delay) _describe 'topic delay flags' topic_delay_flags; return ;;
+                esac
+                ;;
+        esac
+    fi
 
     _arguments -C \
         '1:command:->command' \
@@ -224,5 +259,11 @@ mod tests {
     fn zsh_script_completes_kind_subcommands() {
         assert!(SCRIPT.contains("roc _complete topic '' '' 1"));
         assert!(SCRIPT.contains("roc _complete service '' '' 1"));
+    }
+
+    #[test]
+    fn zsh_script_completes_work_build_flags() {
+        assert!(SCRIPT.contains("work_build_flags=("));
+        assert!(SCRIPT.contains("--continue-on-error"));
     }
 }
