@@ -1,4 +1,4 @@
-use crate::graph::{RclGraphContext, action_operations, interface_operations};
+use crate::graph::{action_operations, interface_operations, RclGraphContext};
 use crate::shared::param_operations::ParamClientContext;
 use crate::shared::tf2_subscriber::TfFrameIndex;
 use crate::utils::{get_ros_workspace_paths, is_executable};
@@ -19,7 +19,7 @@ const NODE_SUBCOMMANDS: &[&str] = &["list", "info"];
 const ACTION_SUBCOMMANDS: &[&str] = &["list", "info", "goal"];
 const INTERFACE_SUBCOMMANDS: &[&str] = &["list", "package", "all", "show", "model"];
 const BAG_SUBCOMMANDS: &[&str] = &["record", "play", "info", "list"];
-const WORK_SUBCOMMANDS: &[&str] = &["build", "create", "info", "list", "test"];
+const WORK_SUBCOMMANDS: &[&str] = &["build", "create", "info", "list", "test", "test-result"];
 const FRAME_SUBCOMMANDS: &[&str] = &["list", "echo", "info", "pub"];
 const DAEMON_SUBCOMMANDS: &[&str] = &["start", "stop", "status"];
 const MIDDLEWARE_SUBCOMMANDS: &[&str] = &["get", "set", "list"];
@@ -594,9 +594,7 @@ mod tests {
     fn topic_completions_use_kind_subcommand() {
         assert_eq!(
             complete("topic", None, None, 1, &[]),
-            strings(&[
-                "echo", "hz", "info", "list", "kind", "pub", "bw", "find", "delay"
-            ])
+            strings(&["echo", "hz", "info", "list", "kind", "pub", "bw", "find", "delay"])
         );
     }
 

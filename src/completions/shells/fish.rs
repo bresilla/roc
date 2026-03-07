@@ -108,6 +108,11 @@ complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) =
 complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l continue-on-error
 complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l ctest-args
 complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test" -l pytest-args
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test-result" -l test-result-base
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test-result" -l all
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test-result" -l verbose
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test-result" -l result-files-only
+complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = test-result" -l delete-result-files
 
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-profile
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = echo" -l qos-depth
@@ -222,5 +227,11 @@ mod tests {
         assert!(SCRIPT.contains("test (__roc_sub_cmd) = test"));
         assert!(SCRIPT.contains("-l ctest-args"));
         assert!(SCRIPT.contains("-l pytest-args"));
+    }
+
+    #[test]
+    fn fish_script_completes_work_test_result_flags() {
+        assert!(SCRIPT.contains("test (__roc_sub_cmd) = test-result"));
+        assert!(SCRIPT.contains("-l delete-result-files"));
     }
 }

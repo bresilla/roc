@@ -1,4 +1,4 @@
-use clap::{Arg, Command, arg};
+use clap::{arg, Arg, Command};
 
 pub fn cmd() -> Command {
     Command::new("work")
@@ -277,6 +277,45 @@ pub fn cmd() -> Command {
                     .allow_hyphen_values(true)
                     .value_name("ARGS")
                     .help("Arguments to pass to pytest for Python packages")
+            )
+        )
+        .subcommand(
+            Command::new("test-result")
+            .about("Summarize test results from the workspace build tree")
+            .visible_alias("test_result")
+            .aliases(["results", "tr"])
+            .arg(
+                Arg::new("test_result_base")
+                    .long("test-result-base")
+                    .visible_alias("test_result_base")
+                    .value_name("TEST_RESULT_BASE")
+                    .help("Base path containing per-package test result files")
+            )
+            .arg(
+                Arg::new("all")
+                    .long("all")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Show passing result files in addition to failing ones")
+            )
+            .arg(
+                Arg::new("verbose")
+                    .long("verbose")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Show per-file test counters and package summaries")
+            )
+            .arg(
+                Arg::new("result_files_only")
+                    .long("result-files-only")
+                    .visible_alias("result_files_only")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Print matching result file paths only")
+            )
+            .arg(
+                Arg::new("delete_result_files")
+                    .long("delete-result-files")
+                    .visible_alias("delete_result_files")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Delete discovered result files instead of printing them")
             )
         )
 }

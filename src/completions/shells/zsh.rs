@@ -14,10 +14,11 @@ _roc_dynamic_lines() {
 _roc() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
-    local -a launch_flags work_build_flags work_test_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_bw_flags topic_find_flags topic_delay_flags
+    local -a launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_bw_flags topic_find_flags topic_delay_flags
     launch_flags=(-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter)
     work_build_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor)
     work_test_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --merge-install --continue-on-error --ctest-args --pytest-args)
+    work_test_result_flags=(--test-result-base --all --verbose --result-files-only --delete-result-files)
     topic_echo_flags=(--qos-profile --qos-depth --qos-history --qos-reliability --qos-durability --csv --field -f --full-length -l --truncate-length --no-arr --no-str --flow-style --no-lost-messages --raw --once)
     topic_hz_flags=(-w --window --filter --wall-time)
     topic_info_flags=(-v --verbose)
@@ -36,6 +37,9 @@ _roc() {
                     return
                 elif [[ "$words[3]" == "test" ]]; then
                     _describe 'work test flags' work_test_flags
+                    return
+                elif [[ "$words[3]" == "test-result" ]]; then
+                    _describe 'work test-result flags' work_test_result_flags
                     return
                 fi
                 ;;
@@ -276,5 +280,11 @@ mod tests {
         assert!(SCRIPT.contains("work_test_flags=("));
         assert!(SCRIPT.contains("--ctest-args"));
         assert!(SCRIPT.contains("--pytest-args"));
+    }
+
+    #[test]
+    fn zsh_script_completes_work_test_result_flags() {
+        assert!(SCRIPT.contains("work_test_result_flags=("));
+        assert!(SCRIPT.contains("--delete-result-files"));
     }
 }

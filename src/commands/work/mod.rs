@@ -18,6 +18,9 @@ pub fn handle(matches: ArgMatches) {
         Some(("test", args)) => {
             test::handle(args.clone());
         }
+        Some(("test-result", args)) => {
+            test_result::handle(args.clone());
+        }
         _ => print_error_and_exit("No work subcommand selected"),
     }
 }
@@ -27,6 +30,7 @@ pub mod create;
 pub mod info;
 pub mod list;
 pub mod test;
+pub mod test_result;
 
 #[cfg(test)]
 mod tests {
@@ -66,13 +70,11 @@ mod tests {
         );
 
         create::command::create_package_for_tests(create_matches).unwrap();
-        assert!(
-            workspace
-                .join("src")
-                .join("demo_pkg")
-                .join("package.xml")
-                .exists()
-        );
+        assert!(workspace
+            .join("src")
+            .join("demo_pkg")
+            .join("package.xml")
+            .exists());
 
         let list_matches =
             get_subcommand_matches(vec!["work".to_string(), "list".to_string()], "list");
