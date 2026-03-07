@@ -105,3 +105,57 @@ fn frame_pub_detach_prints_publish_block() {
     assert!(stdout.contains("base_link"));
     assert!(stdout.contains("Mode"));
 }
+
+#[test]
+fn service_call_failure_prints_request_block() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &[
+            "service",
+            "call",
+            "/demo_service",
+            "demo_interfaces/srv/Demo",
+            "{data: 1}",
+        ],
+    );
+    assert_failure(&output, "roc service call");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Service Call"));
+    assert!(stdout.contains("Service"));
+    assert!(stdout.contains("/demo_service"));
+    assert!(stdout.contains("Type"));
+    assert!(stdout.contains("demo_interfaces/srv/Demo"));
+    assert!(stdout.contains("Request"));
+    assert!(stdout.contains("{data: 1}"));
+    assert!(stdout.contains("Command"));
+}
+
+#[test]
+fn action_goal_failure_prints_request_block() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &[
+            "action",
+            "goal",
+            "/demo_action",
+            "demo_interfaces/action/Demo",
+            "{order: 10}",
+            "--feedback",
+        ],
+    );
+    assert_failure(&output, "roc action goal");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Action Goal"));
+    assert!(stdout.contains("Action"));
+    assert!(stdout.contains("/demo_action"));
+    assert!(stdout.contains("Type"));
+    assert!(stdout.contains("demo_interfaces/action/Demo"));
+    assert!(stdout.contains("Goal"));
+    assert!(stdout.contains("{order: 10}"));
+    assert!(stdout.contains("Feedback"));
+    assert!(stdout.contains("Command"));
+}
