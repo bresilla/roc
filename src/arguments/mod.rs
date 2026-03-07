@@ -38,7 +38,7 @@ pub fn descriptin_str(word: &str) -> String {
     word.bright_white().to_string()
 }
 
-const ABOUT_STR: &str = "a wannabe ros2 command line tool alternative";
+const ABOUT_STR: &str = "a native ROS 2 command-line tool";
 
 pub fn cli(logo: bool) -> Command {
     let _logo_1: String = "
@@ -187,7 +187,7 @@ Utilities Commands:"
   " + &command_str("frame")
         + "       "
         + &letter_str("f")
-        + &descriptin_str("Various transform subcommands [WIP]")
+        + &descriptin_str("Transform tree inspection and publishing")
         + "
 
 Workspace Commands:"
@@ -214,7 +214,7 @@ Workspace Commands:"
   " + &command_str("idl")
         + "         "
         + &letter_str("d")
-        + &descriptin_str("Various idl subcommands [WIP]")
+        + &descriptin_str("IDL conversion and discovery tools")
         + "
 
 Communication Commands:"
@@ -262,7 +262,7 @@ Shell Integration:"
         .about(&ABOUT_STR) 
         .author(env!("CARGO_PKG_AUTHORS"))
         .version(env!("CARGO_PKG_VERSION"))
-        .long_about("A ROS2 command line tool replacer that aims to be more user friendly and more powerful. [ALPHA STATE]")
+        .long_about("A native ROS 2 command-line tool focused on workspace builds, graph introspection, and daily development workflows.")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .allow_external_subcommands(false)
