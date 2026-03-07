@@ -3,6 +3,8 @@ use clap::ArgMatches;
 use colored::Colorize;
 use std::error::Error;
 use std::future::Future;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 pub type CommandResult<E = Box<dyn std::error::Error>> = Result<(), E>;
 
@@ -76,4 +78,11 @@ where
     if let Err(error) = runtime.block_on(future) {
         print_error_and_exit(error);
     }
+}
+
+pub fn install_ctrlc_flag(flag: Arc<AtomicBool>) -> AnyhowResult<()> {
+    ctrlc::set_handler(move || {
+        flag.store(false, Ordering::Relaxed);
+    })?;
+    Ok(())
 }

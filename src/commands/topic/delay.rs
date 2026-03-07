@@ -1,7 +1,8 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use rclrs::{Context, CreateBasicExecutor, DynamicMessage, MessageTypeName};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -82,14 +83,18 @@ impl TopicDelayInterceptor {
         })
     }
 
-    async fn start_intercepting(&mut self, running: Arc<AtomicBool>) -> Result<()> {
-        if self.verbose {
-            println!(
-                "Starting topic delay interceptor: {} -> {} (delay: {:?})",
-                self.input_topic, self.output_topic, self.delay_duration
-            );
-        }
+    fn snapshot_stats(&self) -> Result<DelayStats> {
+        self.stats
+            .lock()
+            .map(|stats| DelayStats {
+                messages_received: stats.messages_received,
+                messages_published: stats.messages_published,
+                buffer_size: stats.buffer_size,
+            })
+            .map_err(|_| anyhow!("Topic delay stats state poisoned"))
+    }
 
+    async fn start_intercepting(&mut self, running: Arc<AtomicBool>) -> Result<()> {
         // Verify input topic exists
         let topics = self
             .context
@@ -116,10 +121,14 @@ impl TopicDelayInterceptor {
                 })?
         };
 
-        if self.verbose {
-            println!("Topic type: {}", topic_type);
-            println!("Creating subscription and publisher...");
-        }
+        blocks::print_section("Topic Delay");
+        blocks::print_field("Input", &self.input_topic);
+        blocks::print_field("Output", &self.output_topic);
+        blocks::print_field("Delay", format_duration_label(self.delay_duration));
+        blocks::print_field("Type", &topic_type);
+        blocks::print_field("Mode", if self.verbose { "verbose" } else { "standard" });
+        println!();
+        blocks::print_note("Press Ctrl+C to stop");
 
         self.start_message_processing(&topic_type, running).await
     }
@@ -163,25 +172,25 @@ impl TopicDelayInterceptor {
                     Ok(Some(received)) => {
                         let now = Instant::now();
                         let Ok(mut latest) = latest_clone.lock() else {
-                            eprintln!("Topic delay latest-message state poisoned");
+                            blocks::eprint_warning("Topic delay latest-message state poisoned");
                             break;
                         };
                         *latest = Some((received.message, now));
 
                         let Ok(mut stats) = stats_clone.lock() else {
-                            eprintln!("Topic delay stats state poisoned");
+                            blocks::eprint_warning("Topic delay stats state poisoned");
                             break;
                         };
                         stats.messages_received += 1;
                         stats.buffer_size = 1;
 
                         if verbose {
-                            println!("Received latest message from '{}'", input_topic);
+                            blocks::print_status("Received", &[("topic", input_topic.clone())]);
                         }
                     }
                     Ok(None) => {}
                     Err(e) => {
-                        eprintln!("Error receiving message: {}", e);
+                        blocks::eprint_warning(&format!("Error receiving message: {e}"));
                         break;
                     }
                 }
@@ -206,10 +215,12 @@ impl TopicDelayInterceptor {
 
             if self.verbose {
                 let held_for = Instant::now().duration_since(received_at);
-                println!(
-                    "Published latest message to '{}' (held for: {:.3}s)",
-                    output_topic,
-                    held_for.as_secs_f64()
+                blocks::print_status(
+                    "Published",
+                    &[
+                        ("topic", output_topic.clone()),
+                        ("held", format!("{:.3} s", held_for.as_secs_f64())),
+                    ],
                 );
             }
 
@@ -221,6 +232,16 @@ impl TopicDelayInterceptor {
         }
 
         Ok(())
+    }
+}
+
+fn format_duration_label(duration: Duration) -> String {
+    if duration.as_secs() > 0 && duration.subsec_nanos() == 0 {
+        format!("{} s", duration.as_secs())
+    } else if duration.as_millis() > 0 {
+        format!("{:.3} s", duration.as_secs_f64())
+    } else {
+        format!("{} ns", duration.as_nanos())
     }
 }
 
@@ -292,7 +313,7 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     let running_clone = running.clone();
     tokio::spawn(async move {
         if let Err(error) = tokio::signal::ctrl_c().await {
-            eprintln!("Failed to listen for ctrl+c: {}", error);
+            blocks::eprint_warning(&format!("Failed to listen for ctrl+c: {error}"));
             return;
         }
         running_clone.store(false, Ordering::Relaxed);
@@ -305,5 +326,14 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
         options.verbose,
     )?;
 
-    interceptor.start_intercepting(running).await
+    interceptor.start_intercepting(running).await?;
+
+    let stats = interceptor.snapshot_stats()?;
+    println!();
+    blocks::print_section("Delay Summary");
+    blocks::print_field("Received", stats.messages_received);
+    blocks::print_field("Published", stats.messages_published);
+    blocks::print_field("Buffered", stats.buffer_size);
+
+    Ok(())
 }

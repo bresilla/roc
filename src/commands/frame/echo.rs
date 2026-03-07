@@ -1,11 +1,13 @@
-use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::commands::cli::{handle_anyhow_result, install_ctrlc_flag};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use colored::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::shared::tf_tree::TfGraph;
 use crate::shared::tf2_subscriber::TfFrameIndex;
+use crate::shared::tf_tree::TfGraph;
 
 fn run_command(matches: ArgMatches) -> Result<()> {
     let frame_id = matches
@@ -29,8 +31,20 @@ fn run_command(matches: ArgMatches) -> Result<()> {
 
     let index = TfFrameIndex::new()?;
     let mut last_print = Instant::now() - period;
+    let mut last_missing_warning: Option<Instant> = None;
+    let running = Arc::new(AtomicBool::new(true));
+    install_ctrlc_flag(Arc::clone(&running))?;
 
-    loop {
+    blocks::print_section("Frame Echo");
+    blocks::print_field("Source", frame_id);
+    blocks::print_field("Target", child_frame_id);
+    blocks::print_field("Rate", format!("{rate_hz:.2} Hz"));
+    println!();
+    if !once {
+        blocks::print_note("Press Ctrl+C to stop");
+    }
+
+    while running.load(Ordering::Relaxed) {
         std::thread::sleep(Duration::from_millis(10));
         if last_print.elapsed() < period {
             continue;
@@ -39,12 +53,17 @@ fn run_command(matches: ArgMatches) -> Result<()> {
 
         let graph = TfGraph::from_edges(index.edges());
         let Some((tf, kind)) = graph.lookup(frame_id, child_frame_id) else {
-            eprintln!(
-                "{} {} {}",
-                "No transform from".yellow(),
-                frame_id.bright_cyan(),
-                child_frame_id.bright_cyan()
-            );
+            let now = Instant::now();
+            let should_warn = match last_missing_warning {
+                Some(last_warning) => now.duration_since(last_warning) >= Duration::from_secs(5),
+                None => true,
+            };
+            if should_warn {
+                blocks::eprint_warning(&format!(
+                    "No transform from {frame_id} to {child_frame_id}"
+                ));
+                last_missing_warning = Some(now);
+            }
             if once {
                 return Ok(());
             }
@@ -56,25 +75,30 @@ fn run_command(matches: ArgMatches) -> Result<()> {
             crate::shared::tf2_subscriber::TfEdgeKind::Dynamic => "dynamic",
         };
 
-        println!("{}", "Transform:".bright_yellow().bold());
-        println!(
-            "  {}",
-            format!("{} -> {}", frame_id, child_frame_id).bright_cyan()
+        blocks::print_status(
+            "Transform",
+            &[
+                ("path", format!("{frame_id} -> {child_frame_id}")),
+                ("type", kind_str.to_string()),
+                (
+                    "translation",
+                    format!("[{:.6}, {:.6}, {:.6}]", tf.tx, tf.ty, tf.tz),
+                ),
+                (
+                    "rotation",
+                    format!("[{:.6}, {:.6}, {:.6}, {:.6}]", tf.qx, tf.qy, tf.qz, tf.qw),
+                ),
+            ],
         );
-        println!(
-            "  {}",
-            format!(
-                "t=[{:.6},{:.6},{:.6}] q=[{:.6},{:.6},{:.6},{:.6}] type=[{}]",
-                tf.tx, tf.ty, tf.tz, tf.qx, tf.qy, tf.qz, tf.qw, kind_str
-            )
-            .bright_white()
-        );
-        println!();
 
         if once {
             return Ok(());
         }
     }
+
+    println!();
+    blocks::print_success("Frame echo stopped");
+    Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {

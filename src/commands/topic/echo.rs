@@ -1,10 +1,11 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -551,26 +552,38 @@ async fn echo_topic_messages(
     };
 
     if options.flow_style {
-        eprintln!("Note: --flow-style is not fully supported yet; using default YAML formatting");
+        blocks::eprint_note(
+            "--flow-style is not fully supported yet; using default YAML formatting",
+        );
     }
     if options.raw {
-        eprintln!("Note: --raw is not supported for native echo; using formatted output");
+        blocks::eprint_note("--raw is not supported for native echo; using formatted output");
     }
 
     // Wait for publishers to be available
     if !graph_context.wait_for_topic_with_publishers(&options.topic_name, Duration::from_secs(5))? {
         if !options.no_lost_messages {
-            eprintln!("WARNING: no publisher on [{}]", options.topic_name);
+            blocks::eprint_warning(&format!("No publisher on [{}]", options.topic_name));
         }
     }
 
     // Create dynamic subscription using our new infrastructure
     let subscription = graph_context.create_subscription(&options.topic_name, &topic_type)?;
 
-    println!(
-        "Subscribed to [{}] (type: {})",
-        options.topic_name, topic_type
-    );
+    blocks::eprint_section("Topic Echo");
+    blocks::eprint_field("Topic", &options.topic_name);
+    blocks::eprint_field("Type", &topic_type);
+    blocks::eprint_field("Format", if options.csv { "csv" } else { "yaml" });
+    if let Some(field) = &options.field {
+        blocks::eprint_field("Field", field);
+    }
+    if options.once {
+        blocks::eprint_field("Mode", "once");
+    }
+    if !options.full_length {
+        blocks::eprint_field("Truncate", options.truncate_length);
+    }
+    eprintln!();
 
     let mut message_count = 0;
     let check_interval = Duration::from_millis(50); // 20 Hz polling
@@ -666,7 +679,7 @@ async fn echo_topic_messages(
                 // No message available, continue polling
             }
             Err(e) => {
-                eprintln!("Error receiving message: {}", e);
+                blocks::eprint_warning(&format!("Error receiving message: {e}"));
                 break;
             }
         }
@@ -684,7 +697,7 @@ async fn echo_topic_messages(
             };
 
             if should_warn {
-                eprintln!("WARNING: no publisher on [{}]", options.topic_name);
+                blocks::eprint_warning(&format!("No publisher on [{}]", options.topic_name));
                 last_no_publisher_warning = Some(now);
             }
         }
@@ -702,23 +715,23 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     // Handle common arguments silently (like ros2 topic echo does)
     // Only show QoS notes if explicitly set
     if let Some(qos_profile) = matches.get_one::<String>("qos_profile") {
-        eprintln!("Note: Using QoS profile: {}", qos_profile);
+        blocks::eprint_note(&format!("Using QoS profile: {qos_profile}"));
     }
 
     if let Some(qos_depth) = matches.get_one::<String>("qos_depth") {
-        eprintln!("Note: Using QoS depth: {}", qos_depth);
+        blocks::eprint_note(&format!("Using QoS depth: {qos_depth}"));
     }
 
     if let Some(qos_history) = matches.get_one::<String>("qos_history") {
-        eprintln!("Note: Using QoS history: {}", qos_history);
+        blocks::eprint_note(&format!("Using QoS history: {qos_history}"));
     }
 
     if let Some(qos_reliability) = matches.get_one::<String>("qos_reliability") {
-        eprintln!("Note: Using QoS reliability: {}", qos_reliability);
+        blocks::eprint_note(&format!("Using QoS reliability: {qos_reliability}"));
     }
 
     if let Some(qos_durability) = matches.get_one::<String>("qos_durability") {
-        eprintln!("Note: Using QoS durability: {}", qos_durability);
+        blocks::eprint_note(&format!("Using QoS durability: {qos_durability}"));
     }
 
     // Set up signal handler for graceful shutdown
@@ -727,7 +740,7 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
 
     tokio::spawn(async move {
         if let Err(error) = tokio::signal::ctrl_c().await {
-            eprintln!("Failed to listen for ctrl+c: {}", error);
+            blocks::eprint_warning(&format!("Failed to listen for ctrl+c: {error}"));
             return;
         }
         running_clone.store(false, Ordering::Relaxed);

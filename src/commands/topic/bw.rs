@@ -1,7 +1,8 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -117,22 +118,27 @@ async fn monitor_topic_bandwidth(
 
     // Wait for publishers to be available
     if !graph_context.wait_for_topic_with_publishers(topic_name, Duration::from_secs(5))? {
-        println!("WARNING: no publisher on [{}]", topic_name);
+        blocks::eprint_warning(&format!("No publisher on [{topic_name}]"));
     }
 
     // Create dynamic subscription for real bandwidth monitoring
     let subscription = graph_context.create_subscription(topic_name, &topic_type)?;
 
-    println!("Subscribed to [{}]", topic_name);
-    println!("Topic type: {}", topic_type);
+    blocks::print_section("Topic Bandwidth Monitor");
+    blocks::print_field("Topic", topic_name);
+    blocks::print_field("Type", &topic_type);
+    blocks::print_field("Window", format!("{:.2} s", window_size.as_secs_f64()));
+    println!();
 
     let bandwidth_calc = Arc::new(Mutex::new(BandwidthCalculator::new(window_size)));
     let bandwidth_calc_clone = Arc::clone(&bandwidth_calc);
 
     let check_interval = Duration::from_millis(10); // High frequency polling for accurate bandwidth measurement
     let mut stats_print_timer = Instant::now();
-    let stats_print_interval = Duration::from_millis(100); // Print stats every 100ms
+    let stats_print_interval = Duration::from_secs(1);
     let mut last_no_publisher_warning: Option<Instant> = None;
+
+    blocks::print_note("Press Ctrl+C to stop");
 
     // Main monitoring loop with real message reception
     while running.load(Ordering::Relaxed) {
@@ -195,15 +201,22 @@ async fn monitor_topic_bandwidth(
                 };
 
                 // Format bandwidth output like ros2 topic bw
-                println!(
-                    "average: {:.2} B/s\tmean: {:.2} B/s\tmin: {:.2} B/s\tmax: {:.2} B/s\twindow: {}",
-                    current_bw,
-                    average_bw,
-                    min_bw,
-                    max_bw,
-                    calc.message_sizes
-                        .len()
-                        .min(window_size.as_secs() as usize * 10)
+                blocks::print_status(
+                    "Bandwidth",
+                    &[
+                        ("avg", format!("{current_bw:.2} B/s")),
+                        ("mean", format!("{average_bw:.2} B/s")),
+                        ("min", format!("{min_bw:.2} B/s")),
+                        ("max", format!("{max_bw:.2} B/s")),
+                        (
+                            "window",
+                            calc.message_sizes
+                                .len()
+                                .min(window_size.as_secs() as usize * 10)
+                                .to_string(),
+                        ),
+                        ("messages", msg_count.to_string()),
+                    ],
                 );
             }
 
@@ -221,11 +234,23 @@ async fn monitor_topic_bandwidth(
             };
 
             if should_warn {
-                println!("No publishers found for topic '{}'", topic_name);
+                blocks::eprint_warning(&format!("No publishers found for topic '{topic_name}'"));
                 last_no_publisher_warning = Some(now);
             }
         }
     }
+
+    let calc = bandwidth_calc
+        .lock()
+        .map_err(|_| anyhow!("Bandwidth calculator state poisoned"))?;
+    println!();
+    blocks::print_section("Bandwidth Summary");
+    blocks::print_field("Topic", topic_name);
+    blocks::print_field("Messages", calc.get_message_count());
+    blocks::print_field(
+        "Average Bandwidth",
+        format!("{:.2} B/s", calc.get_average_bandwidth()),
+    );
 
     Ok(())
 }
@@ -244,15 +269,15 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
 
     // Handle common arguments
     if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+        blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
 
     if common_args.use_sim_time {
-        eprintln!("Note: Using simulation time for bandwidth calculations");
+        blocks::eprint_note("Using simulation time for bandwidth calculations");
     }
 
     if let Some(ref spin_time_value) = common_args.spin_time {
-        eprintln!("Note: Using spin time {} for discovery", spin_time_value);
+        blocks::eprint_note(&format!("Using spin time {spin_time_value} for discovery"));
     }
 
     // Set up signal handler for graceful shutdown
@@ -261,16 +286,14 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
 
     tokio::spawn(async move {
         if let Err(error) = tokio::signal::ctrl_c().await {
-            eprintln!("Failed to listen for ctrl+c: {}", error);
+            blocks::eprint_warning(&format!("Failed to listen for ctrl+c: {error}"));
             return;
         }
         running_clone.store(false, Ordering::Relaxed);
     });
 
     // Start monitoring
-    monitor_topic_bandwidth(topic_name, window_duration, running).await?;
-    println!("\nBandwidth monitoring stopped.");
-    Ok(())
+    monitor_topic_bandwidth(topic_name, window_duration, running).await
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {

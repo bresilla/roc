@@ -1,18 +1,20 @@
-use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::commands::cli::{handle_anyhow_result, install_ctrlc_flag};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use colored::*;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime};
 
 use mcap::records::MessageHeader;
 use mcap::{WriteOptions, Writer};
 
 use crate::graph::RclGraphContext;
-use crate::shared::serialized_transport::{SerializedReceiver, sleep_short};
+use crate::shared::serialized_transport::{sleep_short, SerializedReceiver};
 
 fn now_nanos() -> u64 {
     let dur = SystemTime::now()
@@ -77,17 +79,25 @@ fn run_command(matches: ArgMatches) -> Result<()> {
         // No-op.
     }
 
-    println!("{}", "Recording MCAP:".bright_yellow().bold());
-    println!("  {} {}", "Output:".bright_yellow(), output.bright_cyan());
-    println!("  {}", "Topics:".bright_yellow());
+    blocks::print_section("Bag Record");
+    blocks::print_field("Output", &output);
+    blocks::print_field(
+        "Mode",
+        if separated {
+            "separated"
+        } else {
+            "single file"
+        },
+    );
     for t in &topics_to_record {
         let ty = topic_types
             .get(t)
             .cloned()
             .unwrap_or_else(|| "<unknown>".to_string());
-        println!("    {} {}", t.bright_cyan(), format!("[{}]", ty).green());
+        blocks::print_field("Topic", format!("{t} [{ty}]"));
     }
     println!();
+    blocks::print_note("Press Ctrl+C to stop");
 
     // If separated, create one writer per topic.
     let mut per_topic_writers: Option<BTreeMap<String, (Writer<File>, u16, u32)>> = None;
@@ -160,8 +170,12 @@ fn run_command(matches: ArgMatches) -> Result<()> {
     }
 
     let mut total: u64 = 0;
+    let running = Arc::new(AtomicBool::new(true));
+    install_ctrlc_flag(Arc::clone(&running))?;
+    let started_at = Instant::now();
+    let mut last_progress = Instant::now();
 
-    loop {
+    while running.load(Ordering::Relaxed) {
         sleep_short();
         let mut wrote_any = false;
         for (topic, _ty, rx) in receivers.iter_mut() {
@@ -206,14 +220,37 @@ fn run_command(matches: ArgMatches) -> Result<()> {
             }
         }
 
-        if wrote_any && total % 50 == 0 {
-            println!(
-                "{} {}",
-                "Recorded".bright_green(),
-                total.to_string().bright_white()
+        if wrote_any && last_progress.elapsed() >= Duration::from_secs(1) {
+            blocks::print_status(
+                "Record",
+                &[
+                    ("messages", total.to_string()),
+                    ("topics", topics_to_record.len().to_string()),
+                    (
+                        "elapsed",
+                        format!("{:.2} s", started_at.elapsed().as_secs_f64()),
+                    ),
+                ],
             );
+            last_progress = Instant::now();
         }
     }
+
+    drop(receivers);
+    drop(per_topic_writers);
+    drop(shared_writer);
+
+    println!();
+    blocks::print_section("Recording Summary");
+    blocks::print_field("Messages", total);
+    blocks::print_field("Topics", topics_to_record.len());
+    blocks::print_field(
+        "Elapsed",
+        format!("{:.2} s", started_at.elapsed().as_secs_f64()),
+    );
+    blocks::print_success("Recording stopped");
+
+    Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {

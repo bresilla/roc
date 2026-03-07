@@ -1,7 +1,8 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -101,25 +102,28 @@ async fn monitor_topic_rate(
 
     // Wait for publishers to be available
     if !graph_context.wait_for_topic_with_publishers(topic_name, Duration::from_secs(5))? {
-        println!("WARNING: no publisher on [{}]", topic_name);
+        blocks::eprint_warning(&format!("No publisher on [{topic_name}]"));
     }
 
     // Create dynamic subscription for real message rate monitoring
     let subscription = graph_context.create_subscription(topic_name, &topic_type)?;
 
-    println!("Subscribed to [{}]", topic_name);
-    println!("Topic type: {}", topic_type);
+    blocks::print_section("Topic Rate Monitor");
+    blocks::print_field("Topic", topic_name);
+    blocks::print_field("Type", &topic_type);
+    blocks::print_field("Window", window_size);
+    blocks::print_field("Clock", if use_wall_time { "wall" } else { "ros" });
+    println!();
 
     let rate_calculator = Arc::new(Mutex::new(RateCalculator::new(window_size)));
     let rate_calc_clone = Arc::clone(&rate_calculator);
 
     let check_interval = Duration::from_millis(10); // High frequency polling for accurate rate measurement
     let mut stats_print_timer = Instant::now();
-    let stats_print_interval = Duration::from_millis(100); // Print stats every 100ms
+    let stats_print_interval = Duration::from_secs(1);
     let mut last_no_publisher_warning: Option<Instant> = None;
 
-    println!("Monitoring topic rate (window size: {})...", window_size);
-    println!("Press Ctrl+C to stop");
+    blocks::print_note("Press Ctrl+C to stop");
 
     // Main monitoring loop with real message reception
     while running.load(Ordering::Relaxed) {
@@ -183,13 +187,16 @@ async fn monitor_topic_rate(
                     (0.0, 0.0, 0.0)
                 };
 
-                println!(
-                    "average rate: {:.3}\tmin: {:.3}s max: {:.3}s std dev: {:.3}s window: {}",
-                    current_rate,
-                    min_period,
-                    max_period,
-                    std_dev,
-                    calc.timestamps.len().min(window_size)
+                blocks::print_status(
+                    "Rate",
+                    &[
+                        ("avg", format!("{current_rate:.3} Hz")),
+                        ("min", format!("{min_period:.3} s")),
+                        ("max", format!("{max_period:.3} s")),
+                        ("stddev", format!("{std_dev:.3} s")),
+                        ("window", calc.timestamps.len().min(window_size).to_string()),
+                        ("messages", total_msgs.to_string()),
+                    ],
                 );
             }
 
@@ -207,11 +214,20 @@ async fn monitor_topic_rate(
             };
 
             if should_warn {
-                println!("No publishers found for topic '{}'", topic_name);
+                blocks::eprint_warning(&format!("No publishers found for topic '{topic_name}'"));
                 last_no_publisher_warning = Some(now);
             }
         }
     }
+
+    let calc = rate_calculator
+        .lock()
+        .map_err(|_| anyhow!("Rate calculator state poisoned"))?;
+    println!();
+    blocks::print_section("Rate Summary");
+    blocks::print_field("Topic", topic_name);
+    blocks::print_field("Messages", calc.get_total_messages());
+    blocks::print_field("Average Rate", format!("{:.3} Hz", calc.get_average_rate()));
 
     Ok(())
 }
@@ -230,15 +246,15 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
 
     // Handle common arguments
     if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+        blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
 
     if common_args.use_sim_time && !use_wall_time {
-        eprintln!("Note: Using simulation time for rate calculations");
+        blocks::eprint_note("Using simulation time for rate calculations");
     }
 
     if let Some(spin_time_value) = common_args.spin_time {
-        eprintln!("Note: Using spin time {} for discovery", spin_time_value);
+        blocks::eprint_note(&format!("Using spin time {spin_time_value} for discovery"));
     }
 
     // Set up signal handler for graceful shutdown
@@ -247,16 +263,14 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
 
     tokio::spawn(async move {
         if let Err(error) = tokio::signal::ctrl_c().await {
-            eprintln!("Failed to listen for ctrl+c: {}", error);
+            blocks::eprint_warning(&format!("Failed to listen for ctrl+c: {error}"));
             return;
         }
         running_clone.store(false, Ordering::Relaxed);
     });
 
     // Start monitoring
-    monitor_topic_rate(topic_name, window_size, use_wall_time, running).await?;
-    println!("\nRate monitoring stopped.");
-    Ok(())
+    monitor_topic_rate(topic_name, window_size, use_wall_time, running).await
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
