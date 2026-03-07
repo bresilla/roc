@@ -1,5 +1,6 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
+use crate::ui::{blocks, table};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
@@ -63,38 +64,33 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         };
 
         // Display topics with types
-        for topic in &filtered_topics {
-            if common_args.ros_style {
-                // Original ROS2 CLI style
+        if common_args.ros_style {
+            for topic in &filtered_topics {
                 if topic.types.is_empty() {
                     println!("{} [unknown type]", topic.name);
                 } else if topic.types.len() == 1 {
                     println!("{} [{}]", topic.name, topic.types[0]);
                 } else {
-                    // Multiple types (rare but possible)
                     println!("{} [{}]", topic.name, topic.types.join(", "));
                 }
-            } else {
-                if topic.types.is_empty() {
-                    println!("{} {}", topic.name.bright_cyan(), "[unknown type]".red());
-                } else if topic.types.len() == 1 {
-                    println!(
-                        "{} {}",
-                        topic.name.bright_cyan(),
-                        format!("[{}]", topic.types[0]).green()
-                    );
-                } else {
-                    // Multiple types (rare but possible)
-                    println!(
-                        "{} {}",
-                        topic.name.bright_cyan(),
-                        format!("[{}]", topic.types.join(", ")).green()
-                    );
-                }
             }
-        }
+        } else {
+            blocks::print_section("Topics");
+            let rows = filtered_topics
+                .iter()
+                .map(|topic| {
+                    let type_label = if topic.types.is_empty() {
+                        "unknown".red().to_string()
+                    } else if topic.types.len() == 1 {
+                        topic.types[0].green().to_string()
+                    } else {
+                        topic.types.join(", ").green().to_string()
+                    };
+                    vec![topic.name.bright_cyan().to_string(), type_label]
+                })
+                .collect();
+            table::print_table(&["Topic", "Type"], rows);
 
-        if !common_args.ros_style {
             if filtered_topics.is_empty() {
                 eprintln!(
                     "{} {}",
@@ -102,12 +98,7 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
                     format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
                 );
             } else {
-                println!();
-                println!(
-                    "{} {} topics found",
-                    "Total:".bright_green(),
-                    filtered_topics.len().to_string().bright_white().bold()
-                );
+                blocks::print_total(filtered_topics.len(), "topic", "topics");
             }
         }
 
@@ -121,18 +112,14 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
             println!("{}", topic);
         }
     } else {
-        // Enhanced colored output with count header
         if !filtered_topics.is_empty() {
-            println!("{}", "Available Topics:".bright_yellow().bold());
-            for topic in &filtered_topics {
-                println!("  {}", topic.bright_cyan());
-            }
-            println!();
-            println!(
-                "{} {} topics found",
-                "Total:".bright_green(),
-                filtered_topics.len().to_string().bright_white().bold()
-            );
+            blocks::print_section("Topics");
+            let rows = filtered_topics
+                .iter()
+                .map(|topic| vec![topic.bright_cyan().to_string()])
+                .collect();
+            table::print_table(&["Topic"], rows);
+            blocks::print_total(filtered_topics.len(), "topic", "topics");
         }
     }
 

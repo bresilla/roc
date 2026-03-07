@@ -1,5 +1,6 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, table};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 
@@ -64,16 +65,13 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
 
     let total = full_names.len();
 
-    println!("{}", "Available Nodes:".bright_yellow().bold());
-    for n in &full_names {
-        println!("  {}", n.bright_cyan());
-    }
-    println!();
-    println!(
-        "{} {} nodes found",
-        "Total:".bright_green(),
-        total.to_string().bright_white().bold()
-    );
+    blocks::print_section("Nodes");
+    let rows = full_names
+        .iter()
+        .map(|name| vec![name.bright_cyan().to_string()])
+        .collect();
+    table::print_table(&["Node"], rows);
+    blocks::print_total(total, "node", "nodes");
 
     Ok(())
 }

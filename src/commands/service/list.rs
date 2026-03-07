@@ -1,9 +1,10 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 
 use crate::arguments::service::CommonServiceArgs;
 use crate::graph::RclGraphContext;
+use crate::ui::{blocks, table};
 
 fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()> {
     if matches.get_flag("include_hidden_services") {
@@ -67,19 +68,28 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
 
     let total = items.len();
 
-    println!("{}", "Available Services:".bright_yellow().bold());
-    for (name, ty) in &items {
-        match ty {
-            Some(t) => println!("  {} {}", name.bright_cyan(), format!("[{}]", t).green()),
-            None => println!("  {}", name.bright_cyan()),
-        }
-    }
-    println!();
-    println!(
-        "{} {} services found",
-        "Total:".bright_green(),
-        total.to_string().bright_white().bold()
-    );
+    blocks::print_section("Services");
+    let headers = if show_types {
+        vec!["Service", "Type"]
+    } else {
+        vec!["Service"]
+    };
+    let rows = items
+        .iter()
+        .map(|(name, ty)| {
+            let mut row = vec![name.bright_cyan().to_string()];
+            if show_types {
+                row.push(
+                    ty.as_ref()
+                        .map(|value| value.green().to_string())
+                        .unwrap_or_else(|| "unknown".red().to_string()),
+                );
+            }
+            row
+        })
+        .collect();
+    table::print_table(&headers, rows);
+    blocks::print_total(total, "service", "services");
     Ok(())
 }
 

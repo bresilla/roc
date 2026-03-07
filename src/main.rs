@@ -3,6 +3,7 @@ mod commands;
 mod completions;
 mod graph;
 mod shared;
+mod ui;
 mod utils;
 use std::env;
 

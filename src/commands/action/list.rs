@@ -1,6 +1,7 @@
 use crate::arguments::action::CommonActionArgs;
-use crate::graph::{RclGraphContext, action_operations};
-use anyhow::{Result, anyhow};
+use crate::graph::{action_operations, RclGraphContext};
+use crate::ui::{blocks, table};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 
@@ -58,19 +59,28 @@ fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<()>
 
     let total = items.len();
 
-    println!("{}", "Available Actions:".bright_yellow().bold());
-    for (name, ty) in &items {
-        match ty {
-            Some(t) => println!("  {} {}", name.bright_cyan(), format!("[{}]", t).green()),
-            None => println!("  {}", name.bright_cyan()),
-        }
-    }
-    println!();
-    println!(
-        "{} {} actions found",
-        "Total:".bright_green(),
-        total.to_string().bright_white().bold()
-    );
+    blocks::print_section("Actions");
+    let headers = if show_types {
+        vec!["Action", "Type"]
+    } else {
+        vec!["Action"]
+    };
+    let rows = items
+        .iter()
+        .map(|(name, ty)| {
+            let mut row = vec![name.bright_cyan().to_string()];
+            if show_types {
+                row.push(
+                    ty.as_ref()
+                        .map(|value| value.green().to_string())
+                        .unwrap_or_else(|| "unknown".red().to_string()),
+                );
+            }
+            row
+        })
+        .collect();
+    table::print_table(&headers, rows);
+    blocks::print_total(total, "action", "actions");
 
     Ok(())
 }

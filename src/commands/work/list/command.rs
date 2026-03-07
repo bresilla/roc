@@ -1,5 +1,6 @@
 use crate::commands::cli::run_async_command;
 use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
+use crate::ui::{blocks, table};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
@@ -102,34 +103,24 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) 
         return Ok(());
     }
 
-    // Print header
-    println!("{}", "ROS 2 Packages in Workspace".bright_cyan().bold());
-    println!("{}", "=".repeat(80).bright_black());
-
     // Sort packages by name for consistent output
     let mut sorted_packages = packages.clone();
     sorted_packages.sort_by(|a, b| a.name.cmp(&b.name));
 
-    for package in &sorted_packages {
-        let status = format_build_status(&package.path, &build_base, &install_base);
-        let build_type = format_build_type(&package.build_type);
-        let created = get_creation_time(&package.path);
-
-        println!(
-            "{:<25} {:<15} {:<20} {}",
-            package.name.bright_white().bold(),
-            build_type,
-            status,
-            created.bright_black()
-        );
-    }
-
-    println!();
-    println!(
-        "{} {} packages found",
-        "Total:".bright_cyan(),
-        packages.len().to_string().bright_white().bold()
-    );
+    blocks::print_section("Workspace Packages");
+    let rows = sorted_packages
+        .iter()
+        .map(|package| {
+            vec![
+                package.name.bright_white().bold().to_string(),
+                format_build_type(&package.build_type),
+                format_build_status(&package.path, &build_base, &install_base),
+                get_creation_time(&package.path).bright_black().to_string(),
+            ]
+        })
+        .collect();
+    table::print_table(&["Package", "Build Type", "Status", "Created"], rows);
+    blocks::print_total(packages.len(), "package", "packages");
 
     Ok(())
 }
