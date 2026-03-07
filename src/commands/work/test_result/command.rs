@@ -38,12 +38,19 @@ struct ResultEntry {
     status: ResultStatus,
     counts: Option<JUnitCounts>,
     detail: Option<String>,
+    failures: Vec<FailureDetail>,
 }
 
 impl ResultEntry {
     fn matches_default_filter(&self) -> bool {
         self.status != ResultStatus::Passed
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FailureDetail {
+    name: String,
+    message: String,
 }
 
 fn config_from_matches(matches: &ArgMatches) -> Result<ResultConfig, Box<dyn std::error::Error>> {
@@ -65,11 +72,14 @@ fn config_from_matches(matches: &ArgMatches) -> Result<ResultConfig, Box<dyn std
     })
 }
 
-fn parse_junit_counts(xml_path: &Path) -> Result<JUnitCounts, Box<dyn std::error::Error>> {
+fn parse_result_xml(
+    xml_path: &Path,
+) -> Result<(JUnitCounts, Vec<FailureDetail>), Box<dyn std::error::Error>> {
     let xml = fs::read_to_string(xml_path)?;
     let doc = Document::parse(&xml)?;
     let root = doc.root_element();
     let mut counts = JUnitCounts::default();
+    let mut failures = Vec::new();
 
     match root.tag_name().name() {
         "Site" => {
@@ -82,7 +92,27 @@ fn parse_junit_counts(xml_path: &Path) -> Result<JUnitCounts, Box<dyn std::error
                     match test.attribute("Status").unwrap_or("failed") {
                         "passed" => {}
                         "notrun" => counts.skipped += 1,
-                        _ => counts.failures += 1,
+                        _ => {
+                            counts.failures += 1;
+                            let name = test
+                                .children()
+                                .find(|node| node.has_tag_name("Name"))
+                                .and_then(|node| node.text())
+                                .unwrap_or("unknown")
+                                .to_string();
+                            let message = test
+                                .descendants()
+                                .find(|node| node.has_tag_name("Measurement"))
+                                .and_then(|node| {
+                                    node.children()
+                                        .find(|child| child.has_tag_name("Value"))
+                                        .and_then(|value| value.text())
+                                })
+                                .unwrap_or("CTest failure")
+                                .trim()
+                                .to_string();
+                            failures.push(FailureDetail { name, message });
+                        }
                     }
                 }
             }
@@ -96,6 +126,7 @@ fn parse_junit_counts(xml_path: &Path) -> Result<JUnitCounts, Box<dyn std::error
                 counts.failures += attribute_as_u64(&suite, "failures");
                 counts.errors += attribute_as_u64(&suite, "errors");
                 counts.skipped += attribute_as_u64(&suite, "skipped");
+                failures.extend(extract_testsuite_failures(&suite));
             }
         }
         "testsuite" => {
@@ -103,19 +134,52 @@ fn parse_junit_counts(xml_path: &Path) -> Result<JUnitCounts, Box<dyn std::error
             counts.failures = attribute_as_u64(&root, "failures");
             counts.errors = attribute_as_u64(&root, "errors");
             counts.skipped = attribute_as_u64(&root, "skipped");
+            failures.extend(extract_testsuite_failures(&root));
         }
         tag => {
             return Err(format!("Unsupported JUnit root element '{tag}'").into());
         }
     }
 
-    Ok(counts)
+    Ok((counts, failures))
 }
 
 fn attribute_as_u64(node: &roxmltree::Node<'_, '_>, name: &str) -> u64 {
     node.attribute(name)
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or(0)
+}
+
+fn extract_testsuite_failures(node: &roxmltree::Node<'_, '_>) -> Vec<FailureDetail> {
+    let mut failures = Vec::new();
+    for testcase in node
+        .children()
+        .filter(|child| child.has_tag_name("testcase"))
+    {
+        let testcase_name = testcase.attribute("name").unwrap_or("unknown");
+        let testcase_class = testcase.attribute("classname").unwrap_or_default();
+        for failure in testcase
+            .children()
+            .filter(|child| child.has_tag_name("failure") || child.has_tag_name("error"))
+        {
+            let name = if testcase_class.is_empty() {
+                testcase_name.to_string()
+            } else {
+                format!("{testcase_class} {testcase_name}")
+            };
+            let message_attr = failure.attribute("message").unwrap_or_default().trim();
+            let body = failure.text().unwrap_or_default().trim();
+            let message = if !body.is_empty() {
+                body.to_string()
+            } else if !message_attr.is_empty() {
+                message_attr.to_string()
+            } else {
+                "Test failure".to_string()
+            };
+            failures.push(FailureDetail { name, message });
+        }
+    }
+    failures
 }
 
 fn collect_result_entries(
@@ -150,13 +214,14 @@ fn collect_result_entries(
                     status: ResultStatus::Failed,
                     counts: None,
                     detail: Some(format!("colcon_test.rc={rc_code}")),
+                    failures: Vec::new(),
                 });
             }
         }
 
         for xml_path in xml_paths {
-            match parse_junit_counts(&xml_path) {
-                Ok(counts) => {
+            match parse_result_xml(&xml_path) {
+                Ok((counts, failures)) => {
                     let status = if counts.errors > 0 {
                         ResultStatus::Error
                     } else if counts.failures > 0 {
@@ -170,6 +235,7 @@ fn collect_result_entries(
                         status,
                         counts: Some(counts),
                         detail: None,
+                        failures,
                     });
                 }
                 Err(error) => {
@@ -179,6 +245,7 @@ fn collect_result_entries(
                         status: ResultStatus::Error,
                         counts: None,
                         detail: Some(error.to_string()),
+                        failures: Vec::new(),
                     });
                 }
             }
@@ -224,12 +291,13 @@ fn delete_result_files(entries: &[ResultEntry]) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-fn render_entry(entry: &ResultEntry, verbose: bool) -> String {
+fn render_entry(entry: &ResultEntry, verbose: bool) -> Vec<String> {
     let status = match entry.status {
         ResultStatus::Passed => "passed".bright_green().bold(),
         ResultStatus::Failed => "failed".bright_red().bold(),
         ResultStatus::Error => "error".bright_red().bold(),
     };
+    let mut lines = Vec::new();
     if verbose {
         let counts = entry
             .counts
@@ -246,22 +314,37 @@ fn render_entry(entry: &ResultEntry, verbose: bool) -> String {
             .as_deref()
             .map(|detail| format!(" detail={detail}"))
             .unwrap_or_default();
-        format!(
+        lines.push(format!(
             "{} {} {}{}{}",
             entry.package_name.bright_white().bold(),
             status,
             entry.path.display(),
             counts,
             detail
-        )
+        ));
+        if entry.status != ResultStatus::Passed {
+            for failure in &entry.failures {
+                lines.push(format!("- {}", failure.name));
+                lines.push("  <<< failure message".to_string());
+                for line in failure
+                    .message
+                    .lines()
+                    .filter(|line| !line.trim().is_empty())
+                {
+                    lines.push(format!("    {line}"));
+                }
+                lines.push("  >>>".to_string());
+            }
+        }
     } else {
-        format!(
+        lines.push(format!(
             "{} {} {}",
             entry.package_name.bright_white().bold(),
             status,
             entry.path.display()
-        )
+        ));
     }
+    lines
 }
 
 fn print_summary(entries: &[ResultEntry], verbose: bool) {
@@ -346,7 +429,9 @@ fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
 
     print_summary(&entries, config.verbose);
     for entry in &entries {
-        println!("{}", render_entry(entry, config.verbose));
+        for line in render_entry(entry, config.verbose) {
+            println!("{line}");
+        }
     }
 
     Ok(())
@@ -359,7 +444,7 @@ pub fn handle(matches: ArgMatches) {
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_result_entries, config_from_matches, parse_junit_counts, JUnitCounts, ResultConfig,
+        collect_result_entries, config_from_matches, parse_result_xml, JUnitCounts, ResultConfig,
         ResultEntry, ResultStatus,
     };
     use std::fs;
@@ -377,7 +462,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            parse_junit_counts(&xml_path).unwrap(),
+            parse_result_xml(&xml_path).unwrap().0,
             JUnitCounts {
                 tests: 4,
                 failures: 1,
@@ -398,7 +483,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            parse_junit_counts(&xml_path).unwrap(),
+            parse_result_xml(&xml_path).unwrap().0,
             JUnitCounts {
                 tests: 5,
                 failures: 1,
@@ -419,7 +504,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            parse_junit_counts(&xml_path).unwrap(),
+            parse_result_xml(&xml_path).unwrap().0,
             JUnitCounts {
                 tests: 3,
                 failures: 1,
@@ -427,6 +512,23 @@ mod tests {
                 skipped: 1,
             }
         );
+    }
+
+    #[test]
+    fn parse_result_xml_extracts_failure_details() {
+        let temp = tempdir().unwrap();
+        let xml_path = temp.path().join("pytest.xml");
+        fs::write(
+            &xml_path,
+            r#"<testsuite tests="1" failures="1" errors="0" skipped="0"><testcase classname="demo_pkg.test" name="test_demo"><failure message="assert 1 == 0">line 1
+line 2</failure></testcase></testsuite>"#,
+        )
+        .unwrap();
+
+        let (_, failures) = parse_result_xml(&xml_path).unwrap();
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].name, "demo_pkg.test test_demo");
+        assert!(failures[0].message.contains("line 1"));
     }
 
     #[test]
@@ -544,6 +646,7 @@ mod tests {
             status: ResultStatus::Passed,
             counts: None,
             detail: None,
+            failures: Vec::new(),
         };
         let failed = ResultEntry {
             package_name: "demo".to_string(),
@@ -551,6 +654,7 @@ mod tests {
             status: ResultStatus::Failed,
             counts: None,
             detail: None,
+            failures: Vec::new(),
         };
 
         assert!(!passed.matches_default_filter());
