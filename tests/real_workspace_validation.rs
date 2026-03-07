@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use regex::Regex;
 use tempfile::tempdir;
 use walkdir::WalkDir;
 
@@ -75,6 +76,58 @@ fn assert_stdout_equals(output: std::process::Output, expected: &str, context: &
     assert_success(output.clone(), context);
     let actual = String::from_utf8_lossy(&output.stdout).trim().to_string();
     assert_eq!(actual, expected, "{context} produced unexpected stdout");
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct TestSummary {
+    tests: u64,
+    errors: u64,
+    failures: u64,
+    skipped: u64,
+}
+
+fn parse_colcon_test_result_summary(stdout: &str) -> TestSummary {
+    let summary = Regex::new(
+        r"Summary:\s+(?P<tests>\d+)\s+tests?,\s+(?P<errors>\d+)\s+errors?,\s+(?P<failures>\d+)\s+failures?,\s+(?P<skipped>\d+)\s+skipped",
+    )
+    .unwrap();
+    let captures = summary
+        .captures(stdout)
+        .expect("missing colcon test-result summary");
+    TestSummary {
+        tests: captures["tests"].parse().unwrap(),
+        errors: captures["errors"].parse().unwrap(),
+        failures: captures["failures"].parse().unwrap(),
+        skipped: captures["skipped"].parse().unwrap(),
+    }
+}
+
+fn parse_roc_test_result_summary(stdout: &str) -> TestSummary {
+    let package_line = Regex::new(
+        r"^\s+\S+\s+tests=(?P<tests>\d+)\s+failures=(?P<failures>\d+)\s+errors=(?P<errors>\d+)\s+skipped=(?P<skipped>\d+)$",
+    )
+    .unwrap();
+    let mut summary = TestSummary {
+        tests: 0,
+        errors: 0,
+        failures: 0,
+        skipped: 0,
+    };
+    for line in stdout.lines() {
+        if let Some(captures) = package_line.captures(line) {
+            summary.tests += captures["tests"].parse::<u64>().unwrap();
+            summary.errors += captures["errors"].parse::<u64>().unwrap();
+            summary.failures += captures["failures"].parse::<u64>().unwrap();
+            summary.skipped += captures["skipped"].parse::<u64>().unwrap();
+        }
+    }
+    assert!(summary.tests > 0, "missing roc package totals");
+    summary
+}
+
+fn real_workspace(path: &str) -> Option<PathBuf> {
+    let path = PathBuf::from(path);
+    path.exists().then_some(path)
 }
 
 #[test]
@@ -386,7 +439,11 @@ fn validate_failed_build_resume_against_colcon() {
         broken_cmake,
     )
     .unwrap();
-    fs::write(roc_ws.join("src/consumer_node_pkg/CMakeLists.txt"), broken_cmake).unwrap();
+    fs::write(
+        roc_ws.join("src/consumer_node_pkg/CMakeLists.txt"),
+        broken_cmake,
+    )
+    .unwrap();
 
     assert_failure(
         run_shell(
@@ -412,7 +469,11 @@ fn validate_failed_build_resume_against_colcon() {
         &valid_cmake,
     )
     .unwrap();
-    fs::write(roc_ws.join("src/consumer_node_pkg/CMakeLists.txt"), &valid_cmake).unwrap();
+    fs::write(
+        roc_ws.join("src/consumer_node_pkg/CMakeLists.txt"),
+        &valid_cmake,
+    )
+    .unwrap();
 
     assert_success(
         run_shell(
@@ -454,4 +515,174 @@ fn validate_failed_build_resume_against_colcon() {
             .as_ref(),
         "roc resumed ros2 pkg prefix for dependency chain fixture",
     );
+}
+
+#[test]
+#[ignore = "requires colcon, a sourced ROS 2 environment, and a local ros2/examples checkout"]
+fn validate_real_workspace_test_execution_against_colcon() {
+    if !command_exists("colcon") || !Path::new("/opt/ros/jazzy/setup.bash").exists() {
+        return;
+    }
+    let Some(source_ws) = real_workspace("/tmp/roc_ros2_examples") else {
+        return;
+    };
+
+    let temp = tempdir().unwrap();
+    let colcon_ws = temp.path().join("colcon_ws");
+    let roc_ws = temp.path().join("roc_ws");
+    copy_workspace(&source_ws, &colcon_ws);
+    copy_workspace(&source_ws, &roc_ws);
+
+    let selected = "examples_rclcpp_minimal_publisher examples_rclpy_executors";
+
+    assert_success(
+        run_shell(
+            &colcon_ws,
+            &format!(
+                "source /opt/ros/jazzy/setup.bash && colcon build --packages-select {selected}"
+            ),
+        ),
+        "colcon build for real examples workspace",
+    );
+    assert_success(
+        run_shell(
+            &roc_ws,
+            &format!(
+                "source /opt/ros/jazzy/setup.bash && {} work build --packages-select {selected}",
+                env!("CARGO_BIN_EXE_roc")
+            ),
+        ),
+        "roc build for real examples workspace",
+    );
+
+    assert_failure(
+        run_shell(
+            &colcon_ws,
+            &format!(
+                "source /opt/ros/jazzy/setup.bash && source install/setup.bash && colcon test --packages-select {selected}"
+            ),
+        ),
+        "colcon test for real examples workspace",
+    );
+    assert_failure(
+        run_shell(
+            &roc_ws,
+            &format!(
+                "source /opt/ros/jazzy/setup.bash && source install/setup.bash && {} work test --packages-select {selected}",
+                env!("CARGO_BIN_EXE_roc")
+            ),
+        ),
+        "roc test for real examples workspace",
+    );
+
+    assert!(colcon_ws
+        .join("build/examples_rclcpp_minimal_publisher/colcon_test.rc")
+        .exists());
+    assert!(roc_ws
+        .join("build/examples_rclcpp_minimal_publisher/colcon_test.rc")
+        .exists());
+    assert!(roc_ws.join("log/latest_test/test_summary.log").exists());
+    assert!(roc_ws
+        .join("log/latest_test/examples_rclpy_executors/status.txt")
+        .exists());
+}
+
+#[test]
+#[ignore = "requires colcon, a sourced ROS 2 environment, and a local ros2/demos checkout"]
+fn validate_real_workspace_test_result_against_colcon() {
+    if !command_exists("colcon") || !Path::new("/opt/ros/jazzy/setup.bash").exists() {
+        return;
+    }
+    let Some(source_ws) = real_workspace("/tmp/roc_ros2_demos") else {
+        return;
+    };
+
+    let temp = tempdir().unwrap();
+    let colcon_ws = temp.path().join("colcon_ws");
+    let roc_ws = temp.path().join("roc_ws");
+    copy_workspace(&source_ws, &colcon_ws);
+    copy_workspace(&source_ws, &roc_ws);
+
+    let selected = "action_tutorials_cpp demo_nodes_py";
+
+    assert_success(
+        run_shell(
+            &colcon_ws,
+            &format!(
+                "source /opt/ros/jazzy/setup.bash && colcon build --packages-select {selected}"
+            ),
+        ),
+        "colcon build for real demos workspace",
+    );
+    assert_success(
+        run_shell(
+            &roc_ws,
+            &format!(
+                "source /opt/ros/jazzy/setup.bash && {} work build --packages-select {selected}",
+                env!("CARGO_BIN_EXE_roc")
+            ),
+        ),
+        "roc build for real demos workspace",
+    );
+
+    assert_failure(
+        run_shell(
+            &colcon_ws,
+            &format!(
+                "source /opt/ros/jazzy/setup.bash && source install/setup.bash && colcon test --packages-select {selected}"
+            ),
+        ),
+        "colcon test for real demos workspace",
+    );
+    assert_failure(
+        run_shell(
+            &roc_ws,
+            &format!(
+                "source /opt/ros/jazzy/setup.bash && source install/setup.bash && {} work test --packages-select {selected}",
+                env!("CARGO_BIN_EXE_roc")
+            ),
+        ),
+        "roc test for real demos workspace",
+    );
+
+    let colcon_results = run_shell(
+        &colcon_ws,
+        "source /opt/ros/jazzy/setup.bash && colcon test-result --all --verbose",
+    );
+    let roc_results = run_shell(
+        &roc_ws,
+        &format!(
+            "source /opt/ros/jazzy/setup.bash && {} work test-result --all --verbose",
+            env!("CARGO_BIN_EXE_roc")
+        ),
+    );
+
+    assert_success(
+        colcon_results.clone(),
+        "colcon test-result for real demos workspace",
+    );
+    assert_success(
+        roc_results.clone(),
+        "roc test-result for real demos workspace",
+    );
+
+    let colcon_stdout = String::from_utf8_lossy(&colcon_results.stdout);
+    let roc_stdout = String::from_utf8_lossy(&roc_results.stdout);
+
+    assert_eq!(
+        parse_colcon_test_result_summary(&colcon_stdout),
+        parse_roc_test_result_summary(&roc_stdout),
+        "test-result summaries diverged"
+    );
+
+    for needle in ["xmllint", "test_flake8", "test_xmllint"] {
+        assert!(
+            colcon_stdout.contains(needle),
+            "colcon output missing expected marker {needle}"
+        );
+        assert!(
+            roc_stdout.contains(needle),
+            "roc output missing expected marker {needle}"
+        );
+    }
 }
