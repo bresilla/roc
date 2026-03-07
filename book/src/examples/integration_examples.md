@@ -497,6 +497,8 @@ roc completion fish > ~/.config/fish/completions/roc.fish
 
 The generated scripts include live completion for many runtime values such as topics, services,
 nodes, action names, workspace packages, launch files, and interface paths.
+They also use a short-lived cache by default; set `ROC_DISABLE_COMPLETION_CACHE=1` to disable it
+or `ROC_COMPLETION_CACHE_DIR=/path/to/cache` to move it.
 
 ## Systemd Service Integration
 

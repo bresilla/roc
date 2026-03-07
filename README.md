@@ -78,6 +78,12 @@ roc completion fish > ~/.config/fish/completions/roc.fish
 
 The `--install` path prefers user-local locations first and falls back to common system paths for each shell.
 
+Dynamic completions use a short-lived filesystem cache to avoid rebuilding the ROS graph and
+rescanning workspaces on every shell invocation.
+
+- `ROC_DISABLE_COMPLETION_CACHE=1` disables the cache entirely
+- `ROC_COMPLETION_CACHE_DIR=/path/to/cache` overrides the default cache directory
+
 ## Workspace commands
 
 `roc work` includes package and workspace utilities:

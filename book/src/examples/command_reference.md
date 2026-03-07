@@ -54,6 +54,9 @@ roc completion fish --install
 - `--install` prefers user-local locations first and falls back to common system paths.
 - `--print-path` shows where `--install` will try to write first.
 - Generated completions include dynamic values for topics, services, nodes, workspaces, and other graph-aware commands.
+- Dynamic completions use a short-lived filesystem cache by default.
+- Set `ROC_DISABLE_COMPLETION_CACHE=1` to disable that cache.
+- Set `ROC_COMPLETION_CACHE_DIR=/path/to/cache` to override the cache location.
 
 ## Topic Commands
 
