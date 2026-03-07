@@ -190,6 +190,10 @@ complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) 
 complete -c roc -n "__fish_seen_subcommand_from bag; and test (__roc_sub_cmd) = list" -l recursive
 complete -c roc -n "__fish_seen_subcommand_from bag; and test (__roc_sub_cmd) = list" -l output
 complete -c roc -n "__fish_seen_subcommand_from bag; and test (__roc_sub_cmd) = info" -l output
+complete -c roc -n "__fish_seen_subcommand_from daemon; and contains (__roc_sub_cmd) start stop status" -l output
+complete -c roc -n "__fish_seen_subcommand_from middleware; and test (__roc_sub_cmd) = list" -l output
+complete -c roc -n "__fish_seen_subcommand_from middleware; and test (__roc_sub_cmd) = get" -l output
+complete -c roc -n "__fish_seen_subcommand_from middleware; and test (__roc_sub_cmd) = set" -l output
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = list" -s m -l messages
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = list" -s s -l services
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = list" -s a -l actions

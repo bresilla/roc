@@ -38,6 +38,10 @@ _roc_completion() {
     local interface_package_flags="--output"
     local interface_show_flags="--all-comments --no-comments --output"
     local interface_model_flags="--no-quotes --output"
+    local daemon_flags="--output"
+    local middleware_list_flags="--output"
+    local middleware_get_flags="--output"
+    local middleware_set_flags="--output"
 
     if [[ "$cur" == -* ]]; then
         case "$top" in
@@ -92,6 +96,18 @@ _roc_completion() {
                 case "${words[2]}" in
                     list) COMPREPLY=($(compgen -W "$bag_list_flags" -- "$cur")); return ;;
                     info) COMPREPLY=($(compgen -W "$bag_info_flags" -- "$cur")); return ;;
+                esac
+                ;;
+            daemon)
+                case "${words[2]}" in
+                    start|stop|status) COMPREPLY=($(compgen -W "$daemon_flags" -- "$cur")); return ;;
+                esac
+                ;;
+            middleware)
+                case "${words[2]}" in
+                    list) COMPREPLY=($(compgen -W "$middleware_list_flags" -- "$cur")); return ;;
+                    get) COMPREPLY=($(compgen -W "$middleware_get_flags" -- "$cur")); return ;;
+                    set) COMPREPLY=($(compgen -W "$middleware_set_flags" -- "$cur")); return ;;
                 esac
                 ;;
             interface)

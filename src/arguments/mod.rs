@@ -231,12 +231,12 @@ Communication Commands:"
   " + &command_str("daemon")
         + "      "
         + &letter_str("d")
-        + &descriptin_str("Deamon and bridge [WIP]")
+        + &descriptin_str("Daemon compatibility commands")
         + "
   " + &command_str("middleware")
         + "  "
         + &letter_str("m")
-        + &descriptin_str("Middleware settings [WIP]")
+        + &descriptin_str("Middleware inspection and selection")
         + "
 
 Shell Integration:"

@@ -15,6 +15,15 @@ fn run_roc(workdir: &Path, args: &[&str]) -> Output {
         .expect("failed to run roc")
 }
 
+fn run_roc_with_env(workdir: &Path, args: &[&str], envs: &[(&str, &str)]) -> Output {
+    let mut command = Command::new(roc_bin());
+    command.args(args).current_dir(workdir);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    command.output().expect("failed to run roc")
+}
+
 fn assert_failure(output: &Output, context: &str) {
     assert!(
         !output.status.success(),
@@ -158,4 +167,73 @@ fn action_goal_failure_prints_request_block() {
     assert!(stdout.contains("{order: 10}"));
     assert!(stdout.contains("Feedback"));
     assert!(stdout.contains("Command"));
+}
+
+#[test]
+fn daemon_status_json_reports_direct_dds_mode() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(temp.path(), &["daemon", "status", "--output", "json"]);
+
+    assert!(
+        output.status.success(),
+        "roc daemon status failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\"mode\": \"direct-dds\""));
+    assert!(stdout.contains("\"uses_daemon\": false"));
+}
+
+#[test]
+fn middleware_list_discovers_fake_rmw_libraries() {
+    let temp = tempdir().unwrap();
+    let prefix = temp.path().join("prefix");
+    let lib_dir = prefix.join("lib");
+    std::fs::create_dir_all(&lib_dir).unwrap();
+    std::fs::write(lib_dir.join("librmw_fastrtps_cpp.so"), "").unwrap();
+    std::fs::write(lib_dir.join("librmw_dds_common.so"), "").unwrap();
+
+    let output = run_roc_with_env(
+        temp.path(),
+        &["middleware", "list", "--output", "json"],
+        &[("AMENT_PREFIX_PATH", prefix.to_str().unwrap())],
+    );
+
+    assert!(
+        output.status.success(),
+        "roc middleware list failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("rmw_fastrtps_cpp"));
+    assert!(!stdout.contains("rmw_dds_common"));
+}
+
+#[test]
+fn middleware_set_plain_prints_shell_export_command() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &[
+            "middleware",
+            "set",
+            "rmw_fastrtps_cpp",
+            "--output",
+            "plain",
+        ],
+    );
+
+    assert!(
+        output.status.success(),
+        "roc middleware set failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout.trim(), "export RMW_IMPLEMENTATION=rmw_fastrtps_cpp");
 }

@@ -1,4 +1,5 @@
 use clap::ArgMatches;
+use crate::commands::cli::print_error_and_exit;
 
 pub fn handle(matches: ArgMatches) {
     match matches.subcommand() {
@@ -11,10 +12,7 @@ pub fn handle(matches: ArgMatches) {
         Some(("status", args)) => {
             status::handle(args.clone());
         }
-        _ => {
-            println!("Daemon functionality is currently work in progress.");
-            println!("Available subcommands: start, stop, status");
-        }
+        _ => print_error_and_exit("No daemon subcommand selected"),
     }
 }
 
