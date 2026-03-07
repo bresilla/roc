@@ -49,6 +49,10 @@ ROC_VALIDATION_ROS2_EXAMPLES=... ROC_VALIDATION_ROS2_DEMOS=... \
   cargo test --test real_workspace_validation -- --ignored --nocapture
 ```
 
+The repository also includes a matching GitHub Actions workflow in
+[.github/workflows/parity.yaml](/doc/code/tools/roc/.github/workflows/parity.yaml),
+which clones the same upstream validation workspaces and runs the same gate on Ubuntu 24.04 with ROS 2 Jazzy.
+
 ## Checklist
 
 1. `make release-gate` passes on the target Linux/Jazzy environment.

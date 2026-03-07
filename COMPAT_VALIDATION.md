@@ -99,6 +99,7 @@ The explicit signoff process now lives in:
 
 - [RELEASE_GATE.md](/doc/code/tools/roc/RELEASE_GATE.md)
 - `make release-gate`
+- [.github/workflows/parity.yaml](/doc/code/tools/roc/.github/workflows/parity.yaml)
 
 That gate requires:
 
