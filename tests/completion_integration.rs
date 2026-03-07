@@ -29,6 +29,21 @@ fn generate_completion_script(shell: &str, dir: &Path) -> std::path::PathBuf {
     path
 }
 
+fn shell_install_path(shell: &str, home: &Path) -> std::path::PathBuf {
+    let output = Command::new(roc_bin())
+        .env("HOME", home)
+        .args(["completion", shell, "--print-path"])
+        .output()
+        .expect("failed to run roc completion --print-path");
+    assert!(
+        output.status.success(),
+        "roc completion {shell} --print-path failed"
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    std::path::PathBuf::from(stdout.trim())
+}
+
 #[test]
 fn bash_completion_script_handles_work_build_flags_end_to_end() {
     if !shell_exists("bash") {
@@ -189,6 +204,46 @@ printf '%s\n' "${COMPREPLY[@]}"
 }
 
 #[test]
+fn bash_completion_script_handles_completion_flags_end_to_end() {
+    if !shell_exists("bash") {
+        return;
+    }
+
+    let temp = tempdir().unwrap();
+    let script = generate_completion_script("bash", temp.path());
+    let output = Command::new("bash")
+        .env("ROC_BIN", roc_bin())
+        .env("ROC_COMPLETION_SCRIPT", &script)
+        .arg("--noprofile")
+        .arg("--norc")
+        .arg("-c")
+        .arg(
+            r#"
+roc() { "$ROC_BIN" "$@"; }
+_init_completion() {
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    words=("${COMP_WORDS[@]}")
+    cword=$COMP_CWORD
+}
+source "$ROC_COMPLETION_SCRIPT"
+COMP_WORDS=(roc completion bash --)
+COMP_CWORD=3
+_roc_completion
+printf '%s\n' "${COMPREPLY[@]}"
+"#,
+        )
+        .output()
+        .expect("failed to execute bash completion test");
+
+    assert!(output.status.success(), "bash completion probe failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--install"));
+    assert!(stdout.contains("--print-path"));
+}
+
+#[test]
 fn bash_completion_script_handles_idl_protobuf_flags_end_to_end() {
     if !shell_exists("bash") {
         return;
@@ -276,6 +331,41 @@ printf '%s\n' "${COMPREPLY[@]}"
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("msg/Example.msg"));
     assert!(stdout.contains("proto/example.proto"));
+}
+
+#[test]
+fn completion_print_path_prefers_user_locations() {
+    let temp = tempdir().unwrap();
+
+    let bash_path = shell_install_path("bash", temp.path());
+    let zsh_path = shell_install_path("zsh", temp.path());
+    let fish_path = shell_install_path("fish", temp.path());
+
+    assert!(bash_path.starts_with(temp.path()));
+    assert!(bash_path.ends_with(".local/share/bash-completion/completions/roc"));
+    assert!(zsh_path.starts_with(temp.path()));
+    assert!(zsh_path.ends_with(".zfunc/_roc"));
+    assert!(fish_path.starts_with(temp.path()));
+    assert!(fish_path.ends_with(".config/fish/completions/roc.fish"));
+}
+
+#[test]
+fn completion_install_writes_script_into_printed_path() {
+    let temp = tempdir().unwrap();
+    let path = shell_install_path("bash", temp.path());
+
+    let output = Command::new(roc_bin())
+        .env("HOME", temp.path())
+        .args(["completion", "bash", "--install"])
+        .output()
+        .expect("failed to run roc completion bash --install");
+    assert!(
+        output.status.success(),
+        "roc completion bash --install failed"
+    );
+
+    let installed = fs::read_to_string(&path).expect("completion script should be installed");
+    assert!(installed.contains("_roc_completion"));
 }
 
 #[test]
@@ -425,6 +515,36 @@ complete --do-complete "roc work test-result --"
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--result-files-only"));
     assert!(stdout.contains("--delete-yes"));
+}
+
+#[test]
+fn fish_completion_script_handles_completion_flags_end_to_end() {
+    if !shell_exists("fish") {
+        return;
+    }
+
+    let temp = tempdir().unwrap();
+    let script = generate_completion_script("fish", temp.path());
+    let output = Command::new("fish")
+        .env("ROC_BIN", roc_bin())
+        .arg("-c")
+        .arg(format!(
+            r#"
+function roc
+    $ROC_BIN $argv
+end
+source {}
+complete --do-complete "roc completion bash --"
+"#,
+            script.display()
+        ))
+        .output()
+        .expect("failed to execute fish completion test");
+
+    assert!(output.status.success(), "fish completion probe failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--install"));
+    assert!(stdout.contains("--print-path"));
 }
 
 #[test]

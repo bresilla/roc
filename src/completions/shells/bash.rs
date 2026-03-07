@@ -1,5 +1,7 @@
+use crate::completions::shells::{default_install_path, install_script};
+use crate::ui::blocks;
+use std::env;
 use std::path::PathBuf;
-use std::{env, fs};
 
 /// Bash completion script with dynamic completions delegated to `roc _complete`.
 const SCRIPT: &str = r#"
@@ -255,7 +257,7 @@ _roc_completion() {
         completion)
             case "$cword" in
                 2) COMPREPLY=($(compgen -W "bash zsh fish" -- "$cur")) ;;
-                *) COMPREPLY=($(compgen -W "--install" -- "$cur")) ;;
+                *) COMPREPLY=($(compgen -W "--install --print-path" -- "$cur")) ;;
             esac
             ;;
     esac
@@ -268,47 +270,42 @@ pub fn print_completions() {
     println!("{}", SCRIPT);
 }
 
-pub fn install_completion() {
-    let install_path = find_install_path(vec![
-        Some(PathBuf::from("/usr/share/bash-completion/completions/roc")),
-        env::home_dir().map(|h| h.join(".bash_completion.d/roc")),
-        env::home_dir().map(|h| h.join(".local/share/bash-completion/completions/roc")),
-    ]);
-    match install_path {
-        Some(path) => {
-            println!("Installing bash completions to: {}", path.display());
-            match fs::write(&path, SCRIPT) {
-                Ok(_) => {
-                    println!("✅ Completions installed successfully!");
-                    println!("To enable completions, add this to your ~/.bashrc:");
-                    println!("  source {}", path.display());
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to install completions: {}", e);
-                    eprintln!("Try running with sudo or use manual installation:");
-                    eprintln!("  roc completion bash > completion_file");
-                }
-            }
-        }
+pub fn print_install_path() {
+    match default_install_path(candidate_locations()) {
+        Some(path) => println!("{}", path.display()),
         None => {
-            eprintln!("❌ Could not determine installation location for bash completions");
-            eprintln!("Use manual installation:");
-            eprintln!("  roc completion bash > completion_file");
+            blocks::eprint_warning("Could not determine installation path for bash completions")
         }
     }
 }
 
-fn find_install_path(locations: Vec<Option<PathBuf>>) -> Option<PathBuf> {
-    for loc in locations {
-        if let Some(path) = loc {
-            if let Some(parent) = path.parent() {
-                if parent.exists() || fs::create_dir_all(parent).is_ok() {
-                    return Some(path);
-                }
-            }
+pub fn install_completion() {
+    match install_script(SCRIPT, candidate_locations()) {
+        Ok(path) => {
+            blocks::print_section("COMPLETION");
+            blocks::print_field("Shell", "bash");
+            blocks::print_field("Path", path.display());
+            blocks::print_success("Installed completion script");
+            blocks::print_note(
+                "Add this to ~/.bashrc if your shell does not load it automatically.",
+            );
+            blocks::print_field("Source", format!("source {}", path.display()));
+        }
+        Err(error) => {
+            blocks::eprint_section("COMPLETION");
+            blocks::eprint_field("Shell", "bash");
+            blocks::eprint_warning(&format!("Failed to install completion script: {error}"));
+            blocks::eprint_note("Manual install: roc completion bash > completion_file");
         }
     }
-    None
+}
+
+fn candidate_locations() -> Vec<Option<PathBuf>> {
+    vec![
+        env::home_dir().map(|h| h.join(".local/share/bash-completion/completions/roc")),
+        env::home_dir().map(|h| h.join(".bash_completion.d/roc")),
+        Some(PathBuf::from("/usr/share/bash-completion/completions/roc")),
+    ]
 }
 
 #[cfg(test)]
@@ -358,5 +355,10 @@ mod tests {
         assert!(SCRIPT.contains("local idl_protobuf_flags="));
         assert!(SCRIPT.contains("--search-root"));
         assert!(SCRIPT.contains("roc _complete idl"));
+    }
+
+    #[test]
+    fn bash_script_completes_completion_install_flags() {
+        assert!(SCRIPT.contains("--install --print-path"));
     }
 }

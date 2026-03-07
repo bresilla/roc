@@ -64,3 +64,13 @@ fn middleware_help_lists_implemented_subcommands() {
     assert!(stdout.contains("get"));
     assert!(stdout.contains("set"));
 }
+
+#[test]
+fn completion_help_lists_print_path_flag() {
+    let output = run_roc(&["completion", "--help"]);
+    assert_success(&output, "roc completion --help");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--install"));
+    assert!(stdout.contains("--print-path"));
+}

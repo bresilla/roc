@@ -1,5 +1,7 @@
+use crate::completions::shells::{default_install_path, install_script};
+use crate::ui::blocks;
+use std::env;
 use std::path::PathBuf;
-use std::{env, fs};
 
 /// Zsh completion script with corrected word indexing and dynamic dispatch.
 const SCRIPT: &str = r#"
@@ -278,7 +280,9 @@ _roc() {
                 completion)
                     case $CURRENT in
                         3) _describe 'shells' "bash zsh fish" ;;
-                        *) _arguments '--install[Install completions to a default location]' ;;
+                        *) _arguments \
+                            '--install[Install completions to a default location]' \
+                            '--print-path[Print the default installation path]' ;;
                     esac
                     ;;
             esac
@@ -293,55 +297,45 @@ pub fn print_completions() {
     println!("{}", SCRIPT);
 }
 
+pub fn print_install_path() {
+    match default_install_path(candidate_locations()) {
+        Some(path) => println!("{}", path.display()),
+        None => blocks::eprint_warning("Could not determine installation path for zsh completions"),
+    }
+}
+
 pub fn install_completion() {
-    let install_path = find_install_path(vec![
-        env::home_dir().map(|h| h.join(".zfunc/_roc")),
-        Some(PathBuf::from("/usr/local/share/zsh/site-functions/_roc")),
-        env::home_dir().map(|h| h.join(".local/share/zsh/site-functions/_roc")),
-    ]);
-    match install_path {
-        Some(path) => {
-            println!("Installing zsh completions to: {}", path.display());
-            match fs::write(&path, SCRIPT) {
-                Ok(_) => {
-                    println!("✅ Completions installed successfully!");
-                    println!("To enable completions, add this to your ~/.zshrc:");
-                    if path
-                        .parent()
-                        .and_then(|p| p.to_str())
-                        .unwrap_or("")
-                        .contains(".zfunc")
-                    {
-                        println!("  fpath=(~/.zfunc $fpath)");
-                    }
-                    println!("  autoload -U compinit && compinit");
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to install completions: {}", e);
-                    eprintln!("Try running with sudo or use manual installation:");
-                    eprintln!("  roc completion zsh > completion_file");
-                }
+    match install_script(SCRIPT, candidate_locations()) {
+        Ok(path) => {
+            blocks::print_section("COMPLETION");
+            blocks::print_field("Shell", "zsh");
+            blocks::print_field("Path", path.display());
+            blocks::print_success("Installed completion script");
+            if path
+                .parent()
+                .and_then(|parent| parent.to_str())
+                .unwrap_or("")
+                .contains(".zfunc")
+            {
+                blocks::print_field("fpath", "fpath=(~/.zfunc $fpath)");
             }
+            blocks::print_field("Setup", "autoload -U compinit && compinit");
         }
-        None => {
-            eprintln!("❌ Could not determine installation location for zsh completions");
-            eprintln!("Use manual installation:");
-            eprintln!("  roc completion zsh > completion_file");
+        Err(error) => {
+            blocks::eprint_section("COMPLETION");
+            blocks::eprint_field("Shell", "zsh");
+            blocks::eprint_warning(&format!("Failed to install completion script: {error}"));
+            blocks::eprint_note("Manual install: roc completion zsh > completion_file");
         }
     }
 }
 
-fn find_install_path(locations: Vec<Option<PathBuf>>) -> Option<PathBuf> {
-    for loc in locations {
-        if let Some(path) = loc {
-            if let Some(parent) = path.parent() {
-                if parent.exists() || fs::create_dir_all(parent).is_ok() {
-                    return Some(path);
-                }
-            }
-        }
-    }
-    None
+fn candidate_locations() -> Vec<Option<PathBuf>> {
+    vec![
+        env::home_dir().map(|h| h.join(".zfunc/_roc")),
+        env::home_dir().map(|h| h.join(".local/share/zsh/site-functions/_roc")),
+        Some(PathBuf::from("/usr/local/share/zsh/site-functions/_roc")),
+    ]
 }
 
 #[cfg(test)]
@@ -384,5 +378,10 @@ mod tests {
         assert!(SCRIPT.contains("idl_protobuf_flags=("));
         assert!(SCRIPT.contains("--search-root"));
         assert!(SCRIPT.contains("roc _complete idl"));
+    }
+
+    #[test]
+    fn zsh_script_completes_completion_install_flags() {
+        assert!(SCRIPT.contains("--print-path[Print the default installation path]"));
     }
 }

@@ -1,5 +1,7 @@
+use crate::completions::shells::{default_install_path, install_script};
+use crate::ui::blocks;
+use std::env;
 use std::path::PathBuf;
-use std::{env, fs};
 
 /// Fish completion script with dynamic completions delegated to `roc _complete`.
 const SCRIPT: &str = r#"
@@ -85,6 +87,7 @@ complete -c roc -f -n "__fish_seen_subcommand_from idl; and not __roc_sub_cmd" -
 complete -c roc -f -n "__fish_seen_subcommand_from idl; and __roc_sub_cmd" -a "(roc _complete idl (__roc_sub_cmd) '' (__roc_idl_position) (__roc_idl_args) 2>/dev/null)"
 complete -c roc -f -n "__fish_seen_subcommand_from completion; and not __roc_sub_cmd" -a "bash zsh fish"
 complete -c roc -f -n "__fish_seen_subcommand_from completion" -l install
+complete -c roc -f -n "__fish_seen_subcommand_from completion" -l print-path
 
 complete -c roc -n "__fish_seen_subcommand_from launch" -s n -l noninteractive
 complete -c roc -n "__fish_seen_subcommand_from launch" -s d -l debug
@@ -245,45 +248,38 @@ pub fn print_completions() {
     println!("{}", SCRIPT);
 }
 
-pub fn install_completion() {
-    let install_path = find_install_path(vec![
-        env::home_dir().map(|h| h.join(".config/fish/completions/roc.fish")),
-        Some(PathBuf::from("/usr/share/fish/completions/roc.fish")),
-    ]);
-    match install_path {
-        Some(path) => {
-            println!("Installing fish completions to: {}", path.display());
-            match fs::write(&path, SCRIPT) {
-                Ok(_) => {
-                    println!("✅ Completions installed successfully!");
-                    println!("Completions should be automatically available in new fish sessions.");
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to install completions: {}", e);
-                    eprintln!("Try running with sudo or use manual installation:");
-                    eprintln!("  roc completion fish > completion_file");
-                }
-            }
-        }
+pub fn print_install_path() {
+    match default_install_path(candidate_locations()) {
+        Some(path) => println!("{}", path.display()),
         None => {
-            eprintln!("❌ Could not determine installation location for fish completions");
-            eprintln!("Use manual installation:");
-            eprintln!("  roc completion fish > completion_file");
+            blocks::eprint_warning("Could not determine installation path for fish completions")
         }
     }
 }
 
-fn find_install_path(locations: Vec<Option<PathBuf>>) -> Option<PathBuf> {
-    for loc in locations {
-        if let Some(path) = loc {
-            if let Some(parent) = path.parent() {
-                if parent.exists() || fs::create_dir_all(parent).is_ok() {
-                    return Some(path);
-                }
-            }
+pub fn install_completion() {
+    match install_script(SCRIPT, candidate_locations()) {
+        Ok(path) => {
+            blocks::print_section("COMPLETION");
+            blocks::print_field("Shell", "fish");
+            blocks::print_field("Path", path.display());
+            blocks::print_success("Installed completion script");
+            blocks::print_note("Completions should be available in new fish sessions.");
+        }
+        Err(error) => {
+            blocks::eprint_section("COMPLETION");
+            blocks::eprint_field("Shell", "fish");
+            blocks::eprint_warning(&format!("Failed to install completion script: {error}"));
+            blocks::eprint_note("Manual install: roc completion fish > completion_file");
         }
     }
-    None
+}
+
+fn candidate_locations() -> Vec<Option<PathBuf>> {
+    vec![
+        env::home_dir().map(|h| h.join(".config/fish/completions/roc.fish")),
+        Some(PathBuf::from("/usr/share/fish/completions/roc.fish")),
+    ]
 }
 
 #[cfg(test)]
@@ -325,5 +321,10 @@ mod tests {
         assert!(SCRIPT.contains("roc _complete idl"));
         assert!(SCRIPT.contains("-l search-root"));
         assert!(SCRIPT.contains("__roc_idl_position"));
+    }
+
+    #[test]
+    fn fish_script_completes_completion_install_flags() {
+        assert!(SCRIPT.contains("-l print-path"));
     }
 }
