@@ -1,13 +1,35 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, output};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use serde_json::{json, Value};
 
 use crate::arguments::param::CommonParamArgs;
-use crate::shared::param_operations::{ParamClientContext, parse_value_tokens_to_parameter_value};
+use crate::shared::param_operations::{
+    format_parameter_value_for_display, parameter_type_to_string,
+    parse_value_tokens_to_parameter_value, ParamClientContext,
+};
 
-use rclrs::vendor::rcl_interfaces::msg::Parameter;
+use rclrs::vendor::rcl_interfaces::msg::{Parameter, ParameterType, ParameterValue};
+
+fn parameter_value_to_json(value: &ParameterValue) -> Value {
+    match value.type_ {
+        ParameterType::PARAMETER_NOT_SET => Value::Null,
+        ParameterType::PARAMETER_BOOL => json!(value.bool_value),
+        ParameterType::PARAMETER_INTEGER => json!(value.integer_value),
+        ParameterType::PARAMETER_DOUBLE => json!(value.double_value),
+        ParameterType::PARAMETER_STRING => json!(value.string_value),
+        ParameterType::PARAMETER_BYTE_ARRAY => json!(value.byte_array_value),
+        ParameterType::PARAMETER_BOOL_ARRAY => json!(value.bool_array_value),
+        ParameterType::PARAMETER_INTEGER_ARRAY => json!(value.integer_array_value),
+        ParameterType::PARAMETER_DOUBLE_ARRAY => json!(value.double_array_value),
+        ParameterType::PARAMETER_STRING_ARRAY => json!(value.string_array_value),
+        _ => Value::Null,
+    }
+}
 
 fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let node_name = matches
         .get_one::<String>("node_name")
         .ok_or_else(|| anyhow!("node_name is required"))?;
@@ -42,7 +64,7 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
     let value = parse_value_tokens_to_parameter_value(&value_tokens)?;
     let param = Parameter {
         name: param_name.to_string(),
-        value,
+        value: value.clone(),
     };
 
     let response = ctx.set_parameters(&node_fqn, vec![param])?;
@@ -60,7 +82,29 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         ));
     }
 
-    println!("Set parameter {} successful", param_name);
+    let type_name = parameter_type_to_string(value.type_);
+    let display_value = format_parameter_value_for_display(&value, true);
+
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Parameter Updated");
+            blocks::print_field("Node", &node_fqn);
+            blocks::print_field("Name", param_name);
+            blocks::print_field("Type", type_name);
+            blocks::print_field("Value", display_value);
+        }
+        output::OutputMode::Plain => println!("Set parameter {} successful", param_name),
+        output::OutputMode::Json => {
+            output::print_json(&json!({
+                "node": node_fqn,
+                "name": param_name,
+                "type": type_name,
+                "value": parameter_value_to_json(&value),
+                "display_value": display_value,
+                "successful": true,
+            }))?;
+        }
+    }
     Ok(())
 }
 

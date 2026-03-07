@@ -1,11 +1,13 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use colored::*;
+use serde_json::json;
 
 use crate::arguments::service::CommonServiceArgs;
 use crate::graph::RclGraphContext;
+use crate::ui::{blocks, output, table};
 
 fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let service_type = matches
         .get_one::<String>("service_type")
         .ok_or_else(|| anyhow!("service_type is required"))?;
@@ -43,39 +45,45 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
     names.dedup();
 
     if matches.get_flag("count_services") {
-        println!(
-            "{} {}",
-            "Total:".bright_green(),
-            names.len().to_string().bright_white().bold()
-        );
+        match output_mode {
+            output::OutputMode::Human => blocks::print_total(names.len(), "service", "services"),
+            output::OutputMode::Plain => println!("{}", names.len()),
+            output::OutputMode::Json => {
+                let count = names.len();
+                output::print_json(
+                    &json!({ "service_type": service_type, "services": names, "count": count }),
+                )?;
+            }
+        }
         return Ok(());
     }
 
-    if names.is_empty() {
-        eprintln!(
-            "{} {}",
-            "No services found for type".yellow(),
-            format!("[{}]", service_type).bright_cyan()
-        );
-        return Ok(());
-    }
+    match output_mode {
+        output::OutputMode::Human => {
+            if names.is_empty() {
+                blocks::eprint_warning(&format!("No services found for type {service_type}"));
+                return Ok(());
+            }
 
-    let total = names.len();
-
-    println!(
-        "{} {}",
-        "Services with type".bright_yellow().bold(),
-        format!("[{}]", service_type).bright_cyan()
-    );
-    for name in &names {
-        println!("  {}", name.bright_cyan());
+            blocks::print_section("Services");
+            blocks::print_field("Requested Type", service_type);
+            println!();
+            let rows = names.iter().map(|name| vec![name.clone()]).collect();
+            table::print_table(&["Service"], rows);
+            blocks::print_total(names.len(), "service", "services");
+        }
+        output::OutputMode::Plain => {
+            for name in &names {
+                println!("{name}");
+            }
+        }
+        output::OutputMode::Json => {
+            let count = names.len();
+            output::print_json(
+                &json!({ "service_type": service_type, "services": names, "count": count }),
+            )?;
+        }
     }
-    println!();
-    println!(
-        "{} {} services found",
-        "Total:".bright_green(),
-        total.to_string().bright_white().bold()
-    );
     Ok(())
 }
 

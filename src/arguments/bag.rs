@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{arg, ArgAction, Command};
 
 pub fn cmd() -> Command {
@@ -11,15 +12,15 @@ pub fn cmd() -> Command {
                 .about("List rosbag2 recordings")
                 .aliases(["l", "ls"])
                 .arg(arg!([PATH] "Directory to scan (default: .)").required(false))
-                .arg(
-                    arg!(--recursive "Scan subdirectories recursively").action(ArgAction::SetTrue),
-                ),
+                .arg(arg!(--recursive "Scan subdirectories recursively").action(ArgAction::SetTrue))
+                .arg(output::arg()),
         )
         .subcommand(
             Command::new("info")
                 .about("Show rosbag2 recording info")
                 .aliases(["i", "show"])
-                .arg(arg!(<PATH> "Bag directory containing metadata.yaml").required(true)),
+                .arg(arg!(<PATH> "Bag directory containing metadata.yaml").required(true))
+                .arg(output::arg()),
         )
         .subcommand(
             Command::new("record")

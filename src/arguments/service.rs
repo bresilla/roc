@@ -110,6 +110,7 @@ pub fn cmd() -> Command {
                 .help("Consider hidden services as well")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("list")
@@ -156,5 +157,6 @@ pub fn cmd() -> Command {
                 .required(true)
                 .value_name("SERVICE_NAME")
             )
+            .arg(output::arg())
         )
 }

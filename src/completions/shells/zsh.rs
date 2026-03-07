@@ -14,19 +14,34 @@ _roc_dynamic_lines() {
 _roc() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
-    local -a launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_bw_flags topic_find_flags topic_delay_flags
+    local -a launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_kind_flags topic_bw_flags topic_find_flags topic_delay_flags service_find_flags service_list_flags service_kind_flags param_get_flags param_list_flags param_set_flags param_describe_flags bag_list_flags bag_info_flags interface_list_flags interface_all_flags interface_package_flags interface_show_flags interface_model_flags
     launch_flags=(-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter)
     work_build_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor)
     work_test_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --merge-install --continue-on-error --ctest-args --pytest-args)
     work_test_result_flags=(--test-result-base --all --verbose --result-files-only --delete --delete-yes)
     topic_echo_flags=(--qos-profile --qos-depth --qos-history --qos-reliability --qos-durability --csv --field -f --full-length -l --truncate-length --no-arr --no-str --flow-style --no-lost-messages --raw --once)
     topic_hz_flags=(-w --window --filter --wall-time)
-    topic_info_flags=(-v --verbose)
-    topic_list_flags=(-t --show-types -c --count-topics -a --include-hidden-topics)
+    topic_info_flags=(-v --verbose --output)
+    topic_list_flags=(-t --show-types -c --count-topics -a --include-hidden-topics --output)
     topic_pub_flags=(-r --rate -p --print --once -1 -t --times --wait-matching-subscriptions --keep-alive -n --node-name --qos-profile --qos-depth --qos-history --qos-reliability --qos-durability)
+    topic_kind_flags=(--output)
     topic_bw_flags=(-w --window)
-    topic_find_flags=(-c --count-topics -a --include-hidden-topics)
+    topic_find_flags=(-c --count-topics -a --include-hidden-topics --output)
     topic_delay_flags=(-o --output -v --verbose)
+    service_find_flags=(-c --count-services -a --include-hidden-services --output)
+    service_list_flags=(-t --show-types -c --count-services -a --include-hidden-services --output)
+    service_kind_flags=(--output)
+    param_get_flags=(-a --include-hidden-nodes --hide-type --output)
+    param_list_flags=(-a --include-hidden-nodes --param-prefixes --param-type --filter --output)
+    param_set_flags=(-a --include-hidden-nodes --output)
+    param_describe_flags=(--output)
+    bag_list_flags=(--recursive --output)
+    bag_info_flags=(--output)
+    interface_list_flags=(-m --messages -s --services -a --actions --output)
+    interface_all_flags=(-m --messages -s --services -a --actions --output)
+    interface_package_flags=(--output)
+    interface_show_flags=(--all-comments --no-comments --output)
+    interface_model_flags=(--no-quotes --output)
 
     if [[ "$words[$CURRENT]" == -* ]]; then
         case "$words[2]" in
@@ -50,9 +65,40 @@ _roc() {
                     info) _describe 'topic info flags' topic_info_flags; return ;;
                     list) _describe 'topic list flags' topic_list_flags; return ;;
                     pub) _describe 'topic pub flags' topic_pub_flags; return ;;
+                    kind) _describe 'topic kind flags' topic_kind_flags; return ;;
                     bw) _describe 'topic bw flags' topic_bw_flags; return ;;
                     find) _describe 'topic find flags' topic_find_flags; return ;;
                     delay) _describe 'topic delay flags' topic_delay_flags; return ;;
+                esac
+                ;;
+            service)
+                case "$words[3]" in
+                    find) _describe 'service find flags' service_find_flags; return ;;
+                    list) _describe 'service list flags' service_list_flags; return ;;
+                    kind) _describe 'service kind flags' service_kind_flags; return ;;
+                esac
+                ;;
+            param)
+                case "$words[3]" in
+                    get) _describe 'param get flags' param_get_flags; return ;;
+                    list) _describe 'param list flags' param_list_flags; return ;;
+                    set) _describe 'param set flags' param_set_flags; return ;;
+                    describe) _describe 'param describe flags' param_describe_flags; return ;;
+                esac
+                ;;
+            bag)
+                case "$words[3]" in
+                    list) _describe 'bag list flags' bag_list_flags; return ;;
+                    info) _describe 'bag info flags' bag_info_flags; return ;;
+                esac
+                ;;
+            interface)
+                case "$words[3]" in
+                    list) _describe 'interface list flags' interface_list_flags; return ;;
+                    all) _describe 'interface all flags' interface_all_flags; return ;;
+                    package) _describe 'interface package flags' interface_package_flags; return ;;
+                    show) _describe 'interface show flags' interface_show_flags; return ;;
+                    model) _describe 'interface model flags' interface_model_flags; return ;;
                 esac
                 ;;
         esac

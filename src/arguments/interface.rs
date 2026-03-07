@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{Arg, ArgAction, Command};
 
 pub fn cmd() -> Command {
@@ -38,6 +39,7 @@ pub fn cmd() -> Command {
                 .action(ArgAction::SetTrue)
                 .conflicts_with_all(&["messages", "services"])
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("package")
@@ -50,6 +52,7 @@ pub fn cmd() -> Command {
                 .required(true)
                 .value_name("PACKAGE_NAME")
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("all")
@@ -83,6 +86,7 @@ pub fn cmd() -> Command {
                 .action(ArgAction::SetTrue)
                 .conflicts_with_all(&["messages", "services"])
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("show")
@@ -107,6 +111,7 @@ pub fn cmd() -> Command {
                 .help("Show no comments or whitespace")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("model")
@@ -124,6 +129,7 @@ pub fn cmd() -> Command {
                 .long("no-quotes")
                 .help("Do not output outer quotes")
                 .action(ArgAction::SetTrue)
-            )             
+            )
+            .arg(output::arg())
         )
 }

@@ -1,28 +1,45 @@
 use anyhow::Result;
 use clap::ArgMatches;
-use colored::*;
+use serde_json::json;
 
-use crate::graph::interface_operations;
-use crate::ui::{blocks, table};
+use crate::shared::interface_operations;
+use crate::ui::{blocks, output, table};
 
 fn run_command(matches: ArgMatches) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let only_msgs = matches.get_flag("messages");
     let only_srvs = matches.get_flag("services");
     let only_actions = matches.get_flag("actions");
 
     let items = interface_operations::list_interfaces(only_msgs, only_srvs, only_actions)?;
     if items.is_empty() {
-        eprintln!("{}", "No interfaces found.".yellow());
+        match output_mode {
+            output::OutputMode::Human => blocks::eprint_warning("No interfaces found."),
+            output::OutputMode::Json => {
+                output::print_json(&json!({ "interfaces": [], "count": 0 }))?;
+            }
+            output::OutputMode::Plain => {}
+        }
         return Ok(());
     }
 
-    blocks::print_section("Interfaces");
-    let rows = items
-        .iter()
-        .map(|item| vec![item.bright_cyan().to_string()])
-        .collect();
-    table::print_table(&["Interface"], rows);
-    blocks::print_total(items.len(), "interface", "interfaces");
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Interfaces");
+            let rows = items.iter().map(|item| vec![item.clone()]).collect();
+            table::print_table(&["Interface"], rows);
+            blocks::print_total(items.len(), "interface", "interfaces");
+        }
+        output::OutputMode::Plain => {
+            for item in &items {
+                println!("{item}");
+            }
+        }
+        output::OutputMode::Json => {
+            let count = items.len();
+            output::print_json(&json!({ "interfaces": items, "count": count }))?;
+        }
+    }
 
     Ok(())
 }

@@ -1,10 +1,13 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use serde_json::json;
 
 use crate::arguments::service::CommonServiceArgs;
 use crate::graph::RclGraphContext;
+use crate::ui::{blocks, output, table};
 
 fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let service_name = matches
         .get_one::<String>("service_name")
         .ok_or_else(|| anyhow!("service_name is required"))?;
@@ -42,9 +45,28 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
     types.sort();
     types.dedup();
 
-    // Match ros2 CLI: print each type on its own line (usually only one).
-    for ty in types {
-        println!("{}", ty);
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Service");
+            blocks::print_field("Name", service_name);
+            if types.len() == 1 {
+                blocks::print_field("Type", &types[0]);
+            } else {
+                println!();
+                blocks::print_section("Types");
+                let rows = types.iter().map(|ty| vec![ty.clone()]).collect();
+                table::print_table(&["Type"], rows);
+            }
+        }
+        output::OutputMode::Plain => {
+            for ty in &types {
+                println!("{ty}");
+            }
+        }
+        output::OutputMode::Json => {
+            let count = types.len();
+            output::print_json(&json!({ "name": service_name, "types": types, "count": count }))?;
+        }
     }
     Ok(())
 }

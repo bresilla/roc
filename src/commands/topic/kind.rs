@@ -1,8 +1,9 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, output};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use colored::*;
+use serde_json::json;
 use std::time::Duration;
 
 // Topic Type (Kind) Implementation
@@ -13,6 +14,7 @@ use std::time::Duration;
 // 3. Clean output matching ros2 topic type behavior
 
 fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches_with_compat(&matches, common_args.ros_style);
     let topic_name = matches
         .get_one::<String>("topic_name")
         .ok_or_else(|| anyhow!("Topic name is required"))?;
@@ -47,13 +49,16 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
             })?
     };
 
-    // Simple output - just the type name (like ros2 topic type)
-    if common_args.ros_style {
-        // Original ROS2 CLI style
-        println!("{}", topic_type);
-    } else {
-        // Enhanced colored output
-        println!("{}", topic_type.bright_cyan());
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Topic");
+            blocks::print_field("Name", topic_name);
+            blocks::print_field("Type", &topic_type);
+        }
+        output::OutputMode::Plain => println!("{topic_type}"),
+        output::OutputMode::Json => {
+            output::print_json(&json!({ "name": topic_name, "type": topic_type }))?;
+        }
     }
 
     Ok(())

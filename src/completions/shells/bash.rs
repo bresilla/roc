@@ -14,13 +14,27 @@ _roc_completion() {
     local work_test_result_flags="--test-result-base --all --verbose --result-files-only --delete --delete-yes"
     local topic_echo_flags="--qos-profile --qos-depth --qos-history --qos-reliability --qos-durability --csv --field -f --full-length -l --truncate-length --no-arr --no-str --flow-style --no-lost-messages --raw --once"
     local topic_hz_flags="-w --window --filter --wall-time"
-    local topic_info_flags="-v --verbose"
-    local topic_list_flags="-t --show-types -c --count-topics -a --include-hidden-topics"
+    local topic_info_flags="-v --verbose --output"
+    local topic_list_flags="-t --show-types -c --count-topics -a --include-hidden-topics --output"
     local topic_pub_flags="-r --rate -p --print --once -1 -t --times --wait-matching-subscriptions --keep-alive -n --node-name --qos-profile --qos-depth --qos-history --qos-reliability --qos-durability"
-    local topic_kind_flags=""
+    local topic_kind_flags="--output"
     local topic_bw_flags="-w --window"
-    local topic_find_flags="-c --count-topics -a --include-hidden-topics"
+    local topic_find_flags="-c --count-topics -a --include-hidden-topics --output"
     local topic_delay_flags="-o --output -v --verbose"
+    local service_find_flags="-c --count-services -a --include-hidden-services --output"
+    local service_list_flags="-t --show-types -c --count-services -a --include-hidden-services --output"
+    local service_kind_flags="--output"
+    local param_get_flags="-a --include-hidden-nodes --hide-type --output"
+    local param_list_flags="-a --include-hidden-nodes --param-prefixes --param-type --filter --output"
+    local param_set_flags="-a --include-hidden-nodes --output"
+    local param_describe_flags="--output"
+    local bag_list_flags="--recursive --output"
+    local bag_info_flags="--output"
+    local interface_list_flags="-m --messages -s --services -a --actions --output"
+    local interface_all_flags="-m --messages -s --services -a --actions --output"
+    local interface_package_flags="--output"
+    local interface_show_flags="--all-comments --no-comments --output"
+    local interface_model_flags="--no-quotes --output"
 
     if [[ "$cur" == -* ]]; then
         case "$top" in
@@ -51,6 +65,36 @@ _roc_completion() {
                     bw) COMPREPLY=($(compgen -W "$topic_bw_flags" -- "$cur")); return ;;
                     find) COMPREPLY=($(compgen -W "$topic_find_flags" -- "$cur")); return ;;
                     delay) COMPREPLY=($(compgen -W "$topic_delay_flags" -- "$cur")); return ;;
+                esac
+                ;;
+            service)
+                case "${words[2]}" in
+                    find) COMPREPLY=($(compgen -W "$service_find_flags" -- "$cur")); return ;;
+                    list) COMPREPLY=($(compgen -W "$service_list_flags" -- "$cur")); return ;;
+                    kind) COMPREPLY=($(compgen -W "$service_kind_flags" -- "$cur")); return ;;
+                esac
+                ;;
+            param)
+                case "${words[2]}" in
+                    get) COMPREPLY=($(compgen -W "$param_get_flags" -- "$cur")); return ;;
+                    list) COMPREPLY=($(compgen -W "$param_list_flags" -- "$cur")); return ;;
+                    set) COMPREPLY=($(compgen -W "$param_set_flags" -- "$cur")); return ;;
+                    describe) COMPREPLY=($(compgen -W "$param_describe_flags" -- "$cur")); return ;;
+                esac
+                ;;
+            bag)
+                case "${words[2]}" in
+                    list) COMPREPLY=($(compgen -W "$bag_list_flags" -- "$cur")); return ;;
+                    info) COMPREPLY=($(compgen -W "$bag_info_flags" -- "$cur")); return ;;
+                esac
+                ;;
+            interface)
+                case "${words[2]}" in
+                    list) COMPREPLY=($(compgen -W "$interface_list_flags" -- "$cur")); return ;;
+                    all) COMPREPLY=($(compgen -W "$interface_all_flags" -- "$cur")); return ;;
+                    package) COMPREPLY=($(compgen -W "$interface_package_flags" -- "$cur")); return ;;
+                    show) COMPREPLY=($(compgen -W "$interface_show_flags" -- "$cur")); return ;;
+                    model) COMPREPLY=($(compgen -W "$interface_model_flags" -- "$cur")); return ;;
                 esac
                 ;;
         esac

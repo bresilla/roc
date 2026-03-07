@@ -1,8 +1,9 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, output, table};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use colored::*;
+use serde_json::json;
 use std::time::Duration;
 
 // Topic Find Implementation
@@ -14,6 +15,7 @@ use std::time::Duration;
 // 4. Matching ros2 topic find behavior exactly
 
 fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches_with_compat(&matches, common_args.ros_style);
     let message_type = matches
         .get_one::<String>("topic_type")
         .ok_or_else(|| anyhow!("Message type is required"))?;
@@ -49,14 +51,17 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 
     // Handle --count-topics flag
     if matches.get_flag("count_topics") {
-        if common_args.ros_style {
-            println!("{}", matching_topics.len());
-        } else {
-            println!(
-                "{} {}",
-                "Total:".bright_green(),
-                matching_topics.len().to_string().bright_white().bold()
-            );
+        match output_mode {
+            output::OutputMode::Human => {
+                blocks::print_total(matching_topics.len(), "topic", "topics");
+            }
+            output::OutputMode::Plain => println!("{}", matching_topics.len()),
+            output::OutputMode::Json => {
+                let count = matching_topics.len();
+                output::print_json(
+                    &json!({ "topic_type": message_type, "topics": matching_topics, "count": count }),
+                )?;
+            }
         }
         return Ok(());
     }
@@ -64,36 +69,34 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     // Sort topics for consistent output
     matching_topics.sort();
 
-    // Print matching topics (one per line, like ros2 topic find)
-    if common_args.ros_style {
-        // Original ROS2 CLI style
-        for topic in matching_topics {
-            println!("{}", topic);
-        }
-    } else {
-        if matching_topics.is_empty() {
-            eprintln!(
-                "{} {}",
-                "No topics found with type".yellow(),
-                format!("[{}]", message_type).bright_cyan()
-            );
-            return Ok(());
-        }
+    match output_mode {
+        output::OutputMode::Human => {
+            if matching_topics.is_empty() {
+                blocks::eprint_warning(&format!("No topics found for type {message_type}"));
+                return Ok(());
+            }
 
-        println!(
-            "{} {}",
-            "Topics with type".bright_yellow().bold(),
-            format!("[{}]", message_type).bright_cyan()
-        );
-        for topic in matching_topics.iter() {
-            println!("  {}", topic.bright_cyan());
+            blocks::print_section("Topics");
+            blocks::print_field("Requested Type", message_type);
+            println!();
+            let rows = matching_topics
+                .iter()
+                .map(|topic| vec![topic.clone()])
+                .collect();
+            table::print_table(&["Topic"], rows);
+            blocks::print_total(matching_topics.len(), "topic", "topics");
         }
-        println!();
-        println!(
-            "{} {} topics found",
-            "Total:".bright_green(),
-            matching_topics.len().to_string().bright_white().bold()
-        );
+        output::OutputMode::Plain => {
+            for topic in &matching_topics {
+                println!("{topic}");
+            }
+        }
+        output::OutputMode::Json => {
+            let count = matching_topics.len();
+            output::print_json(
+                &json!({ "topic_type": message_type, "topics": matching_topics, "count": count }),
+            )?;
+        }
     }
 
     Ok(())

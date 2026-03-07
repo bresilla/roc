@@ -84,6 +84,7 @@ pub fn cmd() -> Command {
                 .help("Hide the type information")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("list")
@@ -161,6 +162,7 @@ pub fn cmd() -> Command {
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("export")
