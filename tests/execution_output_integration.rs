@@ -91,6 +91,31 @@ fn topic_pub_failure_prints_publish_block_before_runtime_error() {
 }
 
 #[test]
+fn topic_pub_json_failure_is_structured() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &[
+            "topic",
+            "pub",
+            "/demo",
+            "missing_pkg/msg/Missing",
+            "data: hello",
+            "--once",
+            "--output",
+            "json",
+        ],
+    );
+    assert_failure(&output, "roc topic pub --output json");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\"command\": \"topic pub\""));
+    assert!(stdout.contains("\"status\": \"error\""));
+    assert!(stdout.contains("\"topic\": \"/demo\""));
+    assert!(stdout.contains("\"type\": \"missing_pkg/msg/Missing\""));
+}
+
+#[test]
 fn frame_pub_detach_prints_publish_block() {
     let temp = tempdir().unwrap();
     let output = run_roc(
@@ -113,6 +138,31 @@ fn frame_pub_detach_prints_publish_block() {
     assert!(stdout.contains("map"));
     assert!(stdout.contains("base_link"));
     assert!(stdout.contains("Mode"));
+}
+
+#[test]
+fn frame_pub_json_failure_is_structured() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &[
+            "frame",
+            "pub",
+            "map",
+            "base_link",
+            "[0, 0]",
+            "[0, 0, 0, 1]",
+            "--output",
+            "json",
+        ],
+    );
+    assert_failure(&output, "roc frame pub --output json");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\"command\": \"frame pub\""));
+    assert!(stdout.contains("\"status\": \"error\""));
+    assert!(stdout.contains("\"parent\": \"map\""));
+    assert!(stdout.contains("\"child\": \"base_link\""));
 }
 
 #[test]
@@ -142,6 +192,30 @@ fn service_call_failure_prints_request_block() {
 }
 
 #[test]
+fn service_call_json_failure_is_structured() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &[
+            "service",
+            "call",
+            "/demo_service",
+            "demo_interfaces/srv/Demo",
+            "{data: 1}",
+            "--output",
+            "json",
+        ],
+    );
+    assert_failure(&output, "roc service call --output json");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\"command\": \"service call\""));
+    assert!(stdout.contains("\"service\": \"/demo_service\""));
+    assert!(stdout.contains("\"type\": \"demo_interfaces/srv/Demo\""));
+    assert!(stdout.contains("\"status\": \"error\""));
+}
+
+#[test]
 fn action_goal_failure_prints_request_block() {
     let temp = tempdir().unwrap();
     let output = run_roc(
@@ -167,6 +241,32 @@ fn action_goal_failure_prints_request_block() {
     assert!(stdout.contains("{order: 10}"));
     assert!(stdout.contains("Feedback"));
     assert!(stdout.contains("Command"));
+}
+
+#[test]
+fn action_goal_plain_failure_is_structured() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &[
+            "action",
+            "goal",
+            "/demo_action",
+            "demo_interfaces/action/Demo",
+            "{order: 10}",
+            "--feedback",
+            "--output",
+            "plain",
+        ],
+    );
+    assert_failure(&output, "roc action goal --output plain");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("action-goal:"));
+    assert!(stdout.contains("action: /demo_action"));
+    assert!(stdout.contains("type: demo_interfaces/action/Demo"));
+    assert!(stdout.contains("feedback: true"));
+    assert!(stdout.contains("status: error"));
 }
 
 #[test]

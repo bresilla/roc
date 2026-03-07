@@ -173,6 +173,7 @@ complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) 
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l qos-history
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l qos-reliability
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l qos-durability
+complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = pub" -l output
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = kind" -l output
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = bw" -s w -l window
 complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) = find" -s c -l count-topics
@@ -183,10 +184,14 @@ complete -c roc -n "__fish_seen_subcommand_from topic; and test (__roc_sub_cmd) 
 complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = find" -s c -l count-services
 complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = find" -s a -l include-hidden-services
 complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = find" -l output
+complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = call" -s r -l rate
+complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = call" -l output
 complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = list" -s t -l show-types
 complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = list" -s c -l count-services
 complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = list" -s a -l include-hidden-services
 complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = list" -l output
+complete -c roc -n "__fish_seen_subcommand_from action; and test (__roc_sub_cmd) = goal" -s f -l feedback
+complete -c roc -n "__fish_seen_subcommand_from action; and test (__roc_sub_cmd) = goal" -l output
 complete -c roc -n "__fish_seen_subcommand_from service; and test (__roc_sub_cmd) = kind" -l output
 complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = get" -s a -l include-hidden-nodes
 complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = get" -l hide-type
@@ -242,6 +247,8 @@ complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_c
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = show" -l output
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = model" -l no-quotes
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = model" -l output
+complete -c roc -n "__fish_seen_subcommand_from frame; and test (__roc_sub_cmd) = pub" -l detach
+complete -c roc -n "__fish_seen_subcommand_from frame; and test (__roc_sub_cmd) = pub" -l output
 "#;
 
 pub fn print_completions() {

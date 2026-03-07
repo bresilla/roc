@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{arg, ArgAction, Command};
 
 pub fn cmd() -> Command {
@@ -68,6 +69,7 @@ pub fn cmd() -> Command {
                 .arg(
                     arg!(--detach "Exit immediately after publishing once")
                         .action(ArgAction::SetTrue),
-                ),
+                )
+                .arg(output::arg()),
         )
 }

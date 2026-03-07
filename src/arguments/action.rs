@@ -136,6 +136,7 @@ pub fn cmd() -> Command {
                         .long("feedback")
                         .help("Echo feedback messages for the goal")
                         .action(ArgAction::SetTrue),
-                ),
+                )
+                .arg(output::arg()),
         )
 }

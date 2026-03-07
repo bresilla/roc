@@ -1,9 +1,13 @@
-use crate::commands::cli::{handle_anyhow_result, install_ctrlc_flag};
-use crate::ui::blocks;
+use crate::commands::cli::{install_ctrlc_flag, print_error_and_exit};
+use crate::ui::{
+    blocks,
+    output::{self, OutputMode},
+};
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use rclrs::IntoPrimitiveOptions;
 use rclrs::{Context, CreateBasicExecutor, DynamicMessage, MessageTypeName, QoSProfile};
+use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -95,7 +99,143 @@ fn ensure_seq_len(msg: &mut DynamicMessage, field: &str, len: usize) -> Result<(
     }
 }
 
+fn print_frame_publish_header(
+    output_mode: OutputMode,
+    frame_id: &str,
+    child_frame_id: &str,
+    translation: &str,
+    rotation: &str,
+    detach: bool,
+) {
+    match output_mode {
+        OutputMode::Human => {
+            blocks::print_section("Frame Publish");
+            blocks::print_field("Parent", frame_id);
+            blocks::print_field("Child", child_frame_id);
+            blocks::print_field("Translation", translation);
+            blocks::print_field("Rotation", rotation);
+            blocks::print_field("Topic", "/tf_static");
+            blocks::print_field("Mode", if detach { "detach" } else { "latched" });
+            println!();
+            if !detach {
+                blocks::print_note("Press Ctrl+C to stop");
+            }
+        }
+        OutputMode::Plain => {
+            output::print_plain_section("frame-publish");
+            output::print_plain_field("parent", frame_id);
+            output::print_plain_field("child", child_frame_id);
+            output::print_plain_field("translation", translation);
+            output::print_plain_field("rotation", rotation);
+            output::print_plain_field("topic", "/tf_static");
+            output::print_plain_field("mode", if detach { "detach" } else { "latched" });
+        }
+        OutputMode::Json => {}
+    }
+}
+
+fn print_frame_publish_status(output_mode: OutputMode, frame_id: &str, child_frame_id: &str) {
+    match output_mode {
+        OutputMode::Human => blocks::print_status(
+            "PUB",
+            &[
+                ("parent", frame_id.to_string()),
+                ("child", child_frame_id.to_string()),
+            ],
+        ),
+        OutputMode::Plain => output::print_plain_status(
+            "pub",
+            &[
+                ("parent", frame_id.to_string()),
+                ("child", child_frame_id.to_string()),
+            ],
+        ),
+        OutputMode::Json => {}
+    }
+}
+
+fn print_frame_publish_summary(
+    output_mode: OutputMode,
+    frame_id: &str,
+    child_frame_id: &str,
+    translation: &str,
+    rotation: &str,
+    detach: bool,
+    elapsed_secs: f64,
+    interrupted: bool,
+) -> Result<()> {
+    match output_mode {
+        OutputMode::Human => {
+            println!();
+            blocks::print_section("Frame Summary");
+            blocks::print_field("Parent", frame_id);
+            blocks::print_field("Child", child_frame_id);
+            blocks::print_field("Elapsed", format!("{elapsed_secs:.2}s"));
+            blocks::print_success("Static transform publisher stopped");
+        }
+        OutputMode::Plain => {
+            output::print_plain_section("frame-summary");
+            output::print_plain_field("parent", frame_id);
+            output::print_plain_field("child", child_frame_id);
+            output::print_plain_field("translation", translation);
+            output::print_plain_field("rotation", rotation);
+            output::print_plain_field("mode", if detach { "detach" } else { "latched" });
+            output::print_plain_field("elapsed_secs", format!("{elapsed_secs:.3}"));
+            output::print_plain_field("interrupted", interrupted);
+            output::print_plain_field("status", "ok");
+        }
+        OutputMode::Json => {
+            output::print_json(&json!({
+                "command": "frame pub",
+                "parent": frame_id,
+                "child": child_frame_id,
+                "translation": translation,
+                "rotation": rotation,
+                "mode": if detach { "detach" } else { "latched" },
+                "elapsed_secs": elapsed_secs,
+                "interrupted": interrupted,
+                "status": "ok"
+            }))?;
+        }
+    }
+    Ok(())
+}
+
+fn print_frame_publish_error(
+    output_mode: OutputMode,
+    frame_id: Option<&str>,
+    child_frame_id: Option<&str>,
+    error: &str,
+) {
+    match output_mode {
+        OutputMode::Human => print_error_and_exit(error),
+        OutputMode::Plain => {
+            output::print_plain_section("frame-publish-error");
+            if let Some(frame_id) = frame_id {
+                output::print_plain_field("parent", frame_id);
+            }
+            if let Some(child_frame_id) = child_frame_id {
+                output::print_plain_field("child", child_frame_id);
+            }
+            output::print_plain_field("status", "error");
+            output::print_plain_field("error", error);
+            std::process::exit(1);
+        }
+        OutputMode::Json => {
+            let _ = output::print_json(&json!({
+                "command": "frame pub",
+                "parent": frame_id,
+                "child": child_frame_id,
+                "status": "error",
+                "error": error
+            }));
+            std::process::exit(1);
+        }
+    }
+}
+
 fn run_command(matches: ArgMatches) -> Result<()> {
+    let output_mode = OutputMode::from_matches(&matches);
     let frame_id = matches
         .get_one::<String>("FRAME_ID")
         .ok_or_else(|| anyhow!("FRAME_ID is required"))?;
@@ -128,17 +268,14 @@ fn run_command(matches: ArgMatches) -> Result<()> {
     };
     let (qw, qx, qy, qz) = normalize_quat(qw, qx, qy, qz);
 
-    blocks::print_section("Frame Publish");
-    blocks::print_field("Parent", frame_id);
-    blocks::print_field("Child", child_frame_id);
-    blocks::print_field("Translation", translation);
-    blocks::print_field("Rotation", rotation);
-    blocks::print_field("Topic", "/tf_static");
-    blocks::print_field("Mode", if detach { "detach" } else { "latched" });
-    println!();
-    if !detach {
-        blocks::print_note("Press Ctrl+C to stop");
-    }
+    print_frame_publish_header(
+        output_mode,
+        frame_id,
+        child_frame_id,
+        translation,
+        rotation,
+        detach,
+    );
 
     let context = Context::default_from_env()?;
     let executor = context.create_basic_executor();
@@ -205,36 +342,44 @@ fn run_command(matches: ArgMatches) -> Result<()> {
 
     let started_at = Instant::now();
     publisher.publish(tfmsg)?;
-    blocks::print_status(
-        "PUB",
-        &[
-            ("parent", frame_id.to_string()),
-            ("child", child_frame_id.to_string()),
-        ],
-    );
+    print_frame_publish_status(output_mode, frame_id, child_frame_id);
 
     // Default behavior matches `static_transform_publisher`: keep the node alive so the
     // TRANSIENT_LOCAL sample is reliably available to late joiners.
+    let mut interrupted = false;
     if !detach {
         let running = Arc::new(AtomicBool::new(true));
         install_ctrlc_flag(Arc::clone(&running))?;
         while running.load(Ordering::Relaxed) {
             std::thread::sleep(Duration::from_millis(100));
         }
+        interrupted = true;
     }
 
-    println!();
-    blocks::print_section("Frame Summary");
-    blocks::print_field("Parent", frame_id);
-    blocks::print_field("Child", child_frame_id);
-    blocks::print_field(
-        "Elapsed",
-        format!("{:.2}s", started_at.elapsed().as_secs_f64()),
-    );
-    blocks::print_success("Static transform publisher stopped");
+    print_frame_publish_summary(
+        output_mode,
+        frame_id,
+        child_frame_id,
+        translation,
+        rotation,
+        detach,
+        started_at.elapsed().as_secs_f64(),
+        interrupted,
+    )?;
     Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {
-    handle_anyhow_result(run_command(matches));
+    let output_mode = OutputMode::from_matches(&matches);
+    let frame_id = matches.get_one::<String>("FRAME_ID").cloned();
+    let child_frame_id = matches.get_one::<String>("CHILD_FRAME_ID").cloned();
+
+    if let Err(error) = run_command(matches) {
+        print_frame_publish_error(
+            output_mode,
+            frame_id.as_deref(),
+            child_frame_id.as_deref(),
+            &error.to_string(),
+        );
+    }
 }

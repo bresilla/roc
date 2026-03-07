@@ -1,11 +1,15 @@
 use crate::arguments::topic::CommonTopicArgs;
-use crate::commands::cli::{install_ctrlc_flag, run_async_command};
-use crate::ui::blocks;
+use crate::commands::cli::{install_ctrlc_flag, print_error_and_exit};
+use crate::ui::{
+    blocks,
+    output::{self, OutputMode},
+};
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use rclrs::{
     Context, CreateBasicExecutor, DynamicMessage, MessageTypeName, SimpleValueMut, ValueMut,
 };
+use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -174,7 +178,205 @@ fn build_message(message_type: &str, yaml: &str) -> Result<DynamicMessage> {
     Ok(msg)
 }
 
+fn publish_mode_label(once: bool, times: Option<u64>) -> String {
+    if once {
+        "once".to_string()
+    } else if let Some(limit) = times {
+        format!("{limit} messages")
+    } else {
+        "continuous".to_string()
+    }
+}
+
+fn print_publish_header(
+    output_mode: OutputMode,
+    topic_name: &str,
+    message_type: &str,
+    node_name: &str,
+    rate_hz: f64,
+    print_every: u64,
+    wait_matching_subscriptions: Option<usize>,
+    keep_alive_secs: f64,
+    mode_label: &str,
+) {
+    match output_mode {
+        OutputMode::Human => {
+            blocks::print_section("Topic Publish");
+            blocks::print_field("Topic", topic_name);
+            blocks::print_field("Type", message_type);
+            blocks::print_field("Node", node_name);
+            blocks::print_field("Rate", format!("{rate_hz:.3} Hz"));
+            blocks::print_field("Print Every", print_every);
+            blocks::print_field("Mode", mode_label);
+            if let Some(required) = wait_matching_subscriptions {
+                blocks::print_field("Wait Subs", required);
+            }
+            blocks::print_field("Keep Alive", format!("{keep_alive_secs:.3}s"));
+            println!();
+            if mode_label == "continuous" {
+                blocks::print_note("Press Ctrl+C to stop");
+            }
+        }
+        OutputMode::Plain => {
+            output::print_plain_section("topic-publish");
+            output::print_plain_field("topic", topic_name);
+            output::print_plain_field("type", message_type);
+            output::print_plain_field("node", node_name);
+            output::print_plain_field("rate_hz", format!("{rate_hz:.3}"));
+            output::print_plain_field("print_every", print_every);
+            output::print_plain_field("mode", mode_label);
+            if let Some(required) = wait_matching_subscriptions {
+                output::print_plain_field("wait_matching_subscriptions", required);
+            }
+            output::print_plain_field("keep_alive_secs", format!("{keep_alive_secs:.3}"));
+        }
+        OutputMode::Json => {}
+    }
+}
+
+fn print_wait_status(output_mode: OutputMode, topic_name: &str, required: usize) {
+    match output_mode {
+        OutputMode::Human => blocks::print_status(
+            "WAIT",
+            &[
+                ("topic", topic_name.to_string()),
+                ("subscriptions", required.to_string()),
+            ],
+        ),
+        OutputMode::Plain => output::print_plain_status(
+            "wait",
+            &[
+                ("topic", topic_name.to_string()),
+                ("subscriptions", required.to_string()),
+            ],
+        ),
+        OutputMode::Json => {}
+    }
+}
+
+fn print_publish_progress(
+    output_mode: OutputMode,
+    published: u64,
+    topic_name: &str,
+    elapsed_secs: f64,
+) {
+    match output_mode {
+        OutputMode::Human => blocks::print_status(
+            "PUB",
+            &[
+                ("count", published.to_string()),
+                ("topic", topic_name.to_string()),
+                ("elapsed", format!("{elapsed_secs:.2}s")),
+            ],
+        ),
+        OutputMode::Plain => output::print_plain_status(
+            "pub",
+            &[
+                ("count", published.to_string()),
+                ("topic", topic_name.to_string()),
+                ("elapsed_secs", format!("{elapsed_secs:.2}")),
+            ],
+        ),
+        OutputMode::Json => {}
+    }
+}
+
+fn print_publish_summary(
+    output_mode: OutputMode,
+    topic_name: &str,
+    message_type: &str,
+    node_name: &str,
+    rate_hz: f64,
+    print_every: u64,
+    mode_label: &str,
+    wait_matching_subscriptions: Option<usize>,
+    keep_alive_secs: f64,
+    published: u64,
+    elapsed_secs: f64,
+    interrupted: bool,
+) -> Result<()> {
+    match output_mode {
+        OutputMode::Human => {
+            println!();
+            blocks::print_section("Publish Summary");
+            blocks::print_field("Topic", topic_name);
+            blocks::print_field("Messages", published);
+            blocks::print_field("Elapsed", format!("{elapsed_secs:.2}s"));
+            blocks::print_success("Publishing stopped");
+        }
+        OutputMode::Plain => {
+            output::print_plain_section("publish-summary");
+            output::print_plain_field("topic", topic_name);
+            output::print_plain_field("type", message_type);
+            output::print_plain_field("node", node_name);
+            output::print_plain_field("rate_hz", format!("{rate_hz:.3}"));
+            output::print_plain_field("print_every", print_every);
+            output::print_plain_field("mode", mode_label);
+            if let Some(required) = wait_matching_subscriptions {
+                output::print_plain_field("wait_matching_subscriptions", required);
+            }
+            output::print_plain_field("keep_alive_secs", format!("{keep_alive_secs:.3}"));
+            output::print_plain_field("messages", published);
+            output::print_plain_field("elapsed_secs", format!("{elapsed_secs:.3}"));
+            output::print_plain_field("interrupted", interrupted);
+            output::print_plain_field("status", "ok");
+        }
+        OutputMode::Json => {
+            output::print_json(&json!({
+                "command": "topic pub",
+                "topic": topic_name,
+                "type": message_type,
+                "node": node_name,
+                "rate_hz": rate_hz,
+                "print_every": print_every,
+                "mode": mode_label,
+                "wait_matching_subscriptions": wait_matching_subscriptions,
+                "keep_alive_secs": keep_alive_secs,
+                "messages": published,
+                "elapsed_secs": elapsed_secs,
+                "interrupted": interrupted,
+                "status": "ok"
+            }))?;
+        }
+    }
+    Ok(())
+}
+
+fn print_publish_error(
+    output_mode: OutputMode,
+    topic_name: Option<&str>,
+    message_type: Option<&str>,
+    error: &str,
+) {
+    match output_mode {
+        OutputMode::Human => print_error_and_exit(error),
+        OutputMode::Plain => {
+            output::print_plain_section("topic-publish-error");
+            if let Some(topic_name) = topic_name {
+                output::print_plain_field("topic", topic_name);
+            }
+            if let Some(message_type) = message_type {
+                output::print_plain_field("type", message_type);
+            }
+            output::print_plain_field("status", "error");
+            output::print_plain_field("error", error);
+            std::process::exit(1);
+        }
+        OutputMode::Json => {
+            let _ = output::print_json(&json!({
+                "command": "topic pub",
+                "topic": topic_name,
+                "type": message_type,
+                "status": "error",
+                "error": error
+            }));
+            std::process::exit(1);
+        }
+    }
+}
+
 async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Result<()> {
+    let output_mode = OutputMode::from_matches(&matches);
     let topic_name = matches
         .get_one::<String>("topic_name")
         .ok_or_else(|| anyhow!("Topic name is required"))?
@@ -216,41 +418,26 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
         .unwrap_or_else(|| "roc_topic_pub".to_string());
 
     let yaml = yaml_values.join(" ");
+    let mode_label = publish_mode_label(once, times);
 
-    blocks::print_section("Topic Publish");
-    blocks::print_field("Topic", &topic_name);
-    blocks::print_field("Type", &message_type);
-    blocks::print_field("Node", &node_name);
-    blocks::print_field("Rate", format!("{rate_hz:.3} Hz"));
-    blocks::print_field("Print Every", print_every);
-    if once {
-        blocks::print_field("Mode", "once");
-    } else if let Some(limit) = times {
-        blocks::print_field("Mode", format!("{limit} messages"));
-    } else {
-        blocks::print_field("Mode", "continuous");
-    }
-    if let Some(required) = wait_matching_subscriptions {
-        blocks::print_field("Wait Subs", required);
-    }
-    blocks::print_field("Keep Alive", format!("{keep_alive_secs:.3}s"));
-    println!();
-    if !once && times.is_none() {
-        blocks::print_note("Press Ctrl+C to stop");
-    }
+    print_publish_header(
+        output_mode,
+        &topic_name,
+        &message_type,
+        &node_name,
+        rate_hz,
+        print_every,
+        wait_matching_subscriptions,
+        keep_alive_secs,
+        &mode_label,
+    );
 
     let context = Context::default_from_env()?;
     let executor = context.create_basic_executor();
     let node = executor.create_node(node_name.as_str())?;
 
     if let Some(required) = wait_matching_subscriptions {
-        blocks::print_status(
-            "WAIT",
-            &[
-                ("topic", topic_name.clone()),
-                ("subscriptions", required.to_string()),
-            ],
-        );
+        print_wait_status(output_mode, &topic_name, required);
         let start = Instant::now();
         let timeout = Duration::from_secs(5);
         while start.elapsed() < timeout {
@@ -277,6 +464,7 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
     let running = Arc::new(AtomicBool::new(true));
     install_ctrlc_flag(Arc::clone(&running))?;
     let session_start = Instant::now();
+    let mut interrupted = false;
 
     while running.load(Ordering::Relaxed) {
         let msg = build_message(&message_type, &yaml)?;
@@ -284,16 +472,11 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
         published += 1;
 
         if published % print_every == 0 {
-            blocks::print_status(
-                "PUB",
-                &[
-                    ("count", published.to_string()),
-                    ("topic", topic_name.clone()),
-                    (
-                        "elapsed",
-                        format!("{:.2}s", session_start.elapsed().as_secs_f64()),
-                    ),
-                ],
+            print_publish_progress(
+                output_mode,
+                published,
+                &topic_name,
+                session_start.elapsed().as_secs_f64(),
             );
         }
 
@@ -319,23 +502,45 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
         }
     }
 
+    if !once && times.map(|limit| published < limit).unwrap_or(true) && !running.load(Ordering::Relaxed) {
+        interrupted = true;
+    }
+
     if keep_alive_secs > 0.0 {
         tokio::time::sleep(Duration::from_secs_f64(keep_alive_secs)).await;
     }
 
-    println!();
-    blocks::print_section("Publish Summary");
-    blocks::print_field("Topic", &topic_name);
-    blocks::print_field("Messages", published);
-    blocks::print_field(
-        "Elapsed",
-        format!("{:.2}s", session_start.elapsed().as_secs_f64()),
-    );
-    blocks::print_success("Publishing stopped");
+    print_publish_summary(
+        output_mode,
+        &topic_name,
+        &message_type,
+        &node_name,
+        rate_hz,
+        print_every,
+        &mode_label,
+        wait_matching_subscriptions,
+        keep_alive_secs,
+        published,
+        session_start.elapsed().as_secs_f64(),
+        interrupted,
+    )?;
 
     Ok(())
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    run_async_command(run_command(matches, common_args));
+    let output_mode = OutputMode::from_matches(&matches);
+    let topic_name = matches.get_one::<String>("topic_name").cloned();
+    let message_type = matches.get_one::<String>("message_type").cloned();
+    let runtime = tokio::runtime::Runtime::new()
+        .unwrap_or_else(|error| print_error_and_exit(format!("Failed to create async runtime: {error}")));
+
+    if let Err(error) = runtime.block_on(run_command(matches, common_args)) {
+        print_publish_error(
+            output_mode,
+            topic_name.as_deref(),
+            message_type.as_deref(),
+            &error.to_string(),
+        );
+    }
 }

@@ -60,6 +60,25 @@ pub fn print_plain_field(label: &str, value: impl std::fmt::Display) {
     println!("{label}: {value}");
 }
 
+pub fn print_plain_status(label: &str, fields: &[(&str, String)]) {
+    let mut rendered = String::new();
+    for (index, (name, value)) in fields.iter().enumerate() {
+        if index > 0 {
+            rendered.push(' ');
+        }
+        rendered.push_str(&format!("{name}={value}"));
+    }
+    println!("{label}: {rendered}");
+}
+
+pub fn print_plain_multiline_field(label: &str, value: &str) {
+    println!("{label}:");
+    print!("{value}");
+    if !value.ends_with('\n') {
+        println!();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{arg, OutputMode};

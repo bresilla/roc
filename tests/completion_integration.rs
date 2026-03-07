@@ -204,6 +204,46 @@ printf '%s\n' "${COMPREPLY[@]}"
 }
 
 #[test]
+fn bash_completion_script_handles_service_call_flags_end_to_end() {
+    if !shell_exists("bash") {
+        return;
+    }
+
+    let temp = tempdir().unwrap();
+    let script = generate_completion_script("bash", temp.path());
+    let output = Command::new("bash")
+        .env("ROC_BIN", roc_bin())
+        .env("ROC_COMPLETION_SCRIPT", &script)
+        .arg("--noprofile")
+        .arg("--norc")
+        .arg("-c")
+        .arg(
+            r#"
+roc() { "$ROC_BIN" "$@"; }
+_init_completion() {
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    words=("${COMP_WORDS[@]}")
+    cword=$COMP_CWORD
+}
+source "$ROC_COMPLETION_SCRIPT"
+COMP_WORDS=(roc service call --)
+COMP_CWORD=3
+_roc_completion
+printf '%s\n' "${COMPREPLY[@]}"
+"#,
+        )
+        .output()
+        .expect("failed to execute bash completion test");
+
+    assert!(output.status.success(), "bash completion probe failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--rate"));
+    assert!(stdout.contains("--output"));
+}
+
+#[test]
 fn bash_completion_script_handles_completion_flags_end_to_end() {
     if !shell_exists("bash") {
         return;
@@ -515,6 +555,32 @@ complete --do-complete "roc work test-result --"
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--result-files-only"));
     assert!(stdout.contains("--delete-yes"));
+}
+
+#[test]
+fn fish_completion_script_handles_frame_pub_flags_end_to_end() {
+    if !shell_exists("fish") {
+        return;
+    }
+
+    let temp = tempdir().unwrap();
+    let script = generate_completion_script("fish", temp.path());
+    let output = Command::new("fish")
+        .env("ROC_COMPLETION_SCRIPT", &script)
+        .arg("-c")
+        .arg(
+            r#"
+source $ROC_COMPLETION_SCRIPT
+complete --do-complete "roc frame pub --"
+"#,
+        )
+        .output()
+        .expect("failed to execute fish completion test");
+
+    assert!(output.status.success(), "fish completion probe failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--detach"));
+    assert!(stdout.contains("--output"));
 }
 
 #[test]

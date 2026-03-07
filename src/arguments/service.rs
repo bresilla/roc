@@ -83,6 +83,7 @@ pub fn cmd() -> Command {
                 .num_args(1)
                 .action(ArgAction::Append)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("find")

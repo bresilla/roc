@@ -18,14 +18,17 @@ _roc_completion() {
     local topic_hz_flags="-w --window --filter --wall-time"
     local topic_info_flags="-v --verbose --output"
     local topic_list_flags="-t --show-types -c --count-topics -a --include-hidden-topics --output"
-    local topic_pub_flags="-r --rate -p --print --once -1 -t --times --wait-matching-subscriptions --keep-alive -n --node-name --qos-profile --qos-depth --qos-history --qos-reliability --qos-durability"
+    local topic_pub_flags="-r --rate -p --print --once -1 -t --times --wait-matching-subscriptions --keep-alive -n --node-name --qos-profile --qos-depth --qos-history --qos-reliability --qos-durability --output"
     local topic_kind_flags="--output"
     local topic_bw_flags="-w --window"
     local topic_find_flags="-c --count-topics -a --include-hidden-topics --output"
     local topic_delay_flags="-o --output -v --verbose"
+    local frame_pub_flags="--detach --output"
+    local service_call_flags="-r --rate --output"
     local service_find_flags="-c --count-services -a --include-hidden-services --output"
     local service_list_flags="-t --show-types -c --count-services -a --include-hidden-services --output"
     local service_kind_flags="--output"
+    local action_goal_flags="-f --feedback --output"
     local param_get_flags="-a --include-hidden-nodes --hide-type --output"
     local param_list_flags="-a --include-hidden-nodes --param-prefixes --param-type --filter --output"
     local param_set_flags="-a --include-hidden-nodes --output"
@@ -78,11 +81,22 @@ _roc_completion() {
                     delay) COMPREPLY=($(compgen -W "$topic_delay_flags" -- "$cur")); return ;;
                 esac
                 ;;
+            frame)
+                case "${words[2]}" in
+                    pub) COMPREPLY=($(compgen -W "$frame_pub_flags" -- "$cur")); return ;;
+                esac
+                ;;
             service)
                 case "${words[2]}" in
+                    call) COMPREPLY=($(compgen -W "$service_call_flags" -- "$cur")); return ;;
                     find) COMPREPLY=($(compgen -W "$service_find_flags" -- "$cur")); return ;;
                     list) COMPREPLY=($(compgen -W "$service_list_flags" -- "$cur")); return ;;
                     kind) COMPREPLY=($(compgen -W "$service_kind_flags" -- "$cur")); return ;;
+                esac
+                ;;
+            action)
+                case "${words[2]}" in
+                    goal) COMPREPLY=($(compgen -W "$action_goal_flags" -- "$cur")); return ;;
                 esac
                 ;;
             param)

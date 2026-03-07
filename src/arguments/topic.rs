@@ -412,6 +412,7 @@ pub fn cmd() -> Command {
                 .help("QoS durability setting (overrides profile, default: transient_local)")
                 .action(ArgAction::Append)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("kind")
