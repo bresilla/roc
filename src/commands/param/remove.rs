@@ -1,5 +1,6 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, output};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 
 use crate::arguments::param::CommonParamArgs;
@@ -8,6 +9,7 @@ use crate::shared::param_operations::ParamClientContext;
 use rclrs::vendor::rcl_interfaces::msg::{Parameter, ParameterType, ParameterValue};
 
 fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let node_name = matches
         .get_one::<String>("node_name")
         .ok_or_else(|| anyhow!("node_name is required"))?;
@@ -58,7 +60,23 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         ));
     }
 
-    println!("Deleted parameter {}", param_name);
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Parameter Removed");
+            blocks::print_field("Node", &node_fqn);
+            blocks::print_field("Name", param_name);
+        }
+        output::OutputMode::Plain => {
+            println!("{node_fqn}\t{param_name}");
+        }
+        output::OutputMode::Json => {
+            output::print_json(&serde_json::json!({
+                "node": node_fqn,
+                "name": param_name,
+                "successful": true,
+            }))?;
+        }
+    }
     Ok(())
 }
 

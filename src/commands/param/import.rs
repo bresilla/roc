@@ -1,5 +1,6 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, output};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use serde_yaml::Value;
 use std::fs;
@@ -142,6 +143,7 @@ fn collect_params_from_yaml_mapping(
 }
 
 fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let node_name = matches
         .get_one::<String>("node_name")
         .ok_or_else(|| anyhow!("node_name is required"))?;
@@ -214,6 +216,7 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         ));
     }
 
+    let loaded_count = param_sets.len();
     let response = ctx.set_parameters(&node_fqn, param_sets)?;
     let mut failures = Vec::new();
     for (idx, r) in response.results.iter().enumerate() {
@@ -228,7 +231,25 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         ));
     }
 
-    println!("Loaded parameters into {} from {}", node_fqn, param_file);
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Parameters Imported");
+            blocks::print_field("Node", &node_fqn);
+            blocks::print_field("File", param_file);
+            blocks::print_field("Parameters", loaded_count);
+        }
+        output::OutputMode::Plain => {
+            println!("{node_fqn}\t{param_file}\t{loaded_count}");
+        }
+        output::OutputMode::Json => {
+            output::print_json(&serde_json::json!({
+                "node": node_fqn,
+                "file": param_file,
+                "loaded_count": loaded_count,
+                "successful": true,
+            }))?;
+        }
+    }
     Ok(())
 }
 

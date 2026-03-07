@@ -27,7 +27,10 @@ _roc_completion() {
     local param_get_flags="-a --include-hidden-nodes --hide-type --output"
     local param_list_flags="-a --include-hidden-nodes --param-prefixes --param-type --filter --output"
     local param_set_flags="-a --include-hidden-nodes --output"
-    local param_describe_flags="--output"
+    local param_export_flags="-o --output-dir -a --include-hidden-nodes --output"
+    local param_remove_flags="-a --include-hidden-nodes --output"
+    local param_describe_flags="-a --include-hidden-nodes --output"
+    local param_import_flags="--no-use-wildcard -a --include-hidden-nodes --output"
     local bag_list_flags="--recursive --output"
     local bag_info_flags="--output"
     local interface_list_flags="-m --messages -s --services -a --actions --output"
@@ -79,7 +82,10 @@ _roc_completion() {
                     get) COMPREPLY=($(compgen -W "$param_get_flags" -- "$cur")); return ;;
                     list) COMPREPLY=($(compgen -W "$param_list_flags" -- "$cur")); return ;;
                     set) COMPREPLY=($(compgen -W "$param_set_flags" -- "$cur")); return ;;
+                    export) COMPREPLY=($(compgen -W "$param_export_flags" -- "$cur")); return ;;
+                    remove) COMPREPLY=($(compgen -W "$param_remove_flags" -- "$cur")); return ;;
                     describe) COMPREPLY=($(compgen -W "$param_describe_flags" -- "$cur")); return ;;
+                    import) COMPREPLY=($(compgen -W "$param_import_flags" -- "$cur")); return ;;
                 esac
                 ;;
             bag)

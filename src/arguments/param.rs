@@ -221,6 +221,7 @@ pub fn cmd() -> Command {
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("describe")
@@ -248,6 +249,7 @@ pub fn cmd() -> Command {
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("import")
@@ -282,5 +284,47 @@ pub fn cmd() -> Command {
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cmd;
+
+    #[test]
+    fn param_output_mode_is_available_for_describe_remove_and_import() {
+        cmd()
+            .try_get_matches_from([
+                "param",
+                "describe",
+                "/demo",
+                "answer",
+                "--output",
+                "json",
+            ])
+            .expect("describe should accept --output");
+
+        cmd()
+            .try_get_matches_from([
+                "param",
+                "remove",
+                "/demo",
+                "answer",
+                "--output",
+                "plain",
+            ])
+            .expect("remove should accept --output");
+
+        cmd()
+            .try_get_matches_from([
+                "param",
+                "import",
+                "/demo",
+                "params.yaml",
+                "--output",
+                "human",
+            ])
+            .expect("import should accept --output");
+    }
 }

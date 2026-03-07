@@ -14,7 +14,7 @@ _roc_dynamic_lines() {
 _roc() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
-    local -a launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_kind_flags topic_bw_flags topic_find_flags topic_delay_flags service_find_flags service_list_flags service_kind_flags param_get_flags param_list_flags param_set_flags param_describe_flags bag_list_flags bag_info_flags interface_list_flags interface_all_flags interface_package_flags interface_show_flags interface_model_flags
+    local -a launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_kind_flags topic_bw_flags topic_find_flags topic_delay_flags service_find_flags service_list_flags service_kind_flags param_get_flags param_list_flags param_set_flags param_export_flags param_remove_flags param_describe_flags param_import_flags bag_list_flags bag_info_flags interface_list_flags interface_all_flags interface_package_flags interface_show_flags interface_model_flags
     launch_flags=(-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter)
     work_build_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor)
     work_test_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --merge-install --continue-on-error --ctest-args --pytest-args)
@@ -34,7 +34,10 @@ _roc() {
     param_get_flags=(-a --include-hidden-nodes --hide-type --output)
     param_list_flags=(-a --include-hidden-nodes --param-prefixes --param-type --filter --output)
     param_set_flags=(-a --include-hidden-nodes --output)
-    param_describe_flags=(--output)
+    param_export_flags=(-o --output-dir -a --include-hidden-nodes --output)
+    param_remove_flags=(-a --include-hidden-nodes --output)
+    param_describe_flags=(-a --include-hidden-nodes --output)
+    param_import_flags=(--no-use-wildcard -a --include-hidden-nodes --output)
     bag_list_flags=(--recursive --output)
     bag_info_flags=(--output)
     interface_list_flags=(-m --messages -s --services -a --actions --output)
@@ -83,7 +86,10 @@ _roc() {
                     get) _describe 'param get flags' param_get_flags; return ;;
                     list) _describe 'param list flags' param_list_flags; return ;;
                     set) _describe 'param set flags' param_set_flags; return ;;
+                    export) _describe 'param export flags' param_export_flags; return ;;
+                    remove) _describe 'param remove flags' param_remove_flags; return ;;
                     describe) _describe 'param describe flags' param_describe_flags; return ;;
+                    import) _describe 'param import flags' param_import_flags; return ;;
                 esac
                 ;;
             bag)

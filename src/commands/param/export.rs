@@ -1,5 +1,6 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, output};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use serde_yaml::{Mapping, Value};
 use std::fs;
@@ -84,6 +85,7 @@ fn insert_nested(mapping: &mut Mapping, dotted_name: &str, value: Value) {
 }
 
 fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let node_name = matches
         .get_one::<String>("node_name")
         .ok_or_else(|| anyhow!("node_name is required"))?;
@@ -115,6 +117,7 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
     let list = ctx.list_parameters(&node_fqn, Vec::new())?;
     let mut names: Vec<String> = list.result.names.into_iter().collect();
     names.sort();
+    let discovered_count = names.len();
 
     let values = ctx.get_parameters(&node_fqn, names.clone())?;
     if values.values.len() != names.len() {
@@ -126,12 +129,15 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
     }
 
     let mut ros_params = Mapping::new();
+    let mut exported_count = 0usize;
     for (name, v) in names.into_iter().zip(values.values.into_iter()) {
         let Some(yaml_value) = parameter_value_to_yaml_value(&v) else {
             continue;
         };
         insert_nested(&mut ros_params, &name, yaml_value);
+        exported_count += 1;
     }
+    let skipped_count = discovered_count.saturating_sub(exported_count);
 
     let mut node_entry = Mapping::new();
     node_entry.insert(
@@ -153,7 +159,30 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
     };
 
     fs::write(&out_path, yaml)?;
-    println!("Wrote parameter file: {}", out_path.display());
+    let out_path_display = out_path.display().to_string();
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Parameters Exported");
+            blocks::print_field("Node", &node_fqn);
+            blocks::print_field("File", &out_path_display);
+            blocks::print_field("Parameters", exported_count);
+            if skipped_count > 0 {
+                blocks::print_field("Skipped", skipped_count);
+            }
+        }
+        output::OutputMode::Plain => {
+            println!("{node_fqn}\t{out_path_display}\t{exported_count}");
+        }
+        output::OutputMode::Json => {
+            output::print_json(&serde_json::json!({
+                "node": node_fqn,
+                "file": out_path_display,
+                "exported_count": exported_count,
+                "skipped_count": skipped_count,
+                "successful": true,
+            }))?;
+        }
+    }
     Ok(())
 }
 

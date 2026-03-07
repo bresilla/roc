@@ -177,7 +177,16 @@ complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) 
 complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = list" -l output
 complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = set" -s a -l include-hidden-nodes
 complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = set" -l output
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = export" -s o -l output-dir
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = export" -s a -l include-hidden-nodes
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = export" -l output
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = remove" -s a -l include-hidden-nodes
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = remove" -l output
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = describe" -s a -l include-hidden-nodes
 complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = describe" -l output
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = import" -l no-use-wildcard
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = import" -s a -l include-hidden-nodes
+complete -c roc -n "__fish_seen_subcommand_from param; and test (__roc_sub_cmd) = import" -l output
 complete -c roc -n "__fish_seen_subcommand_from bag; and test (__roc_sub_cmd) = list" -l recursive
 complete -c roc -n "__fish_seen_subcommand_from bag; and test (__roc_sub_cmd) = list" -l output
 complete -c roc -n "__fish_seen_subcommand_from bag; and test (__roc_sub_cmd) = info" -l output
