@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 struct TestConfig {
@@ -68,15 +68,18 @@ struct WorkspaceTester {
     packages: Vec<PackageMeta>,
     test_order: Vec<usize>,
     install_paths: HashMap<String, PathBuf>,
+    run_log_dir: PathBuf,
 }
 
 impl WorkspaceTester {
     fn new(config: TestConfig) -> Self {
+        let run_log_dir = Self::test_run_log_dir(&config.log_base);
         Self {
             config,
             packages: Vec::new(),
             test_order: Vec::new(),
             install_paths: HashMap::new(),
+            run_log_dir,
         }
     }
 
@@ -131,6 +134,7 @@ impl WorkspaceTester {
 
     fn run_tests(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir_all(self.config.log_base.join("latest_test"))?;
+        fs::create_dir_all(&self.run_log_dir)?;
 
         let mut passed = 0usize;
         let mut failed = 0usize;
@@ -228,7 +232,8 @@ impl WorkspaceTester {
                     );
                     if !self.config.continue_on_error {
                         records.insert(package.name.clone(), record.clone());
-                        Self::write_package_state(&self.config, &package.name, &record)?;
+                        self.write_package_state(&package.name, &record)?;
+                        self.write_colcon_test_result(package, &record)?;
                         self.write_test_summary(&records)?;
                         return Err(format!("Tests failed for package {}", package.name).into());
                     }
@@ -236,7 +241,8 @@ impl WorkspaceTester {
             }
 
             records.insert(package.name.clone(), record.clone());
-            Self::write_package_state(&self.config, &package.name, &record)?;
+            self.write_package_state(&package.name, &record)?;
+            self.write_colcon_test_result(package, &record)?;
         }
 
         println!("\n{}", "Test Summary".bright_cyan().bold());
@@ -289,11 +295,11 @@ impl WorkspaceTester {
         let mut command = Command::new("ctest");
         command.args(Self::ctest_args(&build_dir, &self.config.ctest_args));
         command.envs(env_manager.get_env_vars());
-        Self::run_command_checked(
-            command,
-            "CTest",
-            &Self::phase_log_path(&self.config, &package.name, "ctest"),
-        )?;
+        let latest_log = Self::phase_log_path(&self.config, &package.name, "ctest");
+        let run_log = self.run_log_dir.join(&package.name).join("ctest.log");
+        let result = Self::run_command_checked(command, "CTest", &latest_log);
+        Self::mirror_log_file(&latest_log, &run_log)?;
+        result?;
 
         Ok(TestRecord {
             status: TestState::Passed,
@@ -330,11 +336,11 @@ impl WorkspaceTester {
             .envs(env_manager.get_env_vars())
             .env("PYTEST_ADDOPTS", pytest_addopts)
             .env("PYTHONDONTWRITEBYTECODE", "1");
-        Self::run_command_checked(
-            command,
-            "Pytest",
-            &Self::phase_log_path(&self.config, &package.name, "pytest"),
-        )?;
+        let latest_log = Self::phase_log_path(&self.config, &package.name, "pytest");
+        let run_log = self.run_log_dir.join(&package.name).join("pytest.log");
+        let result = Self::run_command_checked(command, "Pytest", &latest_log);
+        Self::mirror_log_file(&latest_log, &run_log)?;
+        result?;
 
         Ok(TestRecord {
             status: TestState::Passed,
@@ -388,12 +394,10 @@ impl WorkspaceTester {
     }
 
     fn write_package_state(
-        config: &TestConfig,
+        &self,
         package_name: &str,
         record: &TestRecord,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let package_dir = config.log_base.join("latest_test").join(package_name);
-        fs::create_dir_all(&package_dir)?;
         let status = match record.status {
             TestState::Passed => "passed",
             TestState::Failed => "failed",
@@ -403,7 +407,13 @@ impl WorkspaceTester {
         if let Some(error) = &record.error {
             contents.push_str(&format!("error={error}\n"));
         }
-        fs::write(package_dir.join("status.txt"), contents)?;
+        for package_dir in [
+            self.config.log_base.join("latest_test").join(package_name),
+            self.run_log_dir.join(package_name),
+        ] {
+            fs::create_dir_all(&package_dir)?;
+            fs::write(package_dir.join("status.txt"), &contents)?;
+        }
         Ok(())
     }
 
@@ -431,14 +441,16 @@ impl WorkspaceTester {
                 lines.push(line);
             }
         }
+        let summary = lines.join("\n");
         fs::create_dir_all(self.config.log_base.join("latest_test"))?;
         fs::write(
             self.config
                 .log_base
                 .join("latest_test")
                 .join("test_summary.log"),
-            lines.join("\n"),
+            &summary,
         )?;
+        fs::write(self.run_log_dir.join("test_summary.log"), summary)?;
         Ok(())
     }
 
@@ -466,6 +478,45 @@ impl WorkspaceTester {
         }
 
         Err(format!("{description} failed; see {}", log_path.display()).into())
+    }
+
+    fn write_colcon_test_result(
+        &self,
+        package: &PackageMeta,
+        record: &TestRecord,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let build_dir = self.config.build_base.join(&package.name);
+        if !build_dir.exists() {
+            return Ok(());
+        }
+
+        let rc = match record.status {
+            TestState::Passed | TestState::Skipped => "0",
+            TestState::Failed => "1",
+        };
+        fs::write(build_dir.join("colcon_test.rc"), format!("{rc}\n"))?;
+        Ok(())
+    }
+
+    fn test_run_log_dir(log_base: &Path) -> PathBuf {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .unwrap_or(0);
+        log_base.join(format!("test_{timestamp}"))
+    }
+
+    fn mirror_log_file(
+        source: &Path,
+        destination: &Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if source.exists() {
+            fs::copy(source, destination)?;
+        }
+        Ok(())
     }
 
     fn apply_package_filters(&mut self) {
