@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 /// Common topic arguments that are extracted from the parent topic command
@@ -223,7 +224,7 @@ pub fn cmd() -> Command {
                 .aliases(&["wall_time", "wall"])
                 .help("Calculate rate using wall time (useful when clock is not published)")
                 .action(ArgAction::SetTrue)
-            )                 
+            )
         )
         .subcommand(
             Command::new("info")
@@ -242,7 +243,8 @@ pub fn cmd() -> Command {
                 .long("verbose")
                 .action(ArgAction::SetTrue)
                 .help("Print detailed information about nodes, namespaces, topic types...")
-            )                  
+            )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("list")
@@ -275,6 +277,7 @@ pub fn cmd() -> Command {
                 .help("Consider hidden topics as well")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("pub")

@@ -1,13 +1,16 @@
 use crate::commands::cli::handle_anyhow_result;
-use crate::ui::{blocks, table};
+use crate::ui::{blocks, output, table};
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
+use serde_json::json;
 
 use crate::arguments::node::CommonNodeArgs;
 use crate::graph::RclGraphContext;
 
 fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
+
     // NOTE: rclrs does not currently provide the same filtering as `ros2 node list`
     // for hidden nodes, so for now we always return what the graph exposes.
     if matches.get_flag("include_hidden_nodes") {
@@ -46,32 +49,55 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
     full_names.sort();
 
     if matches.get_flag("count_nodes") {
-        println!(
-            "{} {}",
-            "Total:".bright_green(),
-            full_names.len().to_string().bright_white().bold()
-        );
+        match output_mode {
+            output::OutputMode::Human => {
+                println!(
+                    "{} {}",
+                    "Total:".bright_green(),
+                    full_names.len().to_string().bright_white().bold()
+                );
+            }
+            output::OutputMode::Plain => println!("{}", full_names.len()),
+            output::OutputMode::Json => output::print_json(&json!({ "count": full_names.len() }))?,
+        }
         return Ok(());
     }
 
     if full_names.is_empty() {
-        eprintln!(
-            "{} {}",
-            "No nodes found.".yellow(),
-            format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
-        );
+        match output_mode {
+            output::OutputMode::Json => output::print_json(&json!({ "nodes": [], "count": 0 }))?,
+            _ => {
+                eprintln!(
+                    "{} {}",
+                    "No nodes found.".yellow(),
+                    format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
+                );
+            }
+        }
         return Ok(());
     }
 
     let total = full_names.len();
 
-    blocks::print_section("Nodes");
-    let rows = full_names
-        .iter()
-        .map(|name| vec![name.bright_cyan().to_string()])
-        .collect();
-    table::print_table(&["Node"], rows);
-    blocks::print_total(total, "node", "nodes");
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Nodes");
+            let rows = full_names
+                .iter()
+                .map(|name| vec![name.bright_cyan().to_string()])
+                .collect();
+            table::print_table(&["Node"], rows);
+            blocks::print_total(total, "node", "nodes");
+        }
+        output::OutputMode::Plain => {
+            for name in &full_names {
+                println!("{name}");
+            }
+        }
+        output::OutputMode::Json => {
+            output::print_json(&json!({ "nodes": full_names, "count": total }))?;
+        }
+    }
 
     Ok(())
 }

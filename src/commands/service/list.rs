@@ -1,12 +1,14 @@
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
+use serde_json::json;
 
 use crate::arguments::service::CommonServiceArgs;
 use crate::graph::RclGraphContext;
-use crate::ui::{blocks, table};
+use crate::ui::{blocks, output, table};
 
 fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     if matches.get_flag("include_hidden_services") {
         eprintln!("Note: --include-hidden-services is not yet supported in native mode");
     }
@@ -49,47 +51,86 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
     items.sort_by(|a, b| a.0.cmp(&b.0));
 
     if count_only {
-        println!(
-            "{} {}",
-            "Total:".bright_green(),
-            items.len().to_string().bright_white().bold()
-        );
+        match output_mode {
+            output::OutputMode::Human => {
+                println!(
+                    "{} {}",
+                    "Total:".bright_green(),
+                    items.len().to_string().bright_white().bold()
+                );
+            }
+            output::OutputMode::Plain => println!("{}", items.len()),
+            output::OutputMode::Json => output::print_json(&json!({ "count": items.len() }))?,
+        }
         return Ok(());
     }
 
     if items.is_empty() {
-        eprintln!(
-            "{} {}",
-            "No services found.".yellow(),
-            format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
-        );
+        match output_mode {
+            output::OutputMode::Json => {
+                output::print_json(&json!({ "services": [], "count": 0 }))?;
+            }
+            _ => {
+                eprintln!(
+                    "{} {}",
+                    "No services found.".yellow(),
+                    format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
+                );
+            }
+        }
         return Ok(());
     }
 
     let total = items.len();
 
-    blocks::print_section("Services");
-    let headers = if show_types {
-        vec!["Service", "Type"]
-    } else {
-        vec!["Service"]
-    };
-    let rows = items
-        .iter()
-        .map(|(name, ty)| {
-            let mut row = vec![name.bright_cyan().to_string()];
-            if show_types {
-                row.push(
-                    ty.as_ref()
-                        .map(|value| value.green().to_string())
-                        .unwrap_or_else(|| "unknown".red().to_string()),
-                );
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Services");
+            let headers = if show_types {
+                vec!["Service", "Type"]
+            } else {
+                vec!["Service"]
+            };
+            let rows = items
+                .iter()
+                .map(|(name, ty)| {
+                    let mut row = vec![name.bright_cyan().to_string()];
+                    if show_types {
+                        row.push(
+                            ty.as_ref()
+                                .map(|value| value.green().to_string())
+                                .unwrap_or_else(|| "unknown".red().to_string()),
+                        );
+                    }
+                    row
+                })
+                .collect();
+            table::print_table(&headers, rows);
+            blocks::print_total(total, "service", "services");
+        }
+        output::OutputMode::Plain => {
+            for (name, ty) in &items {
+                if show_types {
+                    println!("{name}\t{}", ty.as_deref().unwrap_or("unknown"));
+                } else {
+                    println!("{name}");
+                }
             }
-            row
-        })
-        .collect();
-    table::print_table(&headers, rows);
-    blocks::print_total(total, "service", "services");
+        }
+        output::OutputMode::Json => {
+            let services = items
+                .iter()
+                .map(|(name, ty)| {
+                    if show_types {
+                        json!({ "name": name, "type": ty.as_deref().unwrap_or("unknown") })
+                    } else {
+                        json!({ "name": name })
+                    }
+                })
+                .collect::<Vec<_>>();
+            output::print_json(&json!({ "services": services, "count": total }))?;
+        }
+    }
     Ok(())
 }
 

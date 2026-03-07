@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 /// Common service arguments that are extracted from the parent service command
@@ -142,6 +143,7 @@ pub fn cmd() -> Command {
                 .help("Consider hidden services as well")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("kind")

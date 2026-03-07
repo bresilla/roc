@@ -1,11 +1,13 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
-use crate::ui::{blocks, table};
+use crate::ui::{blocks, output, table};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
+use serde_json::json;
 
 fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches_with_compat(&matches, common_args.ros_style);
     // Create RCL graph context for direct API access
     // Note: Our implementation always does direct DDS discovery (daemon-free by design)
     let graph_context = RclGraphContext::new()
@@ -21,20 +23,6 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         .get_topic_names()
         .map_err(|e| anyhow::anyhow!("Failed to get topic names: {}", e))?;
 
-    // Handle --count-topics flag
-    if matches.get_flag("count_topics") {
-        if common_args.ros_style {
-            println!("{}", topics.len());
-        } else {
-            println!(
-                "{} {}",
-                "Total:".bright_green(),
-                topics.len().to_string().bright_white().bold()
-            );
-        }
-        return Ok(());
-    }
-
     // Handle --include-hidden-topics flag
     let filtered_topics: Vec<String> = if matches.get_flag("include_hidden_topics") {
         topics
@@ -45,6 +33,24 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
             .filter(|topic| !topic.starts_with("/_"))
             .collect()
     };
+
+    // Handle --count-topics flag
+    if matches.get_flag("count_topics") {
+        match output_mode {
+            output::OutputMode::Human => {
+                println!(
+                    "{} {}",
+                    "Total:".bright_green(),
+                    filtered_topics.len().to_string().bright_white().bold()
+                );
+            }
+            output::OutputMode::Plain => println!("{}", filtered_topics.len()),
+            output::OutputMode::Json => {
+                output::print_json(&json!({ "count": filtered_topics.len() }))?
+            }
+        }
+        return Ok(());
+    }
 
     // Handle --show-types flag
     if matches.get_flag("show_types") {
@@ -64,41 +70,51 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         };
 
         // Display topics with types
-        if common_args.ros_style {
-            for topic in &filtered_topics {
-                if topic.types.is_empty() {
-                    println!("{} [unknown type]", topic.name);
-                } else if topic.types.len() == 1 {
-                    println!("{} [{}]", topic.name, topic.types[0]);
-                } else {
-                    println!("{} [{}]", topic.name, topic.types.join(", "));
+        match output_mode {
+            output::OutputMode::Plain => {
+                for topic in &filtered_topics {
+                    if topic.types.is_empty() {
+                        println!("{}\tunknown", topic.name);
+                    } else if topic.types.len() == 1 {
+                        println!("{}\t{}", topic.name, topic.types[0]);
+                    } else {
+                        println!("{}\t{}", topic.name, topic.types.join(", "));
+                    }
                 }
             }
-        } else {
-            blocks::print_section("Topics");
-            let rows = filtered_topics
-                .iter()
-                .map(|topic| {
-                    let type_label = if topic.types.is_empty() {
-                        "unknown".red().to_string()
-                    } else if topic.types.len() == 1 {
-                        topic.types[0].green().to_string()
-                    } else {
-                        topic.types.join(", ").green().to_string()
-                    };
-                    vec![topic.name.bright_cyan().to_string(), type_label]
-                })
-                .collect();
-            table::print_table(&["Topic", "Type"], rows);
+            output::OutputMode::Human => {
+                blocks::print_section("Topics");
+                let rows = filtered_topics
+                    .iter()
+                    .map(|topic| {
+                        let type_label = if topic.types.is_empty() {
+                            "unknown".red().to_string()
+                        } else if topic.types.len() == 1 {
+                            topic.types[0].green().to_string()
+                        } else {
+                            topic.types.join(", ").green().to_string()
+                        };
+                        vec![topic.name.bright_cyan().to_string(), type_label]
+                    })
+                    .collect();
+                table::print_table(&["Topic", "Type"], rows);
 
-            if filtered_topics.is_empty() {
-                eprintln!(
-                    "{} {}",
-                    "No topics found.".yellow(),
-                    format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
-                );
-            } else {
-                blocks::print_total(filtered_topics.len(), "topic", "topics");
+                if filtered_topics.is_empty() {
+                    eprintln!(
+                        "{} {}",
+                        "No topics found.".yellow(),
+                        format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
+                    );
+                } else {
+                    blocks::print_total(filtered_topics.len(), "topic", "topics");
+                }
+            }
+            output::OutputMode::Json => {
+                let topics = filtered_topics
+                    .iter()
+                    .map(|topic| json!({ "name": topic.name, "types": topic.types }))
+                    .collect::<Vec<_>>();
+                output::print_json(&json!({ "topics": topics, "count": filtered_topics.len() }))?;
             }
         }
 
@@ -106,20 +122,26 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     }
 
     // Simple topic list (default behavior)
-    if common_args.ros_style {
-        // Original ROS2 CLI style
-        for topic in &filtered_topics {
-            println!("{}", topic);
+    match output_mode {
+        output::OutputMode::Plain => {
+            for topic in &filtered_topics {
+                println!("{topic}");
+            }
         }
-    } else {
-        if !filtered_topics.is_empty() {
-            blocks::print_section("Topics");
-            let rows = filtered_topics
-                .iter()
-                .map(|topic| vec![topic.bright_cyan().to_string()])
-                .collect();
-            table::print_table(&["Topic"], rows);
-            blocks::print_total(filtered_topics.len(), "topic", "topics");
+        output::OutputMode::Human => {
+            if !filtered_topics.is_empty() {
+                blocks::print_section("Topics");
+                let rows = filtered_topics
+                    .iter()
+                    .map(|topic| vec![topic.bright_cyan().to_string()])
+                    .collect();
+                table::print_table(&["Topic"], rows);
+                blocks::print_total(filtered_topics.len(), "topic", "topics");
+            }
+        }
+        output::OutputMode::Json => {
+            let count = filtered_topics.len();
+            output::print_json(&json!({ "topics": filtered_topics, "count": count }))?;
         }
     }
 
@@ -145,14 +167,16 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     // Show helpful message if no topics found
     if filtered_topics.is_empty() {
         let daemon_status = RclGraphContext::get_daemon_status();
-        if common_args.ros_style {
-            eprintln!("No topics found. [{}]", daemon_status);
-        } else {
-            eprintln!(
-                "{} {}",
-                "No topics found.".yellow(),
-                format!("[{}]", daemon_status).bright_black()
-            );
+        match output_mode {
+            output::OutputMode::Human => {
+                eprintln!(
+                    "{} {}",
+                    "No topics found.".yellow(),
+                    format!("[{}]", daemon_status).bright_black()
+                );
+            }
+            output::OutputMode::Plain => eprintln!("No topics found. [{}]", daemon_status),
+            output::OutputMode::Json => {}
         }
     }
 

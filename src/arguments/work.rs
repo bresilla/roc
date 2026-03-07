@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{arg, Arg, Command};
 
 pub fn cmd() -> Command {
@@ -32,6 +33,7 @@ pub fn cmd() -> Command {
             .aliases(["l", "ls"])
             .arg(arg!(-a --all "Display all packages even hidden ones"))
             .arg(arg!(-c --count_packages "Only display the number of packages discovered"))
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("info")
@@ -42,6 +44,7 @@ pub fn cmd() -> Command {
                 .required(true)
             )
             .arg(arg!(--xml "Output the XML of the package manifest"))
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("build")

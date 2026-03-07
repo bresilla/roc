@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 /// Common node arguments that are extracted from the parent node command
@@ -69,7 +70,8 @@ pub fn cmd() -> Command {
                         .visible_aliases(&["all"])
                         .help("Consider hidden nodes as well")
                         .action(ArgAction::SetTrue),
-                ),
+                )
+                .arg(output::arg()),
         )
         .subcommand(
             Command::new("list")
@@ -91,6 +93,7 @@ pub fn cmd() -> Command {
                         .aliases(&["count_nodes", "count"])
                         .help("Only display the number of nodes discovered")
                         .action(ArgAction::SetTrue),
-                ),
+                )
+                .arg(output::arg()),
         )
 }

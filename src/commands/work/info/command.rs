@@ -1,10 +1,12 @@
 use crate::commands::cli::{required_string, run_async_command};
 use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
-use crate::ui::{blocks, table};
+use crate::ui::{blocks, output, table};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
+use console::strip_ansi_codes;
 use roxmltree::Document;
+use serde_json::json;
 use std::fs;
 
 fn has_isolated_install(package_name: &str, install_base: &std::path::Path) -> bool {
@@ -112,6 +114,7 @@ async fn run_command_in_workspace(
     matches: ArgMatches,
     workspace_root: std::path::PathBuf,
 ) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let package_name = required_string(&matches, "PACKAGE_NAME")
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     let show_xml = matches.get_flag("xml");
@@ -155,86 +158,11 @@ async fn run_command_in_workspace(
 
     // Parse the XML for detailed information
     let xml_content = fs::read_to_string(&package_xml_path)?;
-
-    blocks::print_section("Package");
-    blocks::print_field("Name", package.name.bright_white().bold());
-    blocks::print_field("Version", package.version.bright_white());
-    blocks::print_field("Build Type", format_build_type(&package.build_type));
-    blocks::print_field("Path", package.path.display().to_string().bright_black());
-
-    // Description
-    if !package.description.is_empty() {
-        blocks::print_field("Description", package.description.bright_white());
-    }
-
-    // Maintainers
-    if !package.maintainers.is_empty() {
-        println!();
-        blocks::print_section("Maintainers");
-        let rows = package
-            .maintainers
-            .iter()
-            .map(|maintainer| vec![maintainer.bright_white().to_string()])
-            .collect();
-        table::print_table(&["Maintainer"], rows);
-    }
-
-    // Authors
     let authors = extract_authors(&xml_content);
-    if !authors.is_empty() {
-        println!();
-        blocks::print_section("Authors");
-        let rows = authors
-            .iter()
-            .map(|author| vec![author.bright_white().to_string()])
-            .collect();
-        table::print_table(&["Author"], rows);
-    }
-
-    // Licenses
     let licenses = extract_licenses(&xml_content);
-    if !licenses.is_empty() {
-        println!();
-        blocks::print_section("Licenses");
-        let rows = licenses
-            .iter()
-            .map(|license| vec![license.bright_white().to_string()])
-            .collect();
-        table::print_table(&["License"], rows);
-    }
-
-    // URLs
     let urls = extract_urls(&xml_content);
-    if !urls.is_empty() {
-        println!();
-        blocks::print_section("URLs");
-        let rows = urls
-            .iter()
-            .map(|(url_type, url)| {
-                vec![
-                    url_type.bright_magenta().to_string(),
-                    url.bright_white().to_string(),
-                ]
-            })
-            .collect();
-        table::print_table(&["Type", "URL"], rows);
-    }
+    let runtime_deps = package.runtime_deps();
 
-    // Dependencies
-    print_dependencies(&package.depend_deps, "Generic Dependencies");
-    print_dependencies(&package.build_deps, "Build Dependencies");
-    print_dependencies(&package.buildtool_deps, "Build Tool Dependencies");
-    print_dependencies(&package.build_export_deps, "Build Export Dependencies");
-    print_dependencies(&package.exec_deps, "Execution Dependencies");
-    print_dependencies(
-        &package.runtime_deps(),
-        "Derived Runtime/Setup Dependencies",
-    );
-    print_dependencies(&package.test_deps, "Test Dependencies");
-
-    // Build status
-    println!();
-    blocks::print_section("Build Status");
     let package_build_dir = build_base.join(&package.name);
     let package_install_dir = install_base.join(&package.name);
     let install_layout = detect_install_layout(&package.name, &install_base);
@@ -250,30 +178,209 @@ async fn run_command_in_workspace(
             }
         }
     };
+    let build_status_plain = strip_ansi_codes(&build_status).to_string();
+    let build_type_plain = strip_ansi_codes(&format_build_type(&package.build_type)).to_string();
+    let install_layout_plain = match install_layout {
+        InstallLayout::None => "none",
+        InstallLayout::Isolated => "isolated",
+        InstallLayout::Merged => "merged",
+    };
 
-    blocks::print_field("Status", build_status);
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Package");
+            blocks::print_field("Name", package.name.bright_white().bold());
+            blocks::print_field("Version", package.version.bright_white());
+            blocks::print_field("Build Type", format_build_type(&package.build_type));
+            blocks::print_field("Path", package.path.display().to_string().bright_black());
 
-    if package_build_dir.exists() {
-        blocks::print_field(
-            "Build directory",
-            package_build_dir.display().to_string().bright_black(),
-        );
-    }
+            if !package.description.is_empty() {
+                blocks::print_field("Description", package.description.bright_white());
+            }
 
-    match install_layout {
-        InstallLayout::Isolated => {
-            blocks::print_field(
-                "Install directory",
-                package_install_dir.display().to_string().bright_black(),
-            );
+            if !package.maintainers.is_empty() {
+                println!();
+                blocks::print_section("Maintainers");
+                let rows = package
+                    .maintainers
+                    .iter()
+                    .map(|maintainer| vec![maintainer.bright_white().to_string()])
+                    .collect();
+                table::print_table(&["Maintainer"], rows);
+            }
+
+            if !authors.is_empty() {
+                println!();
+                blocks::print_section("Authors");
+                let rows = authors
+                    .iter()
+                    .map(|author| vec![author.bright_white().to_string()])
+                    .collect();
+                table::print_table(&["Author"], rows);
+            }
+
+            if !licenses.is_empty() {
+                println!();
+                blocks::print_section("Licenses");
+                let rows = licenses
+                    .iter()
+                    .map(|license| vec![license.bright_white().to_string()])
+                    .collect();
+                table::print_table(&["License"], rows);
+            }
+
+            if !urls.is_empty() {
+                println!();
+                blocks::print_section("URLs");
+                let rows = urls
+                    .iter()
+                    .map(|(url_type, url)| {
+                        vec![
+                            url_type.bright_magenta().to_string(),
+                            url.bright_white().to_string(),
+                        ]
+                    })
+                    .collect();
+                table::print_table(&["Type", "URL"], rows);
+            }
+
+            print_dependencies(&package.depend_deps, "Generic Dependencies");
+            print_dependencies(&package.build_deps, "Build Dependencies");
+            print_dependencies(&package.buildtool_deps, "Build Tool Dependencies");
+            print_dependencies(&package.build_export_deps, "Build Export Dependencies");
+            print_dependencies(&package.exec_deps, "Execution Dependencies");
+            print_dependencies(&runtime_deps, "Derived Runtime/Setup Dependencies");
+            print_dependencies(&package.test_deps, "Test Dependencies");
+
+            println!();
+            blocks::print_section("Build Status");
+            blocks::print_field("Status", build_status);
+
+            if package_build_dir.exists() {
+                blocks::print_field(
+                    "Build directory",
+                    package_build_dir.display().to_string().bright_black(),
+                );
+            }
+
+            match install_layout {
+                InstallLayout::Isolated => {
+                    blocks::print_field(
+                        "Install directory",
+                        package_install_dir.display().to_string().bright_black(),
+                    );
+                }
+                InstallLayout::Merged => {
+                    blocks::print_field(
+                        "Install directory",
+                        install_base.display().to_string().bright_black(),
+                    );
+                }
+                InstallLayout::None => {}
+            }
         }
-        InstallLayout::Merged => {
-            blocks::print_field(
-                "Install directory",
-                install_base.display().to_string().bright_black(),
-            );
+        output::OutputMode::Plain => {
+            output::print_plain_section("Package");
+            output::print_plain_field("Name", &package.name);
+            output::print_plain_field("Version", &package.version);
+            output::print_plain_field("Build Type", &build_type_plain);
+            output::print_plain_field("Path", package.path.display());
+            if !package.description.is_empty() {
+                output::print_plain_field("Description", &package.description);
+            }
+            if !package.maintainers.is_empty() {
+                println!();
+                output::print_plain_section("Maintainers");
+                for maintainer in &package.maintainers {
+                    println!("{maintainer}");
+                }
+            }
+            if !authors.is_empty() {
+                println!();
+                output::print_plain_section("Authors");
+                for author in &authors {
+                    println!("{author}");
+                }
+            }
+            if !licenses.is_empty() {
+                println!();
+                output::print_plain_section("Licenses");
+                for license in &licenses {
+                    println!("{license}");
+                }
+            }
+            if !urls.is_empty() {
+                println!();
+                output::print_plain_section("URLs");
+                for (url_type, url) in &urls {
+                    println!("{url_type}\t{url}");
+                }
+            }
+            for (title, deps) in [
+                ("Generic Dependencies", &package.depend_deps),
+                ("Build Dependencies", &package.build_deps),
+                ("Build Tool Dependencies", &package.buildtool_deps),
+                ("Build Export Dependencies", &package.build_export_deps),
+                ("Execution Dependencies", &package.exec_deps),
+                ("Derived Runtime/Setup Dependencies", &runtime_deps),
+                ("Test Dependencies", &package.test_deps),
+            ] {
+                if !deps.is_empty() {
+                    println!();
+                    output::print_plain_section(title);
+                    for dep in deps {
+                        println!("{dep}");
+                    }
+                }
+            }
+            println!();
+            output::print_plain_section("Build Status");
+            output::print_plain_field("Status", &build_status_plain);
+            if package_build_dir.exists() {
+                output::print_plain_field("Build directory", package_build_dir.display());
+            }
+            match install_layout {
+                InstallLayout::Isolated => {
+                    output::print_plain_field("Install directory", package_install_dir.display());
+                }
+                InstallLayout::Merged => {
+                    output::print_plain_field("Install directory", install_base.display());
+                }
+                InstallLayout::None => {}
+            }
         }
-        InstallLayout::None => {}
+        output::OutputMode::Json => {
+            output::print_json(&json!({
+                "name": package.name,
+                "version": package.version,
+                "build_type": build_type_plain,
+                "path": package.path,
+                "description": package.description,
+                "maintainers": package.maintainers,
+                "authors": authors,
+                "licenses": licenses,
+                "urls": urls.iter().map(|(url_type, url)| json!({ "type": url_type, "url": url })).collect::<Vec<_>>(),
+                "dependencies": {
+                    "generic": package.depend_deps,
+                    "build": package.build_deps,
+                    "build_tool": package.buildtool_deps,
+                    "build_export": package.build_export_deps,
+                    "execution": package.exec_deps,
+                    "runtime": runtime_deps,
+                    "test": package.test_deps,
+                },
+                "build_status": {
+                    "status": build_status_plain,
+                    "install_layout": install_layout_plain,
+                    "build_directory": if package_build_dir.exists() { Some(package_build_dir) } else { None::<std::path::PathBuf> },
+                    "install_directory": match install_layout {
+                        InstallLayout::Isolated => Some(package_install_dir),
+                        InstallLayout::Merged => Some(install_base),
+                        InstallLayout::None => None,
+                    },
+                }
+            }))?;
+        }
     }
 
     Ok(())

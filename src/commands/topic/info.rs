@@ -1,11 +1,13 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
-use crate::ui::{blocks, table};
+use crate::ui::{blocks, output, table};
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
+use serde_json::json;
 
 fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches_with_compat(&matches, common_args.ros_style);
     let topic_name = matches
         .get_one::<String>("topic_name")
         .ok_or_else(|| anyhow!("Topic name is required"))?;
@@ -49,32 +51,40 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         .count_subscribers(topic_name)
         .map_err(|e| anyhow!("Failed to count subscribers: {}", e))?;
 
-    if common_args.ros_style {
-        // Original ROS2 CLI style
-        println!("Type: {}", topic_type);
-        println!("Publisher count: {}", publisher_count);
-        println!("Subscription count: {}", subscriber_count);
-    } else {
-        blocks::print_section("Topic");
-        blocks::print_field("Name", topic_name.bright_cyan());
-        blocks::print_field("Type", topic_type.bright_green());
-        blocks::print_field(
-            "Publishers",
-            if publisher_count > 0 {
-                publisher_count.to_string().bright_green().to_string()
-            } else {
-                publisher_count.to_string().red().to_string()
-            },
-        );
-        blocks::print_field(
-            "Subscribers",
-            if subscriber_count > 0 {
-                subscriber_count.to_string().bright_green().to_string()
-            } else {
-                subscriber_count.to_string().red().to_string()
-            },
-        );
+    match output_mode {
+        output::OutputMode::Plain => {
+            output::print_plain_section("Topic");
+            output::print_plain_field("Name", topic_name);
+            output::print_plain_field("Type", &topic_type);
+            output::print_plain_field("Publisher count", publisher_count);
+            output::print_plain_field("Subscription count", subscriber_count);
+        }
+        output::OutputMode::Human => {
+            blocks::print_section("Topic");
+            blocks::print_field("Name", topic_name.bright_cyan());
+            blocks::print_field("Type", topic_type.bright_green());
+            blocks::print_field(
+                "Publishers",
+                if publisher_count > 0 {
+                    publisher_count.to_string().bright_green().to_string()
+                } else {
+                    publisher_count.to_string().red().to_string()
+                },
+            );
+            blocks::print_field(
+                "Subscribers",
+                if subscriber_count > 0 {
+                    subscriber_count.to_string().bright_green().to_string()
+                } else {
+                    subscriber_count.to_string().red().to_string()
+                },
+            );
+        }
+        output::OutputMode::Json => {}
     }
+
+    let mut publishers_json = Vec::new();
+    let mut subscribers_json = Vec::new();
 
     if verbose {
         // Get detailed publisher info
@@ -90,69 +100,103 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
             .get_subscribers_info(topic_name)
             .map_err(|e| anyhow!("Failed to get subscribers info: {}", e))?;
 
-        if common_args.ros_style {
-            // Original ROS2 CLI style
-            println!("\nPublishers:");
-            if publishers_info.is_empty() {
-                println!("  <none>");
-            } else {
-                for pub_info in publishers_info {
-                    println!("  - Node name: {}", pub_info.node_name);
-                    println!("    Node namespace: {}", pub_info.node_namespace);
-                    println!("    Topic type: {}", pub_info.topic_type);
-                }
-            }
-        } else {
-            println!();
-            blocks::print_section("Publishers");
-            if publishers_info.is_empty() {
-                println!("{}", "<none>".bright_black());
-            } else {
-                let rows = publishers_info
-                    .iter()
-                    .map(|pub_info| {
-                        vec![
-                            pub_info.node_name.bright_white().to_string(),
-                            pub_info.node_namespace.bright_black().to_string(),
-                            pub_info.topic_type.bright_green().to_string(),
-                        ]
-                    })
-                    .collect();
-                table::print_table(&["Node", "Namespace", "Type"], rows);
-            }
-        }
+        publishers_json = publishers_info
+            .iter()
+            .map(|pub_info| {
+                json!({
+                    "node_name": pub_info.node_name,
+                    "node_namespace": pub_info.node_namespace,
+                    "topic_type": pub_info.topic_type,
+                })
+            })
+            .collect();
+        subscribers_json = subscribers_info
+            .iter()
+            .map(|sub_info| {
+                json!({
+                    "node_name": sub_info.node_name,
+                    "node_namespace": sub_info.node_namespace,
+                    "topic_type": sub_info.topic_type,
+                })
+            })
+            .collect();
 
-        if common_args.ros_style {
-            // Original ROS2 CLI style
-            println!("\nSubscribers:");
-            if subscribers_info.is_empty() {
-                println!("  <none>");
-            } else {
-                for sub_info in subscribers_info {
-                    println!("  - Node name: {}", sub_info.node_name);
-                    println!("    Node namespace: {}", sub_info.node_namespace);
-                    println!("    Topic type: {}", sub_info.topic_type);
+        match output_mode {
+            output::OutputMode::Plain => {
+                output::print_plain_section("Publishers");
+                if publishers_info.is_empty() {
+                    println!("<none>");
+                } else {
+                    for pub_info in &publishers_info {
+                        println!(
+                            "{}\t{}\t{}",
+                            pub_info.node_name, pub_info.node_namespace, pub_info.topic_type
+                        );
+                    }
+                }
+                println!();
+                output::print_plain_section("Subscribers");
+                if subscribers_info.is_empty() {
+                    println!("<none>");
+                } else {
+                    for sub_info in &subscribers_info {
+                        println!(
+                            "{}\t{}\t{}",
+                            sub_info.node_name, sub_info.node_namespace, sub_info.topic_type
+                        );
+                    }
                 }
             }
-        } else {
-            println!();
-            blocks::print_section("Subscribers");
-            if subscribers_info.is_empty() {
-                println!("{}", "<none>".bright_black());
-            } else {
-                let rows = subscribers_info
-                    .iter()
-                    .map(|sub_info| {
-                        vec![
-                            sub_info.node_name.bright_white().to_string(),
-                            sub_info.node_namespace.bright_black().to_string(),
-                            sub_info.topic_type.bright_green().to_string(),
-                        ]
-                    })
-                    .collect();
-                table::print_table(&["Node", "Namespace", "Type"], rows);
+            output::OutputMode::Human => {
+                println!();
+                blocks::print_section("Publishers");
+                if publishers_info.is_empty() {
+                    println!("{}", "<none>".bright_black());
+                } else {
+                    let rows = publishers_info
+                        .iter()
+                        .map(|pub_info| {
+                            vec![
+                                pub_info.node_name.bright_white().to_string(),
+                                pub_info.node_namespace.bright_black().to_string(),
+                                pub_info.topic_type.bright_green().to_string(),
+                            ]
+                        })
+                        .collect();
+                    table::print_table(&["Node", "Namespace", "Type"], rows);
+                }
+
+                println!();
+                blocks::print_section("Subscribers");
+                if subscribers_info.is_empty() {
+                    println!("{}", "<none>".bright_black());
+                } else {
+                    let rows = subscribers_info
+                        .iter()
+                        .map(|sub_info| {
+                            vec![
+                                sub_info.node_name.bright_white().to_string(),
+                                sub_info.node_namespace.bright_black().to_string(),
+                                sub_info.topic_type.bright_green().to_string(),
+                            ]
+                        })
+                        .collect();
+                    table::print_table(&["Node", "Namespace", "Type"], rows);
+                }
             }
+            output::OutputMode::Json => {}
         }
+    }
+
+    if output_mode == output::OutputMode::Json {
+        output::print_json(&json!({
+            "name": topic_name,
+            "type": topic_type,
+            "publisher_count": publisher_count,
+            "subscriber_count": subscriber_count,
+            "publishers": publishers_json,
+            "subscribers": subscribers_json,
+        }))?;
     }
 
     Ok(())

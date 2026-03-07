@@ -1,9 +1,11 @@
 use crate::commands::cli::run_async_command;
 use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
-use crate::ui::{blocks, table};
+use crate::ui::{blocks, output, table};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
+use console::strip_ansi_codes;
+use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 
@@ -70,6 +72,7 @@ fn get_creation_time(package_path: &PathBuf) -> String {
 }
 
 async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) -> Result<()> {
+    let output_mode = output::OutputMode::from_matches(&matches);
     let build_base = workspace_root.join("build");
     let install_base = workspace_root.join("install");
 
@@ -93,13 +96,21 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) 
     let packages = discover_packages(&config)?;
 
     if packages.is_empty() {
-        println!("{}", "No ROS 2 packages found in the workspace.".yellow());
+        match output_mode {
+            output::OutputMode::Json => {
+                output::print_json(&json!({ "packages": [], "count": 0 }))?;
+            }
+            _ => println!("{}", "No ROS 2 packages found in the workspace.".yellow()),
+        }
         return Ok(());
     }
 
     // Check if user wants count only
     if matches.get_flag("count_packages") {
-        println!("{}", packages.len());
+        match output_mode {
+            output::OutputMode::Human | output::OutputMode::Plain => println!("{}", packages.len()),
+            output::OutputMode::Json => output::print_json(&json!({ "count": packages.len() }))?,
+        }
         return Ok(());
     }
 
@@ -107,20 +118,53 @@ async fn run_command_in_workspace(matches: ArgMatches, workspace_root: PathBuf) 
     let mut sorted_packages = packages.clone();
     sorted_packages.sort_by(|a, b| a.name.cmp(&b.name));
 
-    blocks::print_section("Workspace Packages");
-    let rows = sorted_packages
-        .iter()
-        .map(|package| {
-            vec![
-                package.name.bright_white().bold().to_string(),
-                format_build_type(&package.build_type),
-                format_build_status(&package.path, &build_base, &install_base),
-                get_creation_time(&package.path).bright_black().to_string(),
-            ]
-        })
-        .collect();
-    table::print_table(&["Package", "Build Type", "Status", "Created"], rows);
-    blocks::print_total(packages.len(), "package", "packages");
+    match output_mode {
+        output::OutputMode::Human => {
+            blocks::print_section("Workspace Packages");
+            let rows = sorted_packages
+                .iter()
+                .map(|package| {
+                    vec![
+                        package.name.bright_white().bold().to_string(),
+                        format_build_type(&package.build_type),
+                        format_build_status(&package.path, &build_base, &install_base),
+                        get_creation_time(&package.path).bright_black().to_string(),
+                    ]
+                })
+                .collect();
+            table::print_table(&["Package", "Build Type", "Status", "Created"], rows);
+            blocks::print_total(packages.len(), "package", "packages");
+        }
+        output::OutputMode::Plain => {
+            for package in &sorted_packages {
+                println!(
+                    "{}\t{}\t{}\t{}",
+                    package.name,
+                    strip_ansi_codes(&format_build_type(&package.build_type)),
+                    strip_ansi_codes(&format_build_status(
+                        &package.path,
+                        &build_base,
+                        &install_base
+                    )),
+                    get_creation_time(&package.path),
+                );
+            }
+        }
+        output::OutputMode::Json => {
+            let packages_json = sorted_packages
+                .iter()
+                .map(|package| {
+                    json!({
+                        "name": package.name,
+                        "build_type": strip_ansi_codes(&format_build_type(&package.build_type)),
+                        "status": strip_ansi_codes(&format_build_status(&package.path, &build_base, &install_base)),
+                        "created": get_creation_time(&package.path),
+                    })
+                })
+                .collect::<Vec<_>>();
+            output::print_json(&json!({ "packages": packages_json, "count": packages.len() }))?;
+        }
+    }
 
     Ok(())
 }

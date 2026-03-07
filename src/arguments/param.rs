@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 /// Common param arguments that are extracted from the parent param command
@@ -125,6 +126,7 @@ pub fn cmd() -> Command {
                 .value_name("REGEX")
                 .help("Only list parameters matching the provided regex")
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("set")
@@ -189,6 +191,7 @@ pub fn cmd() -> Command {
                 .help("Consider hidden nodes as well")
                 .action(ArgAction::SetTrue)
             )
+            .arg(output::arg())
         )
         .subcommand(
             Command::new("remove")

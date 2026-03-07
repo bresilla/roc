@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 /// Common action arguments that are extracted from the parent action command
@@ -78,7 +79,8 @@ pub fn cmd() -> Command {
                         .help("Only display the number of actions discovered")
                         .action(ArgAction::SetTrue)
                         .conflicts_with("show_types"),
-                ),
+                )
+                .arg(output::arg()),
         )
         .subcommand(
             Command::new("list")
@@ -101,7 +103,8 @@ pub fn cmd() -> Command {
                         .help("Only display the number of actions discovered")
                         .action(ArgAction::SetTrue)
                         .conflicts_with("show_types"),
-                ),
+                )
+                .arg(output::arg()),
         )
         .subcommand(
             Command::new("goal")
