@@ -42,6 +42,8 @@ _roc_completion() {
     local middleware_list_flags="--output"
     local middleware_get_flags="--output"
     local middleware_set_flags="--output"
+    local idl_protobuf_flags="-d --discover -r --search-root --max-depth -o --output -p --package -c --config -I --include -v --verbose -n --dry-run"
+    local idl_ros2msg_flags="-o --output -p --package -v --verbose -n --dry-run"
 
     if [[ "$cur" == -* ]]; then
         case "$top" in
@@ -110,6 +112,12 @@ _roc_completion() {
                     set) COMPREPLY=($(compgen -W "$middleware_set_flags" -- "$cur")); return ;;
                 esac
                 ;;
+            idl)
+                case "${words[2]}" in
+                    protobuf|proto|pb) COMPREPLY=($(compgen -W "$idl_protobuf_flags" -- "$cur")); return ;;
+                    ros2msg|msg|ros2) COMPREPLY=($(compgen -W "$idl_ros2msg_flags" -- "$cur")); return ;;
+                esac
+                ;;
             interface)
                 case "${words[2]}" in
                     list) COMPREPLY=($(compgen -W "$interface_list_flags" -- "$cur")); return ;;
@@ -124,7 +132,7 @@ _roc_completion() {
 
     case "$top" in
         "")
-            COMPREPLY=($(compgen -W "action topic service param node interface frame run launch work bag daemon middleware completion" -- "$cur"))
+            COMPREPLY=($(compgen -W "action topic service param node interface frame run launch work bag daemon middleware idl completion" -- "$cur"))
             ;;
         launch)
             case "$cword" in
@@ -229,6 +237,21 @@ _roc_completion() {
                 COMPREPLY=($(compgen -W "$(roc _complete middleware '' '' 1 2>/dev/null)" -- "$cur"))
             fi
             ;;
+        idl)
+            case "$cword" in
+                2)
+                    COMPREPLY=($(compgen -W "$(roc _complete idl '' '' 1 2>/dev/null)" -- "$cur"))
+                    ;;
+                *)
+                    local idl_position=$((cword - 2))
+                    local idl_args=()
+                    if (( cword > 3 )); then
+                        idl_args=("${words[@]:3:$((cword - 3))}")
+                    fi
+                    COMPREPLY=($(compgen -W "$(roc _complete idl "${words[2]}" '' "$idl_position" "${idl_args[@]}" 2>/dev/null)" -- "$cur"))
+                    ;;
+            esac
+            ;;
         completion)
             case "$cword" in
                 2) COMPREPLY=($(compgen -W "bash zsh fish" -- "$cur")) ;;
@@ -328,5 +351,12 @@ mod tests {
         assert!(SCRIPT.contains("local launch_flags="));
         assert!(SCRIPT.contains("--launch_prefix"));
         assert!(SCRIPT.contains("--show_args"));
+    }
+
+    #[test]
+    fn bash_script_completes_idl_flags() {
+        assert!(SCRIPT.contains("local idl_protobuf_flags="));
+        assert!(SCRIPT.contains("--search-root"));
+        assert!(SCRIPT.contains("roc _complete idl"));
     }
 }

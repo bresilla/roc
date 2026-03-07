@@ -23,7 +23,23 @@ function __roc_sub_cmd
     end
 end
 
-complete -c roc -f -n "not __fish_seen_subcommand_from action topic service param node interface frame run launch work bag daemon middleware completion" -a "action topic service param node interface frame run launch work bag daemon middleware completion"
+function __roc_idl_position
+    set -l cmd (__roc_args)
+    if test (count $cmd) -ge 3
+        math (count $cmd) - 2
+    else
+        echo 1
+    end
+end
+
+function __roc_idl_args
+    set -l cmd (__roc_args)
+    if test (count $cmd) -ge 4
+        printf '%s\n' $cmd[4..-1]
+    end
+end
+
+complete -c roc -f -n "not __fish_seen_subcommand_from action topic service param node interface frame run launch work bag daemon middleware idl completion" -a "action topic service param node interface frame run launch work bag daemon middleware idl completion"
 
 complete -c roc -f -n "__fish_seen_subcommand_from launch; and not __roc_sub_cmd" -a "(roc _complete launch '' '' 1 2>/dev/null)"
 complete -c roc -f -n "__fish_seen_subcommand_from launch; and __roc_sub_cmd" -a "(roc _complete launch '' '' 2 (__roc_sub_cmd) 2>/dev/null)"
@@ -65,6 +81,8 @@ complete -c roc -f -n "__fish_seen_subcommand_from frame; and test (__roc_sub_cm
 
 complete -c roc -f -n "__fish_seen_subcommand_from daemon; and not __roc_sub_cmd" -a "(roc _complete daemon '' '' 1 2>/dev/null)"
 complete -c roc -f -n "__fish_seen_subcommand_from middleware; and not __roc_sub_cmd" -a "(roc _complete middleware '' '' 1 2>/dev/null)"
+complete -c roc -f -n "__fish_seen_subcommand_from idl; and not __roc_sub_cmd" -a "(roc _complete idl '' '' 1 2>/dev/null)"
+complete -c roc -f -n "__fish_seen_subcommand_from idl; and __roc_sub_cmd" -a "(roc _complete idl (__roc_sub_cmd) '' (__roc_idl_position) (__roc_idl_args) 2>/dev/null)"
 complete -c roc -f -n "__fish_seen_subcommand_from completion; and not __roc_sub_cmd" -a "bash zsh fish"
 complete -c roc -f -n "__fish_seen_subcommand_from completion" -l install
 
@@ -194,6 +212,19 @@ complete -c roc -n "__fish_seen_subcommand_from daemon; and contains (__roc_sub_
 complete -c roc -n "__fish_seen_subcommand_from middleware; and test (__roc_sub_cmd) = list" -l output
 complete -c roc -n "__fish_seen_subcommand_from middleware; and test (__roc_sub_cmd) = get" -l output
 complete -c roc -n "__fish_seen_subcommand_from middleware; and test (__roc_sub_cmd) = set" -l output
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -s d -l discover
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -s r -l search-root
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -l max-depth
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -s o -l output
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -s p -l package
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -s c -l config
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -s I -l include
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -s v -l verbose
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) protobuf proto pb" -s n -l dry-run
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) ros2msg msg ros2" -s o -l output
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) ros2msg msg ros2" -s p -l package
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) ros2msg msg ros2" -s v -l verbose
+complete -c roc -n "__fish_seen_subcommand_from idl; and contains (__roc_sub_cmd) ros2msg msg ros2" -s n -l dry-run
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = list" -s m -l messages
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = list" -s s -l services
 complete -c roc -n "__fish_seen_subcommand_from interface; and test (__roc_sub_cmd) = list" -s a -l actions
@@ -287,5 +318,12 @@ mod tests {
     fn fish_script_completes_work_test_result_flags() {
         assert!(SCRIPT.contains("test (__roc_sub_cmd) = test-result"));
         assert!(SCRIPT.contains("-l delete-yes"));
+    }
+
+    #[test]
+    fn fish_script_completes_idl_flags() {
+        assert!(SCRIPT.contains("roc _complete idl"));
+        assert!(SCRIPT.contains("-l search-root"));
+        assert!(SCRIPT.contains("__roc_idl_position"));
     }
 }

@@ -14,7 +14,7 @@ _roc_dynamic_lines() {
 _roc() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
-    local -a launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_kind_flags topic_bw_flags topic_find_flags topic_delay_flags service_find_flags service_list_flags service_kind_flags param_get_flags param_list_flags param_set_flags param_export_flags param_remove_flags param_describe_flags param_import_flags bag_list_flags bag_info_flags daemon_flags middleware_list_flags middleware_get_flags middleware_set_flags interface_list_flags interface_all_flags interface_package_flags interface_show_flags interface_model_flags
+    local -a launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_kind_flags topic_bw_flags topic_find_flags topic_delay_flags service_find_flags service_list_flags service_kind_flags param_get_flags param_list_flags param_set_flags param_export_flags param_remove_flags param_describe_flags param_import_flags bag_list_flags bag_info_flags daemon_flags middleware_list_flags middleware_get_flags middleware_set_flags idl_protobuf_flags idl_ros2msg_flags interface_list_flags interface_all_flags interface_package_flags interface_show_flags interface_model_flags
     launch_flags=(-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter)
     work_build_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor)
     work_test_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --merge-install --continue-on-error --ctest-args --pytest-args)
@@ -44,6 +44,8 @@ _roc() {
     middleware_list_flags=(--output)
     middleware_get_flags=(--output)
     middleware_set_flags=(--output)
+    idl_protobuf_flags=(-d --discover -r --search-root --max-depth -o --output -p --package -c --config -I --include -v --verbose -n --dry-run)
+    idl_ros2msg_flags=(-o --output -p --package -v --verbose -n --dry-run)
     interface_list_flags=(-m --messages -s --services -a --actions --output)
     interface_all_flags=(-m --messages -s --services -a --actions --output)
     interface_package_flags=(--output)
@@ -114,6 +116,12 @@ _roc() {
                     set) _describe 'middleware set flags' middleware_set_flags; return ;;
                 esac
                 ;;
+            idl)
+                case "$words[3]" in
+                    protobuf|proto|pb) _describe 'idl protobuf flags' idl_protobuf_flags; return ;;
+                    ros2msg|msg|ros2) _describe 'idl ros2msg flags' idl_ros2msg_flags; return ;;
+                esac
+                ;;
             interface)
                 case "$words[3]" in
                     list) _describe 'interface list flags' interface_list_flags; return ;;
@@ -146,6 +154,7 @@ _roc() {
                 'bag:ROS bag tools'
                 'daemon:Daemon and bridge'
                 'middleware:Middleware settings'
+                'idl:Interface definition tools'
                 'completion:Generate shell completions'
             )
             _describe 'command' commands
@@ -252,6 +261,20 @@ _roc() {
                 middleware)
                     [[ $CURRENT -eq 3 ]] && _describe 'subcommands' "$(_roc_dynamic_lines roc _complete middleware '' '' 1)"
                     ;;
+                idl)
+                    case $CURRENT in
+                        3) _describe 'subcommands' "$(_roc_dynamic_lines roc _complete idl '' '' 1)" ;;
+                        *)
+                            local -a idl_args
+                            if (( CURRENT > 4 )); then
+                                idl_args=("${(@)words[4,$((CURRENT-1))]}")
+                            else
+                                idl_args=()
+                            fi
+                            _describe 'values' "$(_roc_dynamic_lines roc _complete idl "$words[3]" '' $((CURRENT-3)) ${(@)idl_args})"
+                            ;;
+                    esac
+                    ;;
                 completion)
                     case $CURRENT in
                         3) _describe 'shells' "bash zsh fish" ;;
@@ -354,5 +377,12 @@ mod tests {
     fn zsh_script_completes_work_test_result_flags() {
         assert!(SCRIPT.contains("work_test_result_flags=("));
         assert!(SCRIPT.contains("--delete-yes"));
+    }
+
+    #[test]
+    fn zsh_script_completes_idl_flags() {
+        assert!(SCRIPT.contains("idl_protobuf_flags=("));
+        assert!(SCRIPT.contains("--search-root"));
+        assert!(SCRIPT.contains("roc _complete idl"));
     }
 }

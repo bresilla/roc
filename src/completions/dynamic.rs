@@ -4,7 +4,7 @@ use crate::shared::tf2_subscriber::TfFrameIndex;
 use crate::utils::{get_ros_workspace_paths, is_executable};
 use clap::ArgMatches;
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{env, fs};
 use walkdir::WalkDir;
 
@@ -23,6 +23,7 @@ const WORK_SUBCOMMANDS: &[&str] = &["build", "create", "info", "list", "test", "
 const FRAME_SUBCOMMANDS: &[&str] = &["list", "echo", "info", "pub"];
 const DAEMON_SUBCOMMANDS: &[&str] = &["start", "stop", "status"];
 const MIDDLEWARE_SUBCOMMANDS: &[&str] = &["get", "set", "list"];
+const IDL_SUBCOMMANDS: &[&str] = &["protobuf", "ros2msg"];
 
 /// Handle internal dynamic completion (_complete)
 pub fn handle(matches: ArgMatches) {
@@ -140,6 +141,13 @@ fn complete(
             .iter()
             .map(|s| s.to_string())
             .collect(),
+        ("idl", None, None, 1) => IDL_SUBCOMMANDS.iter().map(|s| s.to_string()).collect(),
+        ("idl", Some("protobuf" | "proto" | "pb"), None, position) if position >= 1 => {
+            complete_idl_protobuf(current_args)
+        }
+        ("idl", Some("ros2msg" | "msg" | "ros2"), None, position) if position >= 1 => {
+            complete_idl_ros2msg(current_args)
+        }
         _ => Vec::new(),
     }
 }
@@ -521,6 +529,111 @@ fn find_interfaces() -> Vec<String> {
     interface_operations::list_interfaces(false, false, false).unwrap_or_default()
 }
 
+fn complete_idl_protobuf(current_args: &[String]) -> Vec<String> {
+    match current_args.last().map(String::as_str) {
+        Some("-r" | "--search-root" | "-o" | "--output" | "-I" | "--include") => find_directories(),
+        Some("-c" | "--config") => find_config_files(),
+        Some("-p" | "--package" | "--max-depth") => Vec::new(),
+        _ => find_completion_paths(&["proto", "msg"], true),
+    }
+}
+
+fn complete_idl_ros2msg(current_args: &[String]) -> Vec<String> {
+    match current_args.last().map(String::as_str) {
+        Some("-o" | "--output") => find_directories(),
+        Some("-p" | "--package") => Vec::new(),
+        _ => find_completion_paths(&["msg"], true),
+    }
+}
+
+fn find_config_files() -> Vec<String> {
+    find_completion_paths(&["yaml", "yml"], true)
+}
+
+fn find_directories() -> Vec<String> {
+    find_completion_paths(&[], true)
+        .into_iter()
+        .filter(|path| path.ends_with('/'))
+        .collect()
+}
+
+fn find_completion_paths(file_extensions: &[&str], include_directories: bool) -> Vec<String> {
+    let mut matches = HashSet::new();
+
+    for entry in WalkDir::new(".")
+        .follow_links(true)
+        .max_depth(6)
+        .into_iter()
+        .filter_entry(|entry| !should_skip_completion_entry(entry.path(), entry.depth()))
+        .filter_map(|entry| entry.ok())
+    {
+        if entry.depth() == 0 {
+            continue;
+        }
+
+        let path = entry.path();
+        let relative = relative_completion_path(path);
+        if relative.is_empty() {
+            continue;
+        }
+
+        if entry.file_type().is_dir() {
+            if include_directories {
+                matches.insert(format!("{relative}/"));
+            }
+            continue;
+        }
+
+        if !file_extensions.is_empty()
+            && path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| {
+                    file_extensions
+                        .iter()
+                        .any(|candidate| candidate.eq_ignore_ascii_case(ext))
+                })
+                .unwrap_or(false)
+        {
+            matches.insert(relative);
+        }
+    }
+
+    sorted(matches)
+}
+
+fn should_skip_completion_entry(path: &Path, depth: usize) -> bool {
+    if depth == 0 {
+        return false;
+    }
+
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| {
+            matches!(
+                name,
+                ".git"
+                    | "target"
+                    | "build"
+                    | "install"
+                    | "log"
+                    | "node_modules"
+                    | ".venv"
+                    | "venv"
+                    | "__pycache__"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn relative_completion_path(path: &Path) -> String {
+    path.strip_prefix(".")
+        .unwrap_or(path)
+        .to_string_lossy()
+        .trim_start_matches("./")
+        .to_string()
+}
+
 fn find_bag_files() -> Vec<String> {
     let mut bags = HashSet::new();
     if let Ok(entries) = fs::read_dir(".") {
@@ -619,6 +732,14 @@ mod tests {
         assert_eq!(
             complete("frame", None, None, 1, &[]),
             strings(&["list", "echo", "info", "pub"])
+        );
+    }
+
+    #[test]
+    fn idl_completions_include_idl_subcommands() {
+        assert_eq!(
+            complete("idl", None, None, 1, &[]),
+            strings(&["protobuf", "ros2msg"])
         );
     }
 
