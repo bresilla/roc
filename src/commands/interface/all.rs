@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::ArgMatches;
 
 use crate::graph::interface_operations;
+use crate::ui::{blocks, table};
 use colored::*;
 
 fn run_command(matches: ArgMatches) -> Result<()> {
@@ -16,16 +17,13 @@ fn run_command(matches: ArgMatches) -> Result<()> {
         return Ok(());
     }
 
-    println!("{}", "Interface Packages:".bright_yellow().bold());
-    for p in items.iter() {
-        println!("  {}", p.bright_cyan());
-    }
-    println!();
-    println!(
-        "{} {} packages found",
-        "Total:".bright_green(),
-        items.len().to_string().bright_white().bold()
-    );
+    blocks::print_section("Interface Packages");
+    let rows = items
+        .iter()
+        .map(|item| vec![item.bright_cyan().to_string()])
+        .collect();
+    table::print_table(&["Package"], rows);
+    blocks::print_total(items.len(), "package", "packages");
 
     Ok(())
 }

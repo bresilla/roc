@@ -3,6 +3,7 @@ use clap::ArgMatches;
 use colored::*;
 
 use crate::graph::interface_operations;
+use crate::ui::{blocks, table};
 
 fn run_command(matches: ArgMatches) -> Result<()> {
     let only_msgs = matches.get_flag("messages");
@@ -15,16 +16,13 @@ fn run_command(matches: ArgMatches) -> Result<()> {
         return Ok(());
     }
 
-    println!("{}", "Available Interfaces:".bright_yellow().bold());
-    for t in items.iter() {
-        println!("  {}", t.bright_cyan());
-    }
-    println!();
-    println!(
-        "{} {} interfaces found",
-        "Total:".bright_green(),
-        items.len().to_string().bright_white().bold()
-    );
+    blocks::print_section("Interfaces");
+    let rows = items
+        .iter()
+        .map(|item| vec![item.bright_cyan().to_string()])
+        .collect();
+    table::print_table(&["Interface"], rows);
+    blocks::print_total(items.len(), "interface", "interfaces");
 
     Ok(())
 }

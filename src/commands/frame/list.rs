@@ -4,6 +4,7 @@ use colored::*;
 use std::time::{Duration, Instant};
 
 use crate::shared::tf2_subscriber::{TfEdgeKind, TfFrameIndex};
+use crate::ui::{blocks, table};
 
 fn run_command(matches: ArgMatches) -> Result<()> {
     let _show_all = matches.get_flag("all");
@@ -36,25 +37,29 @@ fn run_command(matches: ArgMatches) -> Result<()> {
         return Ok(());
     }
 
-    println!("{}", "Available Transforms:".bright_yellow().bold());
-    for ((parent, child), tf, kind) in &edges {
-        let lhs = format!("{} -> {}", parent, child);
-        let kind_str = match kind {
-            TfEdgeKind::Static => "static",
-            TfEdgeKind::Dynamic => "dynamic",
-        };
-        let rhs = format!(
-            "t=[{:.3},{:.3},{:.3}] q=[{:.3},{:.3},{:.3},{:.3}] type=[{}]",
-            tf.tx, tf.ty, tf.tz, tf.qx, tf.qy, tf.qz, tf.qw, kind_str
-        );
-        println!("  {} {}", lhs.bright_cyan(), rhs.bright_black());
-    }
-    println!();
-    println!(
-        "{} {} transforms found",
-        "Total:".bright_green(),
-        edges.len().to_string().bright_white().bold()
-    );
+    blocks::print_section("Transforms");
+    let rows = edges
+        .iter()
+        .map(|((parent, child), tf, kind)| {
+            let kind_str = match kind {
+                TfEdgeKind::Static => "static",
+                TfEdgeKind::Dynamic => "dynamic",
+            };
+            vec![
+                parent.bright_cyan().to_string(),
+                child.bright_cyan().to_string(),
+                format!("[{:.3}, {:.3}, {:.3}]", tf.tx, tf.ty, tf.tz)
+                    .bright_black()
+                    .to_string(),
+                format!("[{:.3}, {:.3}, {:.3}, {:.3}]", tf.qx, tf.qy, tf.qz, tf.qw)
+                    .bright_black()
+                    .to_string(),
+                kind_str.bright_black().to_string(),
+            ]
+        })
+        .collect();
+    table::print_table(&["Parent", "Child", "Translation", "Rotation", "Kind"], rows);
+    blocks::print_total(edges.len(), "transform", "transforms");
 
     Ok(())
 }

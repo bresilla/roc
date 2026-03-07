@@ -1,4 +1,5 @@
 use crate::commands::cli::handle_anyhow_result;
+use crate::ui::{blocks, table};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
@@ -19,16 +20,13 @@ fn run_command(matches: ArgMatches) -> Result<()> {
         return Ok(());
     }
 
-    println!("{}", "Rosbag2 Recordings:".bright_yellow().bold());
-    for bag in &bags {
-        println!("  {}", bag.display().to_string().bright_cyan());
-    }
-    println!();
-    println!(
-        "{} {} recordings found",
-        "Total:".bright_green(),
-        bags.len().to_string().bright_white().bold()
-    );
+    blocks::print_section("Rosbag2 Recordings");
+    let rows = bags
+        .iter()
+        .map(|bag| vec![bag.display().to_string().bright_cyan().to_string()])
+        .collect();
+    table::print_table(&["Path"], rows);
+    blocks::print_total(bags.len(), "recording", "recordings");
 
     Ok(())
 }

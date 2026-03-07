@@ -1,11 +1,12 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, table};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 
 use crate::arguments::param::CommonParamArgs;
 use crate::shared::param_operations::{
-    ParamClientContext, filter_parameter_names, parameter_type_to_string,
+    filter_parameter_names, parameter_type_to_string, ParamClientContext,
 };
 
 fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
@@ -61,24 +62,21 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
             );
             return Ok(());
         }
-        println!(
-            "{} {}",
-            "Parameters:".bright_yellow().bold(),
-            format!("[{}]", node_fqn).bright_black()
-        );
-        for (name, ty) in names.iter().cloned().zip(types_response.types.into_iter()) {
-            println!(
-                "  {} {}",
-                name.bright_cyan(),
-                format!("({})", parameter_type_to_string(ty)).bright_black()
-            );
-        }
-        println!();
-        println!(
-            "{} {} params found",
-            "Total:".bright_green(),
-            names.len().to_string().bright_white().bold()
-        );
+        blocks::print_section("Parameters");
+        blocks::print_field("Node", format!("[{}]", node_fqn).bright_black());
+        let rows = names
+            .iter()
+            .cloned()
+            .zip(types_response.types.into_iter())
+            .map(|(name, ty)| {
+                vec![
+                    name.bright_cyan().to_string(),
+                    parameter_type_to_string(ty).bright_black().to_string(),
+                ]
+            })
+            .collect();
+        table::print_table(&["Parameter", "Type"], rows);
+        blocks::print_total(names.len(), "parameter", "parameters");
         return Ok(());
     }
 
@@ -90,20 +88,14 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         );
         return Ok(());
     }
-    println!(
-        "{} {}",
-        "Parameters:".bright_yellow().bold(),
-        format!("[{}]", node_fqn).bright_black()
-    );
-    for name in names.iter() {
-        println!("  {}", name.bright_cyan());
-    }
-    println!();
-    println!(
-        "{} {} params found",
-        "Total:".bright_green(),
-        names.len().to_string().bright_white().bold()
-    );
+    blocks::print_section("Parameters");
+    blocks::print_field("Node", format!("[{}]", node_fqn).bright_black());
+    let rows = names
+        .iter()
+        .map(|name| vec![name.bright_cyan().to_string()])
+        .collect();
+    table::print_table(&["Parameter"], rows);
+    blocks::print_total(names.len(), "parameter", "parameters");
 
     Ok(())
 }
