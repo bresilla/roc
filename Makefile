@@ -14,7 +14,7 @@ $(info Project: $(PROJECT_NAME))
 $(info Version: $(CURRENT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r test t help h clean docs release
+.PHONY: build b compile c run r test t release-gate gate help h clean docs release
 
 SHELL := /bin/bash
 
@@ -46,6 +46,11 @@ test:
 
 t: test
 
+release-gate:
+	@bash $(TOP_DIR)/scripts/release_gate.sh
+
+gate: release-gate
+
 help:
 	@echo
 	@echo "Usage: make [target]"
@@ -55,6 +60,7 @@ help:
 	@echo "  compile      Configure and generate build files"
 	@echo "  run          Run the main executable"
 	@echo "  test         Run tests"
+	@echo "  release-gate Run the Linux/Jazzy parity release gate"
 	@echo "  docs         Build documentation (TYPE=mdbook|doxygen)"
 	@echo "  release      Create a new release (TYPE=patch|minor|major)"
 	@echo

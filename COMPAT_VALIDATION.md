@@ -16,6 +16,8 @@ Repeatable validators:
 
 - [tests/real_workspace_validation.rs](/doc/code/tools/roc/tests/real_workspace_validation.rs)
 - [tests/completion_integration.rs](/doc/code/tools/roc/tests/completion_integration.rs)
+- [RELEASE_GATE.md](/doc/code/tools/roc/RELEASE_GATE.md)
+- [scripts/release_gate.sh](/doc/code/tools/roc/scripts/release_gate.sh)
 
 ## Build Validation
 
@@ -88,11 +90,25 @@ This is still not an unconditional blanket replacement claim.
 
 What remains weaker than the build parity story:
 
-- the newest `work test` and `work test-result` real-workspace validations are present as ignored tests, but they have not yet been promoted into the same routinely-run release gate as the build matrix
+- the newest `work test` and `work test-result` real-workspace validations still live as ignored tests outside the default `cargo test` path, so they rely on the explicit release gate instead of the everyday test loop
 - some output formatting still differs from `colcon`, even where the underlying results match
+
+## Release Gate
+
+The explicit signoff process now lives in:
+
+- [RELEASE_GATE.md](/doc/code/tools/roc/RELEASE_GATE.md)
+- `make release-gate`
+
+That gate requires:
+
+1. a green `cargo test`
+2. a green `cargo test --test real_workspace_validation -- --ignored --nocapture`
+3. the validated Linux/Jazzy prerequisites documented in [RELEASE_GATE.md](/doc/code/tools/roc/RELEASE_GATE.md)
+4. this file to be refreshed if the gate was rerun for release signoff
 
 ## Remaining Work Before A Stronger Claim
 
-1. Turn the current ignored real-workspace test-flow checks into part of an explicit release gate.
-2. Re-run the full build+test validation matrix after any parity-sensitive change.
+1. Keep the release gate green after parity-sensitive changes.
+2. Re-run the full build+test validation matrix before release signoff and update this file.
 3. Keep docs scoped to the validated Linux/Jazzy environment unless wider validation is added.

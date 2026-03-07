@@ -54,33 +54,20 @@ Completed slices:
 - Slice 24: `test-result` parser and verbose output parity
 - Slice 25: `test-result` delete flag parity
 - Slice 26: real workspace test/test-result validation
+- Slice 27: explicit parity release gate
 
-Remaining parity slice:
+Track A status:
 
-### Slice 27: Release Gate
+- the release/signoff process is now defined in [RELEASE_GATE.md](/doc/code/tools/roc/RELEASE_GATE.md)
+- the repeatable entrypoint is `make release-gate`
+- real-workspace validation paths can be overridden with:
+  - `ROC_VALIDATION_ROS2_EXAMPLES`
+  - `ROC_VALIDATION_ROS2_DEMOS`
 
-Objective:
+Claim policy:
 
-- define a hard gate before claiming full practical `colcon` workflow parity
-
-Tasks:
-
-- create one explicit checklist covering:
-  - build parity matrix
-  - test parity matrix
-  - test-result parity matrix
-  - shell completion sanity for the newer verbs
-  - required ignored real-workspace validations
-- document exactly which ignored validations must be run before release
-- keep product docs conservative until that gate is green
-
-Definition of done:
-
-- parity is backed by an explicit release process instead of scattered notes and ignored tests
-
-Suggested commit title:
-
-- `Add release gate for validated colcon workflow parity`
+- practical `colcon` parity should only be claimed when the latest release-gate run is green on the validated Linux/Jazzy environment
+- after a parity-sensitive change, rerun the gate and refresh [COMPAT_VALIDATION.md](/doc/code/tools/roc/COMPAT_VALIDATION.md)
 
 ## Track B: CLI Output Modernization
 

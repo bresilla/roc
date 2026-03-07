@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -125,9 +126,28 @@ fn parse_roc_test_result_summary(stdout: &str) -> TestSummary {
     summary
 }
 
-fn real_workspace(path: &str) -> Option<PathBuf> {
-    let path = PathBuf::from(path);
+fn resolve_real_workspace_path(default_path: &str, override_path: Option<PathBuf>) -> PathBuf {
+    override_path.unwrap_or_else(|| PathBuf::from(default_path))
+}
+
+fn real_workspace(env_var: &str, default_path: &str) -> Option<PathBuf> {
+    let path = resolve_real_workspace_path(
+        default_path,
+        env::var_os(env_var)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from),
+    );
     path.exists().then_some(path)
+}
+
+#[test]
+fn resolve_real_workspace_path_prefers_override() {
+    let resolved = resolve_real_workspace_path(
+        "/tmp/default_workspace",
+        Some(PathBuf::from("/tmp/override_workspace")),
+    );
+
+    assert_eq!(resolved, PathBuf::from("/tmp/override_workspace"));
 }
 
 #[test]
@@ -518,12 +538,13 @@ fn validate_failed_build_resume_against_colcon() {
 }
 
 #[test]
-#[ignore = "requires colcon, a sourced ROS 2 environment, and a local ros2/examples checkout"]
+#[ignore = "requires colcon, a sourced ROS 2 environment, and a local ros2/examples checkout (override with ROC_VALIDATION_ROS2_EXAMPLES)"]
 fn validate_real_workspace_test_execution_against_colcon() {
     if !command_exists("colcon") || !Path::new("/opt/ros/jazzy/setup.bash").exists() {
         return;
     }
-    let Some(source_ws) = real_workspace("/tmp/roc_ros2_examples") else {
+    let Some(source_ws) = real_workspace("ROC_VALIDATION_ROS2_EXAMPLES", "/tmp/roc_ros2_examples")
+    else {
         return;
     };
 
@@ -588,12 +609,12 @@ fn validate_real_workspace_test_execution_against_colcon() {
 }
 
 #[test]
-#[ignore = "requires colcon, a sourced ROS 2 environment, and a local ros2/demos checkout"]
+#[ignore = "requires colcon, a sourced ROS 2 environment, and a local ros2/demos checkout (override with ROC_VALIDATION_ROS2_DEMOS)"]
 fn validate_real_workspace_test_result_against_colcon() {
     if !command_exists("colcon") || !Path::new("/opt/ros/jazzy/setup.bash").exists() {
         return;
     }
-    let Some(source_ws) = real_workspace("/tmp/roc_ros2_demos") else {
+    let Some(source_ws) = real_workspace("ROC_VALIDATION_ROS2_DEMOS", "/tmp/roc_ros2_demos") else {
         return;
     };
 
