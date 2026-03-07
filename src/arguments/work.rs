@@ -311,11 +311,17 @@ pub fn cmd() -> Command {
                     .help("Print matching result file paths only")
             )
             .arg(
-                Arg::new("delete_result_files")
-                    .long("delete-result-files")
-                    .visible_alias("delete_result_files")
+                Arg::new("delete")
+                    .long("delete")
                     .action(clap::ArgAction::SetTrue)
-                    .help("Delete discovered result files instead of printing them")
+                    .help("Delete discovered result files after interactive confirmation")
+            )
+            .arg(
+                Arg::new("delete_yes")
+                    .long("delete-yes")
+                    .requires("delete")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Delete discovered result files without interactive confirmation")
             )
         )
 }

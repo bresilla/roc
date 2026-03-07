@@ -4,6 +4,7 @@ use colored::Colorize;
 use roxmltree::Document;
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -13,7 +14,8 @@ struct ResultConfig {
     all: bool,
     verbose: bool,
     result_files_only: bool,
-    delete_result_files: bool,
+    delete: bool,
+    delete_yes: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,7 +70,8 @@ fn config_from_matches(matches: &ArgMatches) -> Result<ResultConfig, Box<dyn std
         all: matches.get_flag("all"),
         verbose: matches.get_flag("verbose"),
         result_files_only: matches.get_flag("result_files_only"),
-        delete_result_files: matches.get_flag("delete_result_files"),
+        delete: matches.get_flag("delete"),
+        delete_yes: matches.get_flag("delete_yes"),
     })
 }
 
@@ -282,6 +285,26 @@ fn find_result_xml_files(package_path: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+fn confirm_delete(
+    entries: &[ResultEntry],
+    assume_yes: bool,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    if assume_yes {
+        return Ok(true);
+    }
+
+    print!(
+        "Delete {} test result files? [y/N] ",
+        entries.len().to_string().bright_white().bold()
+    );
+    io::stdout().flush()?;
+
+    let mut response = String::new();
+    io::stdin().read_line(&mut response)?;
+    let normalized = response.trim().to_ascii_lowercase();
+    Ok(matches!(normalized.as_str(), "y" | "yes"))
+}
+
 fn delete_result_files(entries: &[ResultEntry]) -> Result<(), Box<dyn std::error::Error>> {
     for entry in entries {
         if entry.path.exists() {
@@ -410,7 +433,11 @@ fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    if config.delete_result_files {
+    if config.delete {
+        if !confirm_delete(&entries, config.delete_yes)? {
+            println!("{}", "Deletion cancelled".bright_yellow());
+            return Ok(());
+        }
         delete_result_files(&entries)?;
         println!(
             "{} {}",
@@ -558,7 +585,8 @@ line 2</failure></testcase></testsuite>"#,
             all: false,
             verbose: false,
             result_files_only: false,
-            delete_result_files: false,
+            delete: false,
+            delete_yes: false,
         })
         .unwrap();
 
@@ -603,7 +631,8 @@ line 2</failure></testcase></testsuite>"#,
             all: false,
             verbose: false,
             result_files_only: false,
-            delete_result_files: false,
+            delete: false,
+            delete_yes: false,
         })
         .unwrap();
 
@@ -625,6 +654,8 @@ line 2</failure></testcase></testsuite>"#,
                 "--all",
                 "--verbose",
                 "--result-files-only",
+                "--delete",
+                "--delete-yes",
             ])
             .unwrap();
         let (_, submatches) = matches.subcommand().unwrap();
@@ -636,6 +667,8 @@ line 2</failure></testcase></testsuite>"#,
         assert!(config.all);
         assert!(config.verbose);
         assert!(config.result_files_only);
+        assert!(config.delete);
+        assert!(config.delete_yes);
     }
 
     #[test]

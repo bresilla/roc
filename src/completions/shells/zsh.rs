@@ -18,7 +18,7 @@ _roc() {
     launch_flags=(-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter)
     work_build_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor)
     work_test_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --merge-install --continue-on-error --ctest-args --pytest-args)
-    work_test_result_flags=(--test-result-base --all --verbose --result-files-only --delete-result-files)
+    work_test_result_flags=(--test-result-base --all --verbose --result-files-only --delete --delete-yes)
     topic_echo_flags=(--qos-profile --qos-depth --qos-history --qos-reliability --qos-durability --csv --field -f --full-length -l --truncate-length --no-arr --no-str --flow-style --no-lost-messages --raw --once)
     topic_hz_flags=(-w --window --filter --wall-time)
     topic_info_flags=(-v --verbose)
@@ -285,6 +285,6 @@ mod tests {
     #[test]
     fn zsh_script_completes_work_test_result_flags() {
         assert!(SCRIPT.contains("work_test_result_flags=("));
-        assert!(SCRIPT.contains("--delete-result-files"));
+        assert!(SCRIPT.contains("--delete-yes"));
     }
 }

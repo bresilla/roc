@@ -106,7 +106,7 @@ printf '%s\n' "${COMPREPLY[@]}"
     assert!(output.status.success(), "bash completion probe failed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--result-files-only"));
-    assert!(stdout.contains("--delete-result-files"));
+    assert!(stdout.contains("--delete-yes"));
 }
 
 #[test]
@@ -166,7 +166,7 @@ complete --do-complete "roc work test-result --"
     assert!(output.status.success(), "fish completion probe failed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("--result-files-only"));
-    assert!(stdout.contains("--delete-result-files"));
+    assert!(stdout.contains("--delete-yes"));
 }
 
 #[test]
