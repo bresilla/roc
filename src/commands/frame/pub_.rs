@@ -1,8 +1,12 @@
-use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::commands::cli::{handle_anyhow_result, install_ctrlc_flag};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use rclrs::IntoPrimitiveOptions;
 use rclrs::{Context, CreateBasicExecutor, DynamicMessage, MessageTypeName, QoSProfile};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 fn parse_array_f64(text: &str) -> Result<Vec<f64>> {
     let v: serde_yaml::Value = serde_yaml::from_str(text)
@@ -124,6 +128,18 @@ fn run_command(matches: ArgMatches) -> Result<()> {
     };
     let (qw, qx, qy, qz) = normalize_quat(qw, qx, qy, qz);
 
+    blocks::print_section("Frame Publish");
+    blocks::print_field("Parent", frame_id);
+    blocks::print_field("Child", child_frame_id);
+    blocks::print_field("Translation", translation);
+    blocks::print_field("Rotation", rotation);
+    blocks::print_field("Topic", "/tf_static");
+    blocks::print_field("Mode", if detach { "detach" } else { "latched" });
+    println!();
+    if !detach {
+        blocks::print_note("Press Ctrl+C to stop");
+    }
+
     let context = Context::default_from_env()?;
     let executor = context.create_basic_executor();
     let node = executor.create_node("roc_frame_pub")?;
@@ -187,15 +203,35 @@ fn run_command(matches: ArgMatches) -> Result<()> {
     set_f64_field(&mut rotation_msg, "z", qz)?;
     set_f64_field(&mut rotation_msg, "w", qw)?;
 
+    let started_at = Instant::now();
     publisher.publish(tfmsg)?;
+    blocks::print_status(
+        "PUB",
+        &[
+            ("parent", frame_id.to_string()),
+            ("child", child_frame_id.to_string()),
+        ],
+    );
 
     // Default behavior matches `static_transform_publisher`: keep the node alive so the
     // TRANSIENT_LOCAL sample is reliably available to late joiners.
     if !detach {
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(3600));
+        let running = Arc::new(AtomicBool::new(true));
+        install_ctrlc_flag(Arc::clone(&running))?;
+        while running.load(Ordering::Relaxed) {
+            std::thread::sleep(Duration::from_millis(100));
         }
     }
+
+    println!();
+    blocks::print_section("Frame Summary");
+    blocks::print_field("Parent", frame_id);
+    blocks::print_field("Child", child_frame_id);
+    blocks::print_field(
+        "Elapsed",
+        format!("{:.2}s", started_at.elapsed().as_secs_f64()),
+    );
+    blocks::print_success("Static transform publisher stopped");
     Ok(())
 }
 

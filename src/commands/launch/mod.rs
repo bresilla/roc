@@ -1,8 +1,10 @@
 use crate::commands::cli::{required_string, run_async_command};
+use crate::ui::blocks;
 use crate::utils::get_ros_workspace_paths;
 use clap::ArgMatches;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::time::Instant;
 use tokio::process::Command;
 use walkdir::WalkDir;
 
@@ -75,22 +77,50 @@ async fn find_launch_file(
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let package_name = required_string(&matches, "package_name")?;
     let launch_file_name = required_string(&matches, "launch_file_name")?;
+    let launch_arguments = matches
+        .get_one::<String>("launch_arguments")
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+
+    blocks::print_section("Launch");
+    blocks::print_field("Package", package_name);
+    blocks::print_field("Launch File", launch_file_name);
+    if !launch_arguments.is_empty() {
+        blocks::print_field("Arguments", &launch_arguments);
+    }
+    if matches.get_flag("noninteractive") {
+        blocks::print_field("Noninteractive", "yes");
+    }
+    if matches.get_flag("debug") {
+        blocks::print_field("Debug", "enabled");
+    }
+    if matches.get_flag("print") {
+        blocks::print_field("Print Only", "yes");
+    }
+    if matches.get_flag("show_args") {
+        blocks::print_field("Show Args", "yes");
+    }
+    if matches.get_flag("show_all") {
+        blocks::print_field("Show All Output", "yes");
+    }
+    if let Some(prefix) = matches.get_one::<String>("launch_prefix") {
+        blocks::print_field("Launch Prefix", prefix);
+    }
+    if let Some(filter) = matches.get_one::<String>("launch_prefix_filter") {
+        blocks::print_field("Prefix Filter", filter);
+    }
 
     // Find the actual launch file
     let launch_file_path = find_launch_file(package_name, launch_file_name).await?;
-
-    println!("Launching: {}", launch_file_path.display());
+    blocks::print_field("Resolved Path", launch_file_path.display());
 
     // All launch files should be executed through ros2 launch command
     let mut cmd = Command::new("ros2");
     cmd.args(&["launch", package_name, launch_file_name]);
 
     // Add launch arguments if provided
-    if let Some(launch_arguments) = matches.get_one::<String>("launch_arguments") {
-        // Parse and add arguments
-        for arg in launch_arguments.split_whitespace() {
-            cmd.arg(arg);
-        }
+    for arg in launch_arguments.split_whitespace() {
+        cmd.arg(arg);
     }
 
     // Apply launch options
@@ -122,16 +152,31 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
         cmd.args(&["--launch-prefix-filter", launch_prefix_filter]);
     }
 
+    println!();
+    blocks::print_field("Command", format!("{cmd:?}"));
+    blocks::print_note("Child process stdio is attached to the terminal");
+
     // Set up stdio to inherit from parent (better for interactive launch files)
     cmd.stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit());
 
+    let started_at = Instant::now();
     let status = cmd.status().await?;
 
     if !status.success() {
         return Err(format!("Launch failed with exit code: {:?}", status.code()).into());
     }
+
+    println!();
+    blocks::print_section("Launch Summary");
+    blocks::print_field("Package", package_name);
+    blocks::print_field("Launch File", launch_file_name);
+    blocks::print_field(
+        "Elapsed",
+        format!("{:.2}s", started_at.elapsed().as_secs_f64()),
+    );
+    blocks::print_success("Launch command exited successfully");
     Ok(())
 }
 

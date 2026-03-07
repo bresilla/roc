@@ -1,10 +1,13 @@
 use crate::arguments::topic::CommonTopicArgs;
-use crate::commands::cli::run_async_command;
-use anyhow::{Result, anyhow};
+use crate::commands::cli::{install_ctrlc_flag, run_async_command};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use rclrs::{
     Context, CreateBasicExecutor, DynamicMessage, MessageTypeName, SimpleValueMut, ValueMut,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -214,11 +217,40 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
 
     let yaml = yaml_values.join(" ");
 
+    blocks::print_section("Topic Publish");
+    blocks::print_field("Topic", &topic_name);
+    blocks::print_field("Type", &message_type);
+    blocks::print_field("Node", &node_name);
+    blocks::print_field("Rate", format!("{rate_hz:.3} Hz"));
+    blocks::print_field("Print Every", print_every);
+    if once {
+        blocks::print_field("Mode", "once");
+    } else if let Some(limit) = times {
+        blocks::print_field("Mode", format!("{limit} messages"));
+    } else {
+        blocks::print_field("Mode", "continuous");
+    }
+    if let Some(required) = wait_matching_subscriptions {
+        blocks::print_field("Wait Subs", required);
+    }
+    blocks::print_field("Keep Alive", format!("{keep_alive_secs:.3}s"));
+    println!();
+    if !once && times.is_none() {
+        blocks::print_note("Press Ctrl+C to stop");
+    }
+
     let context = Context::default_from_env()?;
     let executor = context.create_basic_executor();
     let node = executor.create_node(node_name.as_str())?;
 
     if let Some(required) = wait_matching_subscriptions {
+        blocks::print_status(
+            "WAIT",
+            &[
+                ("topic", topic_name.clone()),
+                ("subscriptions", required.to_string()),
+            ],
+        );
         let start = Instant::now();
         let timeout = Duration::from_secs(5);
         while start.elapsed() < timeout {
@@ -242,14 +274,27 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
     } else {
         Duration::from_secs(0)
     };
+    let running = Arc::new(AtomicBool::new(true));
+    install_ctrlc_flag(Arc::clone(&running))?;
+    let session_start = Instant::now();
 
-    loop {
+    while running.load(Ordering::Relaxed) {
         let msg = build_message(&message_type, &yaml)?;
         publisher.publish(msg)?;
         published += 1;
 
         if published % print_every == 0 {
-            println!("published #{} to {}", published, topic_name);
+            blocks::print_status(
+                "PUB",
+                &[
+                    ("count", published.to_string()),
+                    ("topic", topic_name.clone()),
+                    (
+                        "elapsed",
+                        format!("{:.2}s", session_start.elapsed().as_secs_f64()),
+                    ),
+                ],
+            );
         }
 
         if once {
@@ -262,7 +307,12 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
         }
 
         if period != Duration::from_secs(0) {
-            tokio::time::sleep(period).await;
+            let sleep_start = Instant::now();
+            while running.load(Ordering::Relaxed) && sleep_start.elapsed() < period {
+                let remaining = period.saturating_sub(sleep_start.elapsed());
+                let chunk = remaining.min(Duration::from_millis(50));
+                tokio::time::sleep(chunk).await;
+            }
         } else {
             // rate 0 -> publish as fast as possible, yield so ctrl+c can interrupt.
             tokio::task::yield_now().await;
@@ -272,6 +322,16 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
     if keep_alive_secs > 0.0 {
         tokio::time::sleep(Duration::from_secs_f64(keep_alive_secs)).await;
     }
+
+    println!();
+    blocks::print_section("Publish Summary");
+    blocks::print_field("Topic", &topic_name);
+    blocks::print_field("Messages", published);
+    blocks::print_field(
+        "Elapsed",
+        format!("{:.2}s", session_start.elapsed().as_secs_f64()),
+    );
+    blocks::print_success("Publishing stopped");
 
     Ok(())
 }
