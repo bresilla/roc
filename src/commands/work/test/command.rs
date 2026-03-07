@@ -63,12 +63,22 @@ struct TestRecord {
     error: Option<String>,
 }
 
+struct CommandRunLog {
+    command: String,
+    cwd: Option<PathBuf>,
+    stdout: String,
+    stderr: String,
+    exit_code: i32,
+}
+
 struct WorkspaceTester {
     config: TestConfig,
     packages: Vec<PackageMeta>,
     test_order: Vec<usize>,
     install_paths: HashMap<String, PathBuf>,
     run_log_dir: PathBuf,
+    event_log: Vec<String>,
+    logger_log: Vec<String>,
 }
 
 impl WorkspaceTester {
@@ -80,6 +90,8 @@ impl WorkspaceTester {
             test_order: Vec::new(),
             install_paths: HashMap::new(),
             run_log_dir,
+            event_log: Vec::new(),
+            logger_log: Vec::new(),
         }
     }
 
@@ -141,9 +153,11 @@ impl WorkspaceTester {
         let mut skipped = 0usize;
         let mut records = HashMap::new();
 
-        for &pkg_idx in &self.test_order {
-            let package = &self.packages[pkg_idx];
+        let test_order = self.test_order.clone();
+        for pkg_idx in test_order {
+            let package = self.packages[pkg_idx].clone();
             let start_time = Instant::now();
+            self.event_log.push(format!("JobStarted {}", package.name));
             println!(
                 "{} {} {}",
                 "Testing >>>".bright_cyan().bold(),
@@ -167,9 +181,9 @@ impl WorkspaceTester {
 
             let result = match package.build_type {
                 BuildType::AmentCmake | BuildType::Cmake => {
-                    self.test_cmake_package(package, &env_manager)
+                    self.test_cmake_package(&package, &env_manager)
                 }
-                BuildType::AmentPython => self.test_python_package(package, &env_manager),
+                BuildType::AmentPython => self.test_python_package(&package, &env_manager),
                 BuildType::Other(ref build_type) => Ok(TestRecord {
                     status: TestState::Skipped,
                     duration_ms: 0,
@@ -233,8 +247,11 @@ impl WorkspaceTester {
                     if !self.config.continue_on_error {
                         records.insert(package.name.clone(), record.clone());
                         self.write_package_state(&package.name, &record)?;
-                        self.write_colcon_test_result(package, &record)?;
+                        self.write_colcon_test_result(&package, &record)?;
+                        self.event_log
+                            .push(format!("JobEnded {} failed", package.name));
                         self.write_test_summary(&records)?;
+                        self.write_top_level_logs()?;
                         return Err(format!("Tests failed for package {}", package.name).into());
                     }
                 }
@@ -242,7 +259,16 @@ impl WorkspaceTester {
 
             records.insert(package.name.clone(), record.clone());
             self.write_package_state(&package.name, &record)?;
-            self.write_colcon_test_result(package, &record)?;
+            self.write_colcon_test_result(&package, &record)?;
+            self.event_log.push(format!(
+                "JobEnded {} {}",
+                package.name,
+                match record.status {
+                    TestState::Passed => "passed",
+                    TestState::Failed => "failed",
+                    TestState::Skipped => "skipped",
+                }
+            ));
         }
 
         println!("\n{}", "Test Summary".bright_cyan().bold());
@@ -267,6 +293,7 @@ impl WorkspaceTester {
         }
 
         self.write_test_summary(&records)?;
+        self.write_top_level_logs()?;
 
         if failed > 0 {
             return Err("Some package tests failed".into());
@@ -276,7 +303,7 @@ impl WorkspaceTester {
     }
 
     fn test_cmake_package(
-        &self,
+        &mut self,
         package: &PackageMeta,
         env_manager: &EnvironmentManager,
     ) -> Result<TestRecord, Box<dyn std::error::Error>> {
@@ -297,9 +324,12 @@ impl WorkspaceTester {
         command.envs(env_manager.get_env_vars());
         let latest_log = Self::phase_log_path(&self.config, &package.name, "ctest");
         let run_log = self.run_log_dir.join(&package.name).join("ctest.log");
-        let result = Self::run_command_checked(command, "CTest", &latest_log);
+        let command_log = Self::run_command_checked(command, "CTest", &latest_log)?;
         Self::mirror_log_file(&latest_log, &run_log)?;
-        result?;
+        self.write_package_log_bundle(package, "ctest", &command_log)?;
+        if command_log.exit_code != 0 {
+            return Err(format!("CTest failed; see {}", latest_log.display()).into());
+        }
 
         Ok(TestRecord {
             status: TestState::Passed,
@@ -309,7 +339,7 @@ impl WorkspaceTester {
     }
 
     fn test_python_package(
-        &self,
+        &mut self,
         package: &PackageMeta,
         env_manager: &EnvironmentManager,
     ) -> Result<TestRecord, Box<dyn std::error::Error>> {
@@ -338,9 +368,12 @@ impl WorkspaceTester {
             .env("PYTHONDONTWRITEBYTECODE", "1");
         let latest_log = Self::phase_log_path(&self.config, &package.name, "pytest");
         let run_log = self.run_log_dir.join(&package.name).join("pytest.log");
-        let result = Self::run_command_checked(command, "Pytest", &latest_log);
+        let command_log = Self::run_command_checked(command, "Pytest", &latest_log)?;
         Self::mirror_log_file(&latest_log, &run_log)?;
-        result?;
+        self.write_package_log_bundle(package, "pytest", &command_log)?;
+        if command_log.exit_code != 0 {
+            return Err(format!("Pytest failed; see {}", latest_log.display()).into());
+        }
 
         Ok(TestRecord {
             status: TestState::Passed,
@@ -456,28 +489,34 @@ impl WorkspaceTester {
 
     fn run_command_checked(
         mut command: Command,
-        description: &str,
+        _description: &str,
         log_path: &Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<CommandRunLog, Box<dyn std::error::Error>> {
         if let Some(parent) = log_path.parent() {
             fs::create_dir_all(parent)?;
         }
 
+        let cwd = command.get_current_dir().map(PathBuf::from);
         let output = command.output()?;
         let rendered_command = format!("{command:?}");
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let exit_code = output.status.code().unwrap_or(-1);
         let log_contents = format!(
             "command={rendered_command}\nexit_code={}\n\nstdout:\n{}\n\nstderr:\n{}\n",
-            output.status.code().unwrap_or(-1),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
+            exit_code, stdout, stderr
         );
         fs::write(log_path, log_contents)?;
 
-        if output.status.success() {
-            return Ok(());
-        }
+        let command_run = CommandRunLog {
+            command: rendered_command,
+            cwd,
+            stdout,
+            stderr,
+            exit_code,
+        };
 
-        Err(format!("{description} failed; see {}", log_path.display()).into())
+        Ok(command_run)
     }
 
     fn write_colcon_test_result(
@@ -515,6 +554,80 @@ impl WorkspaceTester {
         }
         if source.exists() {
             fs::copy(source, destination)?;
+        }
+        Ok(())
+    }
+
+    fn write_package_log_bundle(
+        &mut self,
+        package: &PackageMeta,
+        phase: &str,
+        command_run: &CommandRunLog,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let package_dir = package.path.display().to_string();
+        let command_log = format!(
+            "Invoking command in '{}': {}\nInvoked command in '{}' returned '{}': {}\n",
+            package_dir,
+            command_run.command,
+            package_dir,
+            command_run.exit_code,
+            command_run.command
+        );
+        let combined = if command_run.stderr.is_empty() {
+            command_run.stdout.clone()
+        } else if command_run.stdout.is_empty() {
+            command_run.stderr.clone()
+        } else {
+            format!("{}{}", command_run.stdout, command_run.stderr)
+        };
+
+        for package_log_dir in [
+            self.config.log_base.join("latest_test").join(&package.name),
+            self.run_log_dir.join(&package.name),
+        ] {
+            fs::create_dir_all(&package_log_dir)?;
+            fs::write(package_log_dir.join("command.log"), &command_log)?;
+            fs::write(package_log_dir.join("stdout.log"), &command_run.stdout)?;
+            fs::write(package_log_dir.join("stderr.log"), &command_run.stderr)?;
+            fs::write(package_log_dir.join("stdout_stderr.log"), &combined)?;
+            fs::write(package_log_dir.join("streams.log"), &combined)?;
+            let phase_log = self
+                .config
+                .log_base
+                .join("latest_test")
+                .join(&package.name)
+                .join(format!("{phase}.log"));
+            if phase_log.exists()
+                && package_log_dir != phase_log.parent().unwrap_or(&package_log_dir)
+            {
+                fs::copy(&phase_log, package_log_dir.join(format!("{phase}.log")))?;
+            }
+        }
+
+        let cwd = command_run
+            .cwd
+            .as_ref()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| package_dir.clone());
+        self.event_log.push(format!(
+            "Command {} cwd={} exit_code={}",
+            package.name, cwd, command_run.exit_code
+        ));
+        self.logger_log.push(format!(
+            "[{}] {} exit_code={}",
+            package.name, phase, command_run.exit_code
+        ));
+        self.logger_log.push(combined);
+        Ok(())
+    }
+
+    fn write_top_level_logs(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let events = self.event_log.join("\n");
+        let logger = self.logger_log.join("\n");
+        for log_dir in [&self.run_log_dir, &self.config.log_base.join("latest_test")] {
+            fs::create_dir_all(log_dir)?;
+            fs::write(log_dir.join("events.log"), &events)?;
+            fs::write(log_dir.join("logger_all.log"), &logger)?;
         }
         Ok(())
     }
