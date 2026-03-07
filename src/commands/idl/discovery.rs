@@ -1,6 +1,7 @@
 use crate::shared::package_discovery::{
-    DiscoveryConfig, Package, discover_packages, find_idl_files_in_packages,
+    discover_packages, find_idl_files_in_packages, DiscoveryConfig, Package,
 };
+use crate::ui::blocks;
 use anyhow::Result;
 use std::path::PathBuf;
 
@@ -25,9 +26,15 @@ impl Default for ProjectDiscoveryOptions {
 
 pub fn discover_idl_projects(options: &ProjectDiscoveryOptions) -> Result<Vec<IdlProject>> {
     if options.verbose {
-        println!(
-            "🔍 Discovering ROS2 packages in {}...",
-            options.search_root.display()
+        blocks::print_section("IDL Discovery");
+        blocks::print_field("Search Root", options.search_root.display());
+        blocks::print_field("Include Hidden", options.include_hidden);
+        blocks::print_field(
+            "Max Depth",
+            options
+                .max_depth
+                .map(|depth| depth.to_string())
+                .unwrap_or_else(|| "unbounded".to_string()),
         );
     }
 
@@ -52,7 +59,10 @@ pub fn discover_idl_projects(options: &ProjectDiscoveryOptions) -> Result<Vec<Id
     let packages = discover_packages(&config)?;
 
     if options.verbose {
-        println!("   Found {} ROS2 packages", packages.len());
+        blocks::print_status(
+            "Found",
+            &[("Packages", packages.len().to_string())],
+        );
     }
 
     if packages.is_empty() {
@@ -96,11 +106,13 @@ pub fn discover_idl_projects(options: &ProjectDiscoveryOptions) -> Result<Vec<Id
     if options.verbose {
         let total_proto = projects.iter().map(|p| p.proto_files.len()).sum::<usize>();
         let total_msg = projects.iter().map(|p| p.msg_files.len()).sum::<usize>();
-        println!(
-            "   Found {} .proto files and {} .msg files across {} packages",
-            total_proto,
-            total_msg,
-            projects.len()
+        blocks::print_status(
+            "Files",
+            &[
+                ("Proto", total_proto.to_string()),
+                ("Msg", total_msg.to_string()),
+                ("Projects", projects.len().to_string()),
+            ],
         );
     }
 

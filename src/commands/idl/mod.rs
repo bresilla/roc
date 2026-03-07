@@ -2,6 +2,7 @@ pub mod discovery;
 pub mod protobuf;
 pub mod ros2msg;
 
+use crate::commands::cli::print_error_and_exit;
 use clap::ArgMatches;
 
 pub fn handle(matches: ArgMatches) {
@@ -24,9 +25,6 @@ pub fn handle(matches: ArgMatches) {
         Some(("ros2", submatch)) => {
             ros2msg::handle(submatch.clone());
         }
-        _ => {
-            eprintln!("Unknown IDL subcommand");
-            std::process::exit(1);
-        }
+        _ => print_error_and_exit("Unknown IDL subcommand"),
     }
 }

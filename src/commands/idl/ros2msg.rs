@@ -1,4 +1,6 @@
-use anyhow::{Result, anyhow};
+use crate::commands::cli::handle_anyhow_result;
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -39,33 +41,54 @@ impl Ros2MsgConversionOptions {
     }
 }
 
+fn output_mode_label(output_dir: &Option<PathBuf>, inplace_label: &str) -> String {
+    match output_dir {
+        Some(dir) => dir.display().to_string(),
+        None => inplace_label.to_string(),
+    }
+}
+
+fn print_dry_run_output(output_file: &Path, content: &str) {
+    blocks::print_status(
+        "Dry Run",
+        &[("File", output_file.display().to_string())],
+    );
+    blocks::print_section("Generated Content");
+    println!("{content}");
+}
+
+fn run_command(matches: ArgMatches) -> Result<()> {
+    let options = Ros2MsgConversionOptions::from_matches(&matches)?;
+
+    if options.verbose {
+        blocks::print_section("ROS 2 Message Conversion");
+        blocks::print_field("Mode", "msg -> proto");
+        blocks::print_field("Message Files", options.msg_files.len());
+        blocks::print_field(
+            "Output",
+            output_mode_label(&options.output_dir, "in-place"),
+        );
+        blocks::print_field(
+            "Package",
+            options
+                .package_name
+                .clone()
+                .unwrap_or_else(|| "<derived>".to_string()),
+        );
+        blocks::print_field("Dry Run", options.dry_run);
+    }
+
+    convert_ros2msg_to_protobuf(&options)?;
+
+    if options.verbose {
+        blocks::print_success("ROS 2 message conversion completed");
+    }
+
+    Ok(())
+}
+
 pub fn handle(matches: ArgMatches) {
-    let options = match Ros2MsgConversionOptions::from_matches(&matches) {
-        Ok(opts) => opts,
-        Err(e) => {
-            eprintln!("Error parsing arguments: {}", e);
-            return;
-        }
-    };
-
-    if options.verbose {
-        println!("🚀 Starting ROS 2 message to Protobuf conversion...");
-        println!("   Message files: {:?}", options.msg_files);
-        match &options.output_dir {
-            Some(dir) => println!("   Output directory: {}", dir.display()),
-            None => println!("   Output mode: inplace (same directory as .msg files)"),
-        }
-        println!("   Package name: {:?}", options.package_name);
-    }
-
-    if let Err(e) = convert_ros2msg_to_protobuf(&options) {
-        eprintln!("Error during conversion: {}", e);
-        std::process::exit(1);
-    }
-
-    if options.verbose {
-        println!("✅ Conversion completed successfully!");
-    }
+    handle_anyhow_result(run_command(matches));
 }
 
 fn convert_ros2msg_to_protobuf(options: &Ros2MsgConversionOptions) -> Result<()> {
@@ -90,7 +113,10 @@ fn convert_ros2msg_to_protobuf(options: &Ros2MsgConversionOptions) -> Result<()>
     // Convert each message file
     for msg_file in &options.msg_files {
         if options.verbose {
-            println!("🔄 Converting {}...", msg_file.display());
+            blocks::print_status(
+                "Convert",
+                &[("File", msg_file.display().to_string())],
+            );
         }
 
         let msg_content = fs::read_to_string(msg_file)
@@ -112,13 +138,14 @@ fn convert_ros2msg_to_protobuf(options: &Ros2MsgConversionOptions) -> Result<()>
         let output_file = output_dir.join(format!("{}.proto", msg_name));
 
         if options.verbose {
-            println!("   Generated: {}", output_file.display());
+            blocks::print_status(
+                "Output",
+                &[("File", output_file.display().to_string())],
+            );
         }
 
         if options.dry_run {
-            println!("Would write to: {}", output_file.display());
-            println!("Content:\n{}", proto_content);
-            println!("---");
+            print_dry_run_output(&output_file, &proto_content);
         } else {
             // Create the directory if it doesn't exist (for inplace mode)
             if let Some(parent) = output_file.parent() {
