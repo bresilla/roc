@@ -1,8 +1,8 @@
-# Build Compatibility Validation
+# Colcon Compatibility Validation
 
-Last validated: March 6, 2026
+Last validated: March 7, 2026
 
-This document records direct `colcon` vs `roc work build` comparisons run in this repository against representative ament workspaces.
+This document records direct `colcon` vs `roc` comparisons for both workspace build and test flows.
 
 Validation environment:
 
@@ -12,131 +12,87 @@ Validation environment:
 - `ros2`: `/opt/ros/jazzy/bin/ros2`
 - `roc`: local debug binary from this repository
 
-Repeatable validator:
+Repeatable validators:
 
 - [tests/real_workspace_validation.rs](/doc/code/tools/roc/tests/real_workspace_validation.rs)
+- [tests/completion_integration.rs](/doc/code/tools/roc/tests/completion_integration.rs)
 
-The ignored integration test copies the fixture workspace to a temp directory, builds it once with `colcon`, builds it again with `roc`, and validates the resulting runtime behavior.
+## Build Validation
 
-## Cases
+Validated against ignored end-to-end comparisons:
 
-### `ament_cmake_minimal`
-
-Commands executed:
-
-- `source /opt/ros/jazzy/setup.bash && colcon build --base-paths src`
-- `source /opt/ros/jazzy/setup.bash && roc work build --base-paths src`
-- `source install/setup.bash && ros2 pkg prefix demo_cmake_pkg`
-
-Observed result:
-
-- `colcon build` succeeded
-- `roc work build` succeeded
-- `ros2 pkg prefix demo_cmake_pkg` succeeded for both installs
-- `AMENT_PREFIX_PATH` and `CMAKE_PREFIX_PATH` were equivalent at the package-prefix level after sourcing
-
-Observed tree deltas:
-
-- `colcon` generated `.ps1` wrappers and `_local_setup_util_*.py`
-- `colcon` and `roc` now both place package metadata below `install/<pkg>/share/colcon-core/packages/<pkg>` for isolated installs
-- `colcon` and `roc` now both normalize `COLCON_PREFIX_PATH` without a trailing separator in the validated case
-- `roc` now also emits root `local_setup.ps1`, `setup.ps1`, and `.colcon_install_layout`
-- remaining deltas are now concentrated in larger-workspace validation and resume coverage, not the validated install tree shape
-
-Assessment:
-
-- usable for the validated `ament_cmake` case
-- not yet byte-for-byte compatible with `colcon`
-
-### `ament_python_minimal`
-
-Commands executed:
-
-- `source /opt/ros/jazzy/setup.bash && colcon build --base-paths src`
-- `source /opt/ros/jazzy/setup.bash && roc work build --base-paths src`
-- `source install/setup.bash && python3 -c "import demo_python_pkg"`
-- `source install/setup.bash && ros2 pkg prefix demo_python_pkg`
+- isolated `ament_cmake`
+- isolated `ament_python`
+- merged install
+- underlay/overlay chaining
+- failed-build resume with `--continue-on-error` and `--packages-select-build-failed`
 
 Observed result:
 
-- `colcon build` succeeded
-- `roc work build` succeeded
-- importing `demo_python_pkg` succeeded for both installs
-- `ros2 pkg prefix demo_python_pkg` succeeded for both installs
+- `roc work build` now matches the validated `colcon build` behaviors closely enough for normal ROS package discovery and sourcing flows
+- `ros2 pkg prefix` works in the validated minimal `ament_cmake` and `ament_python` cases
+- merged-install metadata and overlay sourcing behave the same in the validated fixture matrix
 
-Observed tree deltas:
+Real upstream workspace pressure tests previously run in `/tmp`:
 
-- `colcon` and `roc` now both install Python payloads under `install/<pkg>/lib/python3.12/site-packages`
-- `colcon` and `roc` now both install the package marker and `package.xml` under `install/<pkg>/share/...`
-- `colcon` and `roc` now both generate the `ament_prefix_path.*`, `pythonpath.*`, and `package.dsv` hook family for this validated case
-- `roc` also now generates `_local_setup_util_sh.py`, `_local_setup_util_ps1.py`, root `.ps1` setup wrappers, and `.colcon_install_layout`
-- remaining deltas are now concentrated in larger-workspace validation and resume coverage, not the validated install tree shape
+- `/tmp/roc_ros2_examples`
+  - full `ros2/examples` build succeeded with `roc`
+- `/tmp/roc_demos_ws`
+  - `pendulum_msgs` + `pendulum_control` succeeded with both `colcon` and `roc`
+- `/tmp/roc_ros2_demos`
+  - failing packages matched `colcon` failures in the local environment rather than exposing builder-specific breakage
 
-Assessment:
+## Test Validation
 
-- runtime Python import works
-- ROS package discovery now works for the validated minimal case
-- remaining differences are concentrated in metadata fidelity and shell-family parity
+Validated `roc` functionality:
 
-### `dependency_chain` with `--merge-install`
+- `roc work test`
+- `roc work test-result`
 
-Commands executed:
+Current test-flow behavior:
 
-- `source /opt/ros/jazzy/setup.bash && colcon build --merge-install --base-paths src`
-- `source /opt/ros/jazzy/setup.bash && roc work build --merge-install --base-paths src`
-- `source install/setup.bash && ros2 pkg prefix consumer_node_pkg`
+- `roc work test` runs `ctest` for CMake packages and `python3 -m pytest` for Python packages
+- per-package logs, `status.txt`, `test_summary.log`, and `colcon_test.rc` are written into the build/log trees
+- `roc work test-result` reads:
+  - `Testing/.../Test.xml`
+  - `pytest.xml`
+  - package xUnit files under `test_results/...`
+  - `colcon_test.rc` as a fallback when no XML results exist
+- verbose output now includes testcase-level failure blocks similar to `colcon test-result --verbose`
+- delete semantics now use `--delete` and `--delete-yes`, matching `colcon`’s CLI surface
 
-Observed result:
+Real upstream workspace validation now exists as ignored integration tests for:
 
-- both tools built the merged workspace successfully
-- both wrote `install/.colcon_install_layout` as `merged`
-- `ros2 pkg prefix consumer_node_pkg` resolved to the merged install root for both builds
+- `/tmp/roc_ros2_examples`
+  - compare `colcon build/test` vs `roc work build/test` on selected example packages
+- `/tmp/roc_ros2_demos`
+  - compare `colcon build/test/test-result` vs `roc work build/test/test-result` on selected demo packages
 
-### Overlay chaining with underlay + overlay workspaces
+Observed result from the current direct checks:
 
-Commands executed:
-
-- build underlay `ament_cmake_minimal` with `colcon`
-- build underlay `ament_cmake_minimal` with `roc`
-- source each underlay and build overlay `ament_python_minimal`
-- source underlay + overlay setup files and run:
-  - `ros2 pkg prefix demo_cmake_pkg`
-  - `ros2 pkg prefix demo_python_pkg`
-
-Observed result:
-
-- both tools built the underlay and overlay successfully
-- sourcing the overlay preserved discovery of the underlay package for both builds
-- sourcing the overlay also exposed the overlay package for both builds
-
-### Failed build resume on `dependency_chain`
-
-Commands executed:
-
-- break `consumer_node_pkg/CMakeLists.txt`
-- run `colcon build --continue-on-error --base-paths src`
-- run `roc work build --continue-on-error --base-paths src`
-- restore the valid `CMakeLists.txt`
-- rerun both tools with `--packages-select-build-failed`
-- source `install/setup.bash && ros2 pkg prefix consumer_node_pkg`
-
-Observed result:
-
-- both tools returned a failing exit status for the broken build while still preserving successful earlier package output
-- both tools resumed only the failed package on the retry
-- the resumed `consumer_node_pkg` build succeeded for both tools
-- `roc` needed two fixes to reach parity here:
-  - return nonzero after `--continue-on-error` when any package failed
-  - reuse already-installed dependency prefixes during a failed-package retry
+- `roc work test` fails and succeeds on the same selected upstream packages that `colcon test` does in this environment
+- `roc work test-result --all --verbose` now matches `colcon test-result` much more closely on:
+  - result discovery
+  - aggregate totals
+  - testcase-level failure detail presence
 
 ## Current Conclusion
 
-`roc work build` is now validated against isolated `ament_cmake`, isolated `ament_python`, merged install, overlay chaining, and failed-build resume workflows.
+`roc` now has high practical parity with `colcon` for the validated Linux/Jazzy scope across:
 
-It is still not full parity, because the project has not yet defined and enforced an explicit release gate for making the parity claim.
+- `work build`
+- `work test`
+- `work test-result`
 
-## Next Fixes Suggested By Validation
+This is still not an unconditional blanket replacement claim.
 
-1. Add an explicit release gate before claiming full parity.
-2. Keep docs conservative until the gate is green.
-3. Re-run this validation matrix before any release that changes build behavior.
+What remains weaker than the build parity story:
+
+- the newest `work test` and `work test-result` real-workspace validations are present as ignored tests, but they have not yet been promoted into the same routinely-run release gate as the build matrix
+- some output formatting still differs from `colcon`, even where the underlying results match
+
+## Remaining Work Before A Stronger Claim
+
+1. Turn the current ignored real-workspace test-flow checks into part of an explicit release gate.
+2. Re-run the full build+test validation matrix after any parity-sensitive change.
+3. Keep docs scoped to the validated Linux/Jazzy environment unless wider validation is added.
