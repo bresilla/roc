@@ -26,21 +26,22 @@ Source of truth for command-by-command compatibility:
 | `roc bag` | ✅ | Native MCAP record/play + rosbag2 metadata parsing |
 | `roc run` | ✅ | Native executable discovery + execution |
 | `roc launch` | 🔄 | Launch file discovery + `ros2 launch` execution |
-| `roc work` | ✅ | Native workspace management + build system |
+| `roc work` | ✅ | Native workspace management + validated build/test/test-result workflow |
 | `roc idl` | ✅ | Native IDL/protobuf tooling |
-| `roc completion` | ✅ | Native completion generation |
-| `roc daemon` | 🧱 | Placeholder |
-| `roc middleware` | 🧱 | Placeholder |
+| `roc completion` | ✅ | Native shell completion generation, install, and dynamic graph-aware completion |
+| `roc daemon` | ✅ | Native daemon-compatibility commands for direct DDS mode |
+| `roc middleware` | ✅ | Native RMW discovery and selection helpers |
 
 ## Notable Implementations
 
 - Dynamic topic tools: `echo`, `pub`, `hz`, `bw`, `delay` are implemented natively using `rclrs` dynamic subscriptions/publishers.
 - TF tooling: subscribes to `/tf` and `/tf_static`, builds a TF graph, resolves multi-hop transforms.
 - Bag tooling: records serialized CDR bytes into MCAP; plays MCAP back to ROS topics.
-- Workspace tooling: package discovery, dependency resolution, and a native colcon-like builder. Minimal `ament_cmake` validation is in place; `ament_python` still has known compatibility gaps.
+- Workspace tooling: package discovery, dependency resolution, native `work build`, native `work test`, and native `work test-result`. Current validation scope is tracked in `COMPAT_VALIDATION.md`.
+- Shell integration: generated completions for bash/zsh/fish, user-local install helpers, and live completion sources for graph- and workspace-aware commands.
 
 ## Near-Term Priorities
 
 - Replace remaining `ros2` wrappers (`roc service call`, `roc action goal`, and potentially `roc launch`).
 - Improve lifecycle control for long-running commands (graceful ctrl-c, flush/finalize outputs).
-- Implement real dynamic completions using native graph queries (topics/services/nodes/params).
+- Expand live completion coverage and keep the newer completion/install flow documented.

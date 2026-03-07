@@ -248,7 +248,7 @@ Shell Integration:"
   " + &command_str("completion")
         + "  "
         + &letter_str("c")
-        + &descriptin_str("Generate shell completions");
+        + &descriptin_str("Generate, inspect, and install shell completions");
 
     let styles = styling::Styles::styled()
         .header(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
@@ -259,7 +259,7 @@ Shell Integration:"
 
     Command::new("roc")
         .styles(styles)
-        .about(&ABOUT_STR) 
+        .about(&ABOUT_STR)
         .author(env!("CARGO_PKG_AUTHORS"))
         .version(env!("CARGO_PKG_VERSION"))
         .long_about("A native ROS 2 command-line tool focused on workspace builds, graph introspection, and daily development workflows.")

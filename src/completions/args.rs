@@ -3,7 +3,7 @@ use clap::{Arg, Command};
 /// The `roc completion` subcommand arguments
 pub fn cmd() -> Command {
     Command::new("completion")
-        .about("Generate shell completion scripts for roc")
+        .about("Generate, inspect, and install shell completion scripts for roc")
         .arg(
             Arg::new("shell")
                 .help("The shell to generate completions for")

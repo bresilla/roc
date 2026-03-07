@@ -43,6 +43,9 @@ Main command groups:
 - `launch` - launch file discovery with execution delegated to `ros2 launch`
 - `work` - workspace package create/list/info/build
 - `idl` - protobuf and ROS message conversion tools
+- `daemon` - daemon compatibility commands for `roc`'s direct-DDS mode
+- `middleware` - inspect and select `RMW_IMPLEMENTATION`
+- `completion` - generate and install shell completions
 
 Use command help to inspect options:
 
@@ -52,6 +55,29 @@ roc work --help
 roc topic pub --help
 ```
 
+## Shell completions
+
+`roc` can generate shell completions for `bash`, `zsh`, and `fish`.
+
+Examples:
+
+```bash
+# Print the generated script
+roc completion bash
+
+# Show the default install target without writing anything
+roc completion bash --print-path
+
+# Install to the preferred user-local location
+roc completion bash --install
+
+# Manual install
+roc completion zsh > ~/.zfunc/_roc
+roc completion fish > ~/.config/fish/completions/roc.fish
+```
+
+The `--install` path prefers user-local locations first and falls back to common system paths for each shell.
+
 ## Workspace commands
 
 `roc work` includes package and workspace utilities:
@@ -60,11 +86,16 @@ roc topic pub --help
 - `roc work list` - list discovered packages and build state
 - `roc work info <package>` - print package metadata
 - `roc work build` - build workspace packages with dependency ordering and colcon-like setup generation
+- `roc work test` - run package tests
+- `roc work test-result` - inspect test results from the workspace build tree
 
-Current validation status for `roc work build`:
+Current validated scope for the Linux/Jazzy environment in this repository:
 
-- validated against a minimal `ament_cmake` workspace: build and `ros2 pkg prefix` worked
-- validated against a minimal `ament_python` workspace: build and Python import worked, but package registration is still incomplete
+- `roc work build`
+- `roc work test`
+- `roc work test-result`
+
+See `COMPAT_VALIDATION.md` for the exact validated matrix and current caveats.
 
 Examples:
 

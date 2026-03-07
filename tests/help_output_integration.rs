@@ -29,6 +29,7 @@ fn top_level_help_uses_current_product_language() {
     assert!(stdout.contains("Utilities Commands"));
     assert!(stdout.contains("Transform tree inspection and publishing"));
     assert!(stdout.contains("IDL conversion and discovery tools"));
+    assert!(stdout.contains("Generate, inspect, and install shell completions"));
     assert!(!stdout.contains("wannabe"));
     assert!(!stdout.contains("replacer"));
 }
@@ -71,6 +72,7 @@ fn completion_help_lists_print_path_flag() {
     assert_success(&output, "roc completion --help");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Generate, inspect, and install shell completion scripts for roc"));
     assert!(stdout.contains("--install"));
     assert!(stdout.contains("--print-path"));
 }

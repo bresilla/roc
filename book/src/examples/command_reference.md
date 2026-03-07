@@ -27,6 +27,34 @@ The `roc` tool respects standard ROS 2 environment variables:
 roc <COMMAND> [SUBCOMMAND] [OPTIONS] [ARGS]
 ```
 
+## Shell Completion
+
+### `roc completion`
+
+Generate or install shell completion scripts for `roc`.
+
+**Syntax:**
+```bash
+roc completion <bash|zsh|fish> [--install|--print-path]
+```
+
+**Examples:**
+```bash
+# Print the completion script to stdout
+roc completion bash
+
+# Show the default installation target
+roc completion zsh --print-path
+
+# Install into the preferred shell-specific location
+roc completion fish --install
+```
+
+**Notes:**
+- `--install` prefers user-local locations first and falls back to common system paths.
+- `--print-path` shows where `--install` will try to write first.
+- Generated completions include dynamic values for topics, services, nodes, workspaces, and other graph-aware commands.
+
 ## Topic Commands
 
 ### `roc topic list`

@@ -455,143 +455,48 @@ if __name__ == '__main__':
 ### Bash Completion
 
 ```bash
-# roc_completion.bash - Bash completion for roc tool
+# Show the preferred install path
+roc completion bash --print-path
 
-_roc_completion() {
-    local cur prev opts
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-    
-    # Top-level commands
-    local commands="topic help"
-    
-    # Topic subcommands
-    local topic_commands="list info"
-    
-    case ${COMP_CWORD} in
-        1)
-            COMPREPLY=($(compgen -W "${commands}" -- ${cur}))
-            return 0
-            ;;
-        2)
-            case ${prev} in
-                topic)
-                    COMPREPLY=($(compgen -W "${topic_commands}" -- ${cur}))
-                    return 0
-                    ;;
-            esac
-            ;;
-        3)
-            case ${COMP_WORDS[1]} in
-                topic)
-                    case ${prev} in
-                        info)
-                            # Complete with available topics
-                            local topics=$(roc topic list 2>/dev/null)
-                            COMPREPLY=($(compgen -W "${topics}" -- ${cur}))
-                            return 0
-                            ;;
-                    esac
-                    ;;
-            esac
-            ;;
-        4)
-            case ${COMP_WORDS[1]} in
-                topic)
-                    case ${COMP_WORDS[2]} in
-                        info)
-                            COMPREPLY=($(compgen -W "--verbose" -- ${cur}))
-                            return 0
-                            ;;
-                    esac
-                    ;;
-            esac
-            ;;
-    esac
-    
-    return 0
-}
+# Install to the default user-local location
+roc completion bash --install
 
-complete -F _roc_completion roc
+# Manual install
+roc completion bash > ~/.local/share/bash-completion/completions/roc
 ```
 
 ### Zsh Integration
 
 ```zsh
-# roc_completion.zsh - Zsh completion for roc tool
+# Show the preferred install path
+roc completion zsh --print-path
 
-#compdef roc
+# Install to the default user-local location
+roc completion zsh --install
 
-_roc() {
-    local context state line
-    
-    _arguments \
-        '1: :->command' \
-        '*: :->args'
-    
-    case $state in
-        command)
-            _values 'commands' \
-                'topic[Topic operations]' \
-                'help[Show help]'
-            ;;
-        args)
-            case $line[1] in
-                topic)
-                    _roc_topic
-                    ;;
-            esac
-            ;;
-    esac
-}
-
-_roc_topic() {
-    local context state line
-    
-    _arguments \
-        '1: :->subcommand' \
-        '*: :->args'
-    
-    case $state in
-        subcommand)
-            _values 'topic subcommands' \
-                'list[List all topics]' \
-                'info[Show topic information]'
-            ;;
-        args)
-            case $line[1] in
-                info)
-                    _roc_topic_info
-                    ;;
-            esac
-            ;;
-    esac
-}
-
-_roc_topic_info() {
-    local context state line
-    
-    _arguments \
-        '1: :->topic_name' \
-        '2: :->options'
-    
-    case $state in
-        topic_name)
-            # Get available topics
-            local topics
-            topics=(${(f)"$(roc topic list 2>/dev/null)"})
-            _describe 'topics' topics
-            ;;
-        options)
-            _values 'options' \
-                '--verbose[Show detailed information]'
-            ;;
-    esac
-}
-
-_roc "$@"
+# Manual install
+mkdir -p ~/.zfunc
+roc completion zsh > ~/.zfunc/_roc
+echo 'fpath=(~/.zfunc $fpath)' >> ~/.zshrc
+echo 'autoload -U compinit && compinit' >> ~/.zshrc
 ```
+
+### Fish Integration
+
+```fish
+# Show the preferred install path
+roc completion fish --print-path
+
+# Install to the default user-local location
+roc completion fish --install
+
+# Manual install
+mkdir -p ~/.config/fish/completions
+roc completion fish > ~/.config/fish/completions/roc.fish
+```
+
+The generated scripts include live completion for many runtime values such as topics, services,
+nodes, action names, workspace packages, launch files, and interface paths.
 
 ## Systemd Service Integration
 

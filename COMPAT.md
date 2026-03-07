@@ -47,16 +47,19 @@ Legend:
 | `roc work create` | Native Rust | generates package skeletons; `src/commands/work/create/command.rs` |
 | `roc work list` | Native Rust | workspace package discovery; `src/commands/work/list/command.rs` |
 | `roc work info` | Native Rust | package.xml parsing + status; `src/commands/work/info/command.rs` |
-| `roc work build` | Native Rust | Native workspace builder with colcon-like behavior. Validated for a minimal `ament_cmake` workspace; `ament_python` still has package-registration gaps. See `COMPAT_VALIDATION.md`; `src/commands/work/build/*` |
+| `roc work build` | Native Rust | Native workspace builder with validated Linux/Jazzy parity coverage for isolated/merged installs, overlays, and resume flows. See `COMPAT_VALIDATION.md`; `src/commands/work/build/*` |
+| `roc work test` | Native Rust | Native workspace test runner for CMake and Python packages; `src/commands/work/test/*` |
+| `roc work test-result` | Native Rust | Native result summary + verbose failure reporting; `src/commands/work/test_result/*` |
 | `roc idl protobuf` (`proto`, `pb`) | Native Rust | bidirectional `.proto` ↔ `.msg`; `src/commands/idl/protobuf.rs` |
 | `roc idl ros2msg` (`msg`, `ros2`) | Native Rust | `.msg` → `.proto`; `src/commands/idl/ros2msg.rs` |
 | `roc bag record` | Native Rust (MCAP) | Records raw CDR bytes into `.mcap` (multi-topic, optional `--separated`); `src/commands/bag/record.rs`, `src/shared/serialized_transport.rs` |
 | `roc bag list` | Native Rust | Scans for rosbag2 directories via `metadata.yaml`; `src/commands/bag/list.rs`, `src/shared/rosbag2.rs` |
 | `roc bag info` | Native Rust | Parses rosbag2 `metadata.yaml` and prints summary; `src/commands/bag/info.rs`, `src/shared/rosbag2.rs` |
 | `roc bag play` | Native Rust (MCAP) | Plays one or multiple `.mcap` files (merges by `log_time`, supports `--rate` and `--loop`); `src/commands/bag/play.rs`, `src/shared/serialized_transport.rs` |
-| `roc daemon start` | Stub/WIP | prints placeholder; `src/commands/daemon/start.rs` |
-| `roc daemon stop` | Stub/WIP | prints placeholder; `src/commands/daemon/stop.rs` |
-| `roc daemon status` | Stub/WIP | prints placeholder; `src/commands/daemon/status.rs` |
-| `roc middleware list` | Stub/WIP | prints placeholder; `src/commands/middleware/list.rs` |
-| `roc middleware set` | Stub/WIP | prints placeholder; `src/commands/middleware/set.rs` |
-| `roc middleware get` | Stub/WIP | prints placeholder; `src/commands/middleware/get.rs` |
+| `roc completion` | Native Rust | Generates bash/zsh/fish scripts, prints default install paths, and installs completion files; `src/completions/*` |
+| `roc daemon start` | Native Rust | Compatibility no-op; `roc` uses direct DDS discovery and does not need a background daemon; `src/commands/daemon/start.rs` |
+| `roc daemon stop` | Native Rust | Compatibility no-op; `src/commands/daemon/stop.rs` |
+| `roc daemon status` | Native Rust | Reports direct-DDS mode and no-daemon status; `src/commands/daemon/status.rs` |
+| `roc middleware list` | Native Rust | Discovers installed `rmw_*` implementations from ROS prefixes; `src/commands/middleware/list.rs` |
+| `roc middleware set` | Native Rust | Prints the shell export command needed to select an implementation; `src/commands/middleware/set.rs` |
+| `roc middleware get` | Native Rust | Reads and reports the current `RMW_IMPLEMENTATION`; `src/commands/middleware/get.rs` |
