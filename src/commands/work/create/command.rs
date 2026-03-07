@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::commands::cli::{handle_boxed_command_result, required_string};
 use crate::commands::work::create::package_templates::*;
+use crate::ui::blocks;
 
 pub fn handle(matches: ArgMatches) {
     handle_boxed_command_result(create_package(matches));
@@ -103,6 +104,21 @@ fn validate_inputs(
     Ok(())
 }
 
+fn relative_display_path(package_root: &Path, path: &Path) -> String {
+    path.strip_prefix(package_root)
+        .unwrap_or(path)
+        .display()
+        .to_string()
+}
+
+fn print_created_status(item: &str, path: String) {
+    blocks::print_status("Created", &[("Item", item.to_string()), ("Path", path)]);
+}
+
+fn print_created_path(package_root: &Path, item: &str, path: &Path) {
+    print_created_status(item, relative_display_path(package_root, path));
+}
+
 fn create_package(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let package_name = required_string(&matches, "PACKAGE_NAME")?;
 
@@ -172,8 +188,24 @@ fn create_package(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>>
         .into());
     }
 
-    println!("Creating package '{}'...", package_name);
+    blocks::print_section("Create Package");
+    blocks::print_field("Name", package_name);
+    blocks::print_field("Build Type", build_type);
+    blocks::print_field("Format", package_format);
+    blocks::print_field("Destination", package_path.display());
+    if !dependencies.is_empty() {
+        blocks::print_field("Dependencies", dependencies.join(", "));
+    }
+    if let Some(node_name_str) = node_name {
+        blocks::print_field("Node", node_name_str);
+    }
+    if let Some(library_name_str) = library_name {
+        blocks::print_field("Library", library_name_str);
+    }
+    println!();
+
     fs::create_dir_all(&package_path)?;
+    print_created_status("Package Directory", package_path.display().to_string());
 
     // Create package.xml
     let package_xml = create_package_xml(
@@ -189,7 +221,7 @@ fn create_package(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>>
 
     let package_xml_path = package_path.join("package.xml");
     fs::write(&package_xml_path, package_xml)?;
-    println!("  📝 Created package.xml");
+    print_created_path(&package_path, "Manifest", &package_xml_path);
 
     // Create build system files based on build type
     match build_type {
@@ -210,16 +242,26 @@ fn create_package(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>>
         _ => unreachable!("Already validated build type above"),
     }
 
-    println!("✅ Successfully created package '{}'", package_name);
-    println!("   📁 Location: {}", package_path.display());
+    println!();
+    blocks::print_section("Package Ready");
+    blocks::print_field("Name", package_name);
+    blocks::print_field("Location", package_path.display());
+    blocks::print_field("Build Type", build_type);
+    if let Some(node_name_str) = node_name {
+        blocks::print_field("Node", node_name_str);
+    }
+    if let Some(library_name_str) = library_name {
+        blocks::print_field("Library", library_name_str);
+    }
+    blocks::print_success("Package created successfully");
 
-    if build_type == "ament_cmake" {
-        println!(
-            "   🔧 Build with: roc work build --packages-select {}",
+    if matches!(build_type, "ament_cmake" | "cmake") {
+        blocks::print_note(&format!(
+            "Build with: roc work build --packages-select {}",
             package_name
-        );
+        ));
     } else if build_type == "ament_python" {
-        println!("   🐍 Python package ready for development");
+        blocks::print_note("Python package ready for development");
     }
 
     Ok(())
@@ -242,7 +284,7 @@ fn create_cmake_package(
     let cmake_content = create_cmake_lists(package_name, node_name, library_name)?;
     let cmake_path = package_path.join("CMakeLists.txt");
     fs::write(&cmake_path, cmake_content)?;
-    println!("  📝 Created CMakeLists.txt");
+    print_created_path(package_path, "Build File", &cmake_path);
 
     // Create directory structure
     let src_dir = package_path.join("src");
@@ -255,7 +297,7 @@ fn create_cmake_package(
         let node_content = create_cpp_node_template(package_name, node_name_str);
         let node_path = src_dir.join(format!("{}.cpp", node_name_str));
         fs::write(&node_path, node_content)?;
-        println!("  📝 Created C++ node: src/{}.cpp", node_name_str);
+        print_created_path(package_path, "C++ Node", &node_path);
     }
 
     // Create library if specified
@@ -268,9 +310,13 @@ fn create_cmake_package(
 
         fs::write(&header_path, header_content)?;
         fs::write(&source_path, source_content)?;
-        println!(
-            "  📝 Created C++ library: include/{}/{}.hpp, src/{}.cpp",
-            package_name, library_name_str, library_name_str
+        print_created_status(
+            "C++ Library",
+            format!(
+                "{}, {}",
+                relative_display_path(package_path, &header_path),
+                relative_display_path(package_path, &source_path)
+            ),
         );
     }
 
@@ -297,13 +343,13 @@ fn create_python_package(
     )?;
     let setup_path = package_path.join("setup.py");
     fs::write(&setup_path, setup_content)?;
-    println!("  📝 Created setup.py");
+    print_created_path(package_path, "Build File", &setup_path);
 
     // Create setup.cfg
     let setup_cfg_content = create_setup_cfg(package_name);
     let setup_cfg_path = package_path.join("setup.cfg");
     fs::write(&setup_cfg_path, setup_cfg_content)?;
-    println!("  📝 Created setup.cfg");
+    print_created_path(package_path, "Build Config", &setup_cfg_path);
 
     // Create Python package directory
     let python_package_dir = package_path.join(package_name);
@@ -312,17 +358,14 @@ fn create_python_package(
     // Create __init__.py
     let init_path = python_package_dir.join("__init__.py");
     fs::write(&init_path, "")?;
-    println!("  📝 Created {}/__init__.py", package_name);
+    print_created_path(package_path, "Python Package", &init_path);
 
     // Create node if specified
     if let Some(node_name_str) = node_name {
         let node_content = create_python_node_template(package_name, node_name_str);
         let node_path = python_package_dir.join(format!("{}.py", node_name_str));
         fs::write(&node_path, node_content)?;
-        println!(
-            "  📝 Created Python node: {}/{}.py",
-            package_name, node_name_str
-        );
+        print_created_path(package_path, "Python Node", &node_path);
     }
 
     // Create resource directory
@@ -330,19 +373,21 @@ fn create_python_package(
     fs::create_dir_all(&resource_dir)?;
     let resource_file = resource_dir.join(package_name);
     fs::write(&resource_file, "")?;
-    println!("  📝 Created resource/{}", package_name);
+    print_created_path(package_path, "Resource Marker", &resource_file);
 
     // Create test directory
     let test_dir = package_path.join("test");
     fs::create_dir_all(&test_dir)?;
 
     let test_files = ["test_copyright.py", "test_flake8.py", "test_pep257.py"];
+    let mut created_tests = Vec::with_capacity(test_files.len());
     for test_file in &test_files {
         let test_content = create_python_test_template(test_file);
         let test_path = test_dir.join(test_file);
         fs::write(&test_path, test_content)?;
+        created_tests.push(relative_display_path(package_path, &test_path));
     }
-    println!("  📝 Created test files");
+    print_created_status("Test Files", created_tests.join(", "));
 
     Ok(())
 }

@@ -96,6 +96,41 @@ fn work_info_human_output_uses_section_blocks() {
 }
 
 #[test]
+fn work_create_human_output_uses_create_blocks() {
+    let temp = tempdir().unwrap();
+
+    let output = run_roc(
+        temp.path(),
+        &[
+            "work",
+            "create",
+            "demo_pkg",
+            "--build_type",
+            "ament_python",
+            "--node_name",
+            "talker",
+            "--destination_directory",
+            temp.path().to_str().unwrap(),
+        ],
+    );
+    assert_success(&output, "roc work create");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Create Package"));
+    assert!(stdout.contains("Build Type"));
+    assert!(stdout.contains("ament_python"));
+    assert!(stdout.contains("Created"));
+    assert!(stdout.contains("Package Ready"));
+    assert!(stdout.contains("Package created successfully"));
+    assert!(stdout.contains("Python package ready for development"));
+
+    let package_root = temp.path().join("demo_pkg");
+    assert!(package_root.join("package.xml").exists());
+    assert!(package_root.join("setup.py").exists());
+    assert!(package_root.join("demo_pkg").join("talker.py").exists());
+}
+
+#[test]
 fn work_build_failure_still_renders_workspace_header() {
     let temp = tempdir().unwrap();
     fs::create_dir_all(temp.path().join("src")).unwrap();
