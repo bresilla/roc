@@ -36,7 +36,7 @@ impl Default for TestConfig {
             packages_select: None,
             packages_ignore: None,
             packages_up_to: None,
-            continue_on_error: false,
+            continue_on_error: true,
             merge_install: false,
             ctest_args: Vec::new(),
             pytest_args: Vec::new(),
@@ -316,10 +316,20 @@ impl WorkspaceTester {
         }
 
         let mut command = Command::new("python3");
+        let build_dir = self.config.build_base.join(&package.name);
+        let pytest_xml = build_dir.join("pytest.xml");
+        let pytest_addopts = format!(
+            "--tb=short --junit-xml={} --junit-prefix={} -o cache_dir={}",
+            pytest_xml.display(),
+            package.name,
+            build_dir.join(".pytest_cache").display()
+        );
         command
             .args(Self::pytest_args(&self.config.pytest_args))
             .current_dir(&package.path)
-            .envs(env_manager.get_env_vars());
+            .envs(env_manager.get_env_vars())
+            .env("PYTEST_ADDOPTS", pytest_addopts)
+            .env("PYTHONDONTWRITEBYTECODE", "1");
         Self::run_command_checked(
             command,
             "Pytest",
@@ -550,7 +560,7 @@ fn config_from_matches(matches: &ArgMatches) -> Result<TestConfig, Box<dyn std::
         config.pytest_args = args.map(|arg| arg.to_string()).collect();
     }
 
-    config.continue_on_error = matches.get_flag("continue_on_error");
+    config.continue_on_error = config.continue_on_error || matches.get_flag("continue_on_error");
     config.merge_install = matches.get_flag("merge_install");
     config.isolated = !config.merge_install;
     config.workspace_root = std::env::current_dir()?;
@@ -681,5 +691,11 @@ mod tests {
             WorkspaceTester::pytest_args(&["-q".to_string()]),
             vec!["-m".to_string(), "pytest".to_string(), "-q".to_string()]
         );
+    }
+
+    #[test]
+    fn test_config_defaults_to_continue_on_error() {
+        let config = TestConfig::default();
+        assert!(config.continue_on_error);
     }
 }
