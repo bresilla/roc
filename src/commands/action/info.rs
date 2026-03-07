@@ -1,7 +1,9 @@
 use crate::arguments::action::CommonActionArgs;
-use crate::graph::{RclGraphContext, action_operations};
-use anyhow::{Result, anyhow};
+use crate::graph::{action_operations, RclGraphContext};
+use crate::ui::blocks;
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
+use colored::*;
 
 fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<()> {
     let action_name = matches
@@ -28,13 +30,17 @@ fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<()>
     let ty = ty.unwrap_or_else(|| "<unknown>".to_string());
 
     if matches.get_flag("show_types") {
-        println!("{} [{}]", action_name, ty);
+        println!(
+            "{} {}",
+            action_name.bright_cyan(),
+            format!("[{}]", ty).bright_green()
+        );
         return Ok(());
     }
 
-    // Minimal native info: match ros2 style loosely.
-    println!("Action: {}", action_name);
-    println!("Type: {}", ty);
+    blocks::print_section("Action");
+    blocks::print_field("Name", action_name.bright_cyan());
+    blocks::print_field("Type", ty.bright_green());
 
     Ok(())
 }

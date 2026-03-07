@@ -1,5 +1,6 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, table};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 
 use crate::arguments::node::CommonNodeArgs;
@@ -14,14 +15,17 @@ fn print_names_and_types_section(title: &str, map: rclrs::TopicNamesAndTypes) {
     }
     pairs.sort_by(|(a, at), (b, bt)| a.cmp(b).then(at.cmp(bt)));
 
-    println!("{}:", title);
+    println!();
+    blocks::print_section(title);
     if pairs.is_empty() {
-        println!("  (none)");
+        println!("(none)");
         return;
     }
-    for (name, ty) in pairs {
-        println!("  {} [{}]", name, ty);
-    }
+    let rows = pairs
+        .into_iter()
+        .map(|(name, ty)| vec![name, ty])
+        .collect();
+    table::print_table(&["Name", "Type"], rows);
 }
 
 fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
@@ -78,8 +82,9 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
             format!("{namespace}/{name}")
         };
 
-        println!("{}", fqn);
-        println!("  Namespace: {}", namespace);
+        blocks::print_section("Node");
+        blocks::print_field("Name", fqn.as_str());
+        blocks::print_field("Namespace", namespace.as_str());
 
         let publishers = context
             .node()
@@ -98,10 +103,10 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
             .get_client_names_and_types_by_node(&name, &namespace)
             .map_err(|e| anyhow!("Failed to query clients for {}: {}", fqn, e))?;
 
-        print_names_and_types_section("  Subscribers", subscriptions);
-        print_names_and_types_section("  Publishers", publishers);
-        print_names_and_types_section("  Services", services);
-        print_names_and_types_section("  Clients", clients);
+        print_names_and_types_section("Subscribers", subscriptions);
+        print_names_and_types_section("Publishers", publishers);
+        print_names_and_types_section("Services", services);
+        print_names_and_types_section("Clients", clients);
     }
 
     Ok(())

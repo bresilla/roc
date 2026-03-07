@@ -1,13 +1,14 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, table};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use crate::shared::tf_dump;
 use crate::shared::tf2_subscriber::TfFrameIndex;
+use crate::shared::tf_dump;
 
 fn run_command(matches: ArgMatches) -> Result<()> {
     let frame_name = matches
@@ -58,38 +59,41 @@ fn run_command(matches: ArgMatches) -> Result<()> {
         return Err(anyhow!("Frame '{}' not found in TF graph", frame_name));
     }
 
-    println!(
-        "{} {}",
-        "Frame:".bright_yellow().bold(),
-        frame_name.bright_cyan()
-    );
-    println!();
+    blocks::print_section("Frame");
+    blocks::print_field("Name", frame_name.bright_cyan());
 
-    println!("{}", "Parents:".bright_yellow().bold());
+    println!();
+    blocks::print_section("Parents");
     if incoming.is_empty() {
-        println!("  {}", "<none>".bright_black());
+        println!("{}", "<none>".bright_black());
     } else {
-        for e in &incoming {
-            println!(
-                "  {} {}",
-                format!("{} -> {}", e.parent, e.child).bright_cyan(),
-                format!("type=[{}]", e.kind).bright_black()
-            );
-        }
+        let rows = incoming
+            .iter()
+            .map(|e| {
+                vec![
+                    format!("{} -> {}", e.parent, e.child).bright_cyan().to_string(),
+                    e.kind.to_string().bright_black().to_string(),
+                ]
+            })
+            .collect();
+        table::print_table(&["Edge", "Kind"], rows);
     }
 
     println!();
-    println!("{}", "Children:".bright_yellow().bold());
+    blocks::print_section("Children");
     if outgoing.is_empty() {
-        println!("  {}", "<none>".bright_black());
+        println!("{}", "<none>".bright_black());
     } else {
-        for e in &outgoing {
-            println!(
-                "  {} {}",
-                format!("{} -> {}", e.parent, e.child).bright_cyan(),
-                format!("type=[{}]", e.kind).bright_black()
-            );
-        }
+        let rows = outgoing
+            .iter()
+            .map(|e| {
+                vec![
+                    format!("{} -> {}", e.parent, e.child).bright_cyan().to_string(),
+                    e.kind.to_string().bright_black().to_string(),
+                ]
+            })
+            .collect();
+        table::print_table(&["Edge", "Kind"], rows);
     }
 
     Ok(())

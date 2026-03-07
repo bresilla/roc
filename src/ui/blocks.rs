@@ -12,6 +12,14 @@ pub fn print_section(title: &str) {
     println!("{}", style(title).bold().cyan());
 }
 
+pub fn print_field(label: &str, value: impl std::fmt::Display) {
+    println!(
+        "{} {}",
+        style(format!("{label:<18}")).bold().yellow(),
+        value
+    );
+}
+
 pub fn print_total(count: usize, singular: &str, plural: &str) {
     println!(
         "{} {}",

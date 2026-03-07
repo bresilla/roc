@@ -1,5 +1,6 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, table};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 use std::path::PathBuf;
@@ -26,57 +27,46 @@ fn run_command(matches: ArgMatches) -> Result<()> {
     let meta = rosbag2::load_metadata(&bag_dir)?;
     let info = meta.rosbag2_bagfile_information;
 
-    println!("{}", "Rosbag Info".bright_yellow().bold());
-    println!(
-        "{} {}",
-        "Path:".bright_yellow().bold(),
-        bag_dir.display().to_string().bright_cyan()
+    blocks::print_section("Rosbag");
+    blocks::print_field("Path", bag_dir.display().to_string().bright_cyan());
+    blocks::print_field("Storage", info.storage_identifier.bright_white());
+    blocks::print_field("Version", info.version.to_string().bright_white());
+    blocks::print_field(
+        "Duration",
+        fmt_duration(info.duration.nanoseconds).bright_white(),
     );
-    println!(
-        "{} {}",
-        "Storage:".bright_yellow().bold(),
-        info.storage_identifier.bright_white()
-    );
-    println!(
-        "{} {}",
-        "Version:".bright_yellow().bold(),
-        info.version.to_string().bright_white()
-    );
-    println!(
-        "{} {}",
-        "Duration:".bright_yellow().bold(),
-        fmt_duration(info.duration.nanoseconds).bright_white()
-    );
-    println!(
-        "{} {}",
-        "Messages:".bright_yellow().bold(),
-        info.message_count.to_string().bright_white().bold()
-    );
+    blocks::print_field("Messages", info.message_count.to_string().bright_white().bold());
 
     if !info.compression_mode.is_empty() || !info.compression_format.is_empty() {
-        println!(
-            "{} {} {}",
-            "Compression:".bright_yellow().bold(),
-            info.compression_mode.bright_white(),
-            info.compression_format.bright_white()
+        blocks::print_field(
+            "Compression",
+            format!(
+                "{} {}",
+                info.compression_mode.bright_white(),
+                info.compression_format.bright_white()
+            ),
         );
     }
 
     println!();
-    println!("{}", "Topics:".bright_yellow().bold());
+    blocks::print_section("Topics");
     if info.topics_with_message_count.is_empty() {
-        println!("  {}", "<none>".bright_black());
+        println!("{}", "<none>".bright_black());
         return Ok(());
     }
 
-    for t in info.topics_with_message_count {
-        println!(
-            "  {} {} {}",
-            t.topic_metadata.name.bright_cyan(),
-            format!("[{}]", t.topic_metadata.r#type).green(),
-            format!("({})", t.message_count).bright_black()
-        );
-    }
+    let rows = info
+        .topics_with_message_count
+        .into_iter()
+        .map(|t| {
+            vec![
+                t.topic_metadata.name.bright_cyan().to_string(),
+                t.topic_metadata.r#type.green().to_string(),
+                t.message_count.to_string().bright_black().to_string(),
+            ]
+        })
+        .collect();
+    table::print_table(&["Topic", "Type", "Messages"], rows);
 
     Ok(())
 }

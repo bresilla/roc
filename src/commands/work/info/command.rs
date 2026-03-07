@@ -1,5 +1,6 @@
 use crate::commands::cli::{required_string, run_async_command};
 use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
+use crate::ui::{blocks, table};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
@@ -53,17 +54,15 @@ fn format_build_type(build_type: &BuildType) -> String {
     }
 }
 
-fn print_section_header(title: &str) {
-    println!("\n{}", title.bright_cyan().bold());
-    println!("{}", "-".repeat(title.len()).bright_black());
-}
-
 fn print_dependencies(deps: &[String], title: &str) {
     if !deps.is_empty() {
-        print_section_header(title);
-        for dep in deps {
-            println!("  • {}", dep.bright_white());
-        }
+        println!();
+        blocks::print_section(title);
+        let rows = deps
+            .iter()
+            .map(|dep| vec![dep.bright_white().to_string()])
+            .collect();
+        table::print_table(&["Dependency"], rows);
     }
 }
 
@@ -157,74 +156,68 @@ async fn run_command_in_workspace(
     // Parse the XML for detailed information
     let xml_content = fs::read_to_string(&package_xml_path)?;
 
-    // Print package header
-    println!("{}", "Package Information".bright_cyan().bold());
-    println!("{}", "=".repeat(50).bright_black());
-
-    // Basic information
-    println!(
-        "{}: {}",
-        "Name".bright_yellow().bold(),
-        package.name.bright_white().bold()
-    );
-    println!(
-        "{}: {}",
-        "Version".bright_yellow().bold(),
-        package.version.bright_white()
-    );
-    println!(
-        "{}: {}",
-        "Build Type".bright_yellow().bold(),
-        format_build_type(&package.build_type)
-    );
-    println!(
-        "{}: {}",
-        "Path".bright_yellow().bold(),
-        package.path.display().to_string().bright_black()
-    );
+    blocks::print_section("Package");
+    blocks::print_field("Name", package.name.bright_white().bold());
+    blocks::print_field("Version", package.version.bright_white());
+    blocks::print_field("Build Type", format_build_type(&package.build_type));
+    blocks::print_field("Path", package.path.display().to_string().bright_black());
 
     // Description
     if !package.description.is_empty() {
-        println!(
-            "{}: {}",
-            "Description".bright_yellow().bold(),
-            package.description.bright_white()
-        );
+        blocks::print_field("Description", package.description.bright_white());
     }
 
     // Maintainers
     if !package.maintainers.is_empty() {
-        print_section_header("Maintainers");
-        for maintainer in &package.maintainers {
-            println!("  • {}", maintainer.bright_white());
-        }
+        println!();
+        blocks::print_section("Maintainers");
+        let rows = package
+            .maintainers
+            .iter()
+            .map(|maintainer| vec![maintainer.bright_white().to_string()])
+            .collect();
+        table::print_table(&["Maintainer"], rows);
     }
 
     // Authors
     let authors = extract_authors(&xml_content);
     if !authors.is_empty() {
-        print_section_header("Authors");
-        for author in &authors {
-            println!("  • {}", author.bright_white());
-        }
+        println!();
+        blocks::print_section("Authors");
+        let rows = authors
+            .iter()
+            .map(|author| vec![author.bright_white().to_string()])
+            .collect();
+        table::print_table(&["Author"], rows);
     }
 
     // Licenses
     let licenses = extract_licenses(&xml_content);
     if !licenses.is_empty() {
-        print_section_header("Licenses");
-        for license in &licenses {
-            println!("  • {}", license.bright_white());
-        }
+        println!();
+        blocks::print_section("Licenses");
+        let rows = licenses
+            .iter()
+            .map(|license| vec![license.bright_white().to_string()])
+            .collect();
+        table::print_table(&["License"], rows);
     }
 
     // URLs
     let urls = extract_urls(&xml_content);
     if !urls.is_empty() {
-        print_section_header("URLs");
-        for (url_type, url) in &urls {
-            println!("  • {}: {}", url_type.bright_magenta(), url.bright_white());
-        }
+        println!();
+        blocks::print_section("URLs");
+        let rows = urls
+            .iter()
+            .map(|(url_type, url)| {
+                vec![
+                    url_type.bright_magenta().to_string(),
+                    url.bright_white().to_string(),
+                ]
+            })
+            .collect();
+        table::print_table(&["Type", "URL"], rows);
     }
 
     // Dependencies
@@ -240,7 +233,8 @@ async fn run_command_in_workspace(
     print_dependencies(&package.test_deps, "Test Dependencies");
 
     // Build status
-    print_section_header("Build Status");
+    println!();
+    blocks::print_section("Build Status");
     let package_build_dir = build_base.join(&package.name);
     let package_install_dir = install_base.join(&package.name);
     let install_layout = detect_install_layout(&package.name, &install_base);
@@ -257,26 +251,26 @@ async fn run_command_in_workspace(
         }
     };
 
-    println!("  {}", build_status);
+    blocks::print_field("Status", build_status);
 
     if package_build_dir.exists() {
-        println!(
-            "  Build directory: {}",
-            package_build_dir.display().to_string().bright_black()
+        blocks::print_field(
+            "Build directory",
+            package_build_dir.display().to_string().bright_black(),
         );
     }
 
     match install_layout {
         InstallLayout::Isolated => {
-            println!(
-                "  Install directory: {}",
-                package_install_dir.display().to_string().bright_black()
+            blocks::print_field(
+                "Install directory",
+                package_install_dir.display().to_string().bright_black(),
             );
         }
         InstallLayout::Merged => {
-            println!(
-                "  Install directory: {}",
-                install_base.display().to_string().bright_black()
+            blocks::print_field(
+                "Install directory",
+                install_base.display().to_string().bright_black(),
             );
         }
         InstallLayout::None => {}

@@ -1,6 +1,7 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use crate::ui::{blocks, table};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 
@@ -54,29 +55,24 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         println!("Publisher count: {}", publisher_count);
         println!("Subscription count: {}", subscriber_count);
     } else {
-        // Enhanced colored output
-        println!(
-            "{} {}",
-            "Type:".bright_yellow().bold(),
-            topic_type.bright_cyan()
-        );
-        println!(
-            "{} {}",
-            "Publisher count:".bright_yellow().bold(),
+        blocks::print_section("Topic");
+        blocks::print_field("Name", topic_name.bright_cyan());
+        blocks::print_field("Type", topic_type.bright_green());
+        blocks::print_field(
+            "Publishers",
             if publisher_count > 0 {
-                publisher_count.to_string().bright_green()
+                publisher_count.to_string().bright_green().to_string()
             } else {
-                publisher_count.to_string().red()
-            }
+                publisher_count.to_string().red().to_string()
+            },
         );
-        println!(
-            "{} {}",
-            "Subscription count:".bright_yellow().bold(),
+        blocks::print_field(
+            "Subscribers",
             if subscriber_count > 0 {
-                subscriber_count.to_string().bright_green()
+                subscriber_count.to_string().bright_green().to_string()
             } else {
-                subscriber_count.to_string().red()
-            }
+                subscriber_count.to_string().red().to_string()
+            },
         );
     }
 
@@ -107,30 +103,22 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
                 }
             }
         } else {
-            // Enhanced colored output
             println!();
-            println!("{}", "Publishers:".bright_magenta().bold());
+            blocks::print_section("Publishers");
             if publishers_info.is_empty() {
-                println!("  {}", "<none>".bright_black());
+                println!("{}", "<none>".bright_black());
             } else {
-                for pub_info in publishers_info {
-                    println!(
-                        "  • {}: {}",
-                        "Node name".bright_yellow(),
-                        pub_info.node_name.bright_white()
-                    );
-                    println!(
-                        "    {}: {}",
-                        "Node namespace".bright_yellow(),
-                        pub_info.node_namespace.bright_white()
-                    );
-                    println!(
-                        "    {}: {}",
-                        "Topic type".bright_yellow(),
-                        pub_info.topic_type.bright_cyan()
-                    );
-                    println!();
-                }
+                let rows = publishers_info
+                    .iter()
+                    .map(|pub_info| {
+                        vec![
+                            pub_info.node_name.bright_white().to_string(),
+                            pub_info.node_namespace.bright_black().to_string(),
+                            pub_info.topic_type.bright_green().to_string(),
+                        ]
+                    })
+                    .collect();
+                table::print_table(&["Node", "Namespace", "Type"], rows);
             }
         }
 
@@ -147,29 +135,22 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
                 }
             }
         } else {
-            // Enhanced colored output
-            println!("{}", "Subscribers:".bright_magenta().bold());
+            println!();
+            blocks::print_section("Subscribers");
             if subscribers_info.is_empty() {
-                println!("  {}", "<none>".bright_black());
+                println!("{}", "<none>".bright_black());
             } else {
-                for sub_info in subscribers_info {
-                    println!(
-                        "  • {}: {}",
-                        "Node name".bright_yellow(),
-                        sub_info.node_name.bright_white()
-                    );
-                    println!(
-                        "    {}: {}",
-                        "Node namespace".bright_yellow(),
-                        sub_info.node_namespace.bright_white()
-                    );
-                    println!(
-                        "    {}: {}",
-                        "Topic type".bright_yellow(),
-                        sub_info.topic_type.bright_cyan()
-                    );
-                    println!();
-                }
+                let rows = subscribers_info
+                    .iter()
+                    .map(|sub_info| {
+                        vec![
+                            sub_info.node_name.bright_white().to_string(),
+                            sub_info.node_namespace.bright_black().to_string(),
+                            sub_info.topic_type.bright_green().to_string(),
+                        ]
+                    })
+                    .collect();
+                table::print_table(&["Node", "Namespace", "Type"], rows);
             }
         }
     }
