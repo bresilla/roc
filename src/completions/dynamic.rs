@@ -3,9 +3,12 @@ use crate::shared::param_operations::ParamClientContext;
 use crate::shared::tf2_subscriber::TfFrameIndex;
 use crate::utils::{get_ros_workspace_paths, is_executable};
 use clap::ArgMatches;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
+use std::time::Duration;
 use walkdir::WalkDir;
 
 const TOPIC_SUBCOMMANDS: &[&str] = &[
@@ -24,6 +27,11 @@ const FRAME_SUBCOMMANDS: &[&str] = &["list", "echo", "info", "pub"];
 const DAEMON_SUBCOMMANDS: &[&str] = &["start", "stop", "status"];
 const MIDDLEWARE_SUBCOMMANDS: &[&str] = &["get", "set", "list"];
 const IDL_SUBCOMMANDS: &[&str] = &["protobuf", "ros2msg"];
+const GRAPH_CACHE_TTL: Duration = Duration::from_millis(1500);
+const FRAME_CACHE_TTL: Duration = Duration::from_millis(1500);
+const PARAM_CACHE_TTL: Duration = Duration::from_millis(1500);
+const SCAN_CACHE_TTL: Duration = Duration::from_secs(5);
+const PATH_CACHE_TTL: Duration = Duration::from_secs(2);
 
 /// Handle internal dynamic completion (_complete)
 pub fn handle(matches: ArgMatches) {
@@ -47,6 +55,97 @@ pub fn handle(matches: ArgMatches) {
     for item in complete(command, sub, subsub, pos, &current_args) {
         println!("{}", item);
     }
+}
+
+fn completion_cache_dir() -> Option<PathBuf> {
+    if env::var_os("ROC_DISABLE_COMPLETION_CACHE").is_some() {
+        return None;
+    }
+
+    Some(
+        env::var_os("ROC_COMPLETION_CACHE_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| env::temp_dir().join("roc_completion_cache")),
+    )
+}
+
+fn completion_cache_key(scope: &str, cache_key: &str) -> String {
+    let cwd = env::current_dir()
+        .ok()
+        .map(|path| path.display().to_string())
+        .unwrap_or_default();
+    let ros_distro = env::var("ROS_DISTRO").unwrap_or_default();
+    let ament_prefix = env::var("AMENT_PREFIX_PATH").unwrap_or_default();
+    let colcon_prefix = env::var("COLCON_PREFIX_PATH").unwrap_or_default();
+    let cmake_prefix = env::var("CMAKE_PREFIX_PATH").unwrap_or_default();
+
+    format!(
+        "{scope}|{cache_key}|cwd={cwd}|ros={ros_distro}|ament={ament_prefix}|colcon={colcon_prefix}|cmake={cmake_prefix}"
+    )
+}
+
+fn cache_file_path(cache_root: &Path, scope: &str, cache_key: &str) -> PathBuf {
+    let mut hasher = DefaultHasher::new();
+    completion_cache_key(scope, cache_key).hash(&mut hasher);
+    cache_root.join(format!("{scope}_{:016x}.cache", hasher.finish()))
+}
+
+fn with_completion_cache<F>(
+    scope: &str,
+    cache_key: &str,
+    ttl: Duration,
+    producer: F,
+) -> Vec<String>
+where
+    F: FnOnce() -> Vec<String>,
+{
+    with_completion_cache_at(completion_cache_dir(), scope, cache_key, ttl, producer)
+}
+
+fn with_completion_cache_at<F>(
+    cache_root: Option<PathBuf>,
+    scope: &str,
+    cache_key: &str,
+    ttl: Duration,
+    producer: F,
+) -> Vec<String>
+where
+    F: FnOnce() -> Vec<String>,
+{
+    let Some(cache_root) = cache_root else {
+        return producer();
+    };
+
+    let cache_path = cache_file_path(&cache_root, scope, cache_key);
+    if let Ok(metadata) = fs::metadata(&cache_path) {
+        if let Ok(modified) = metadata.modified() {
+            if modified.elapsed().ok().is_some_and(|age| age <= ttl) {
+                if let Ok(contents) = fs::read_to_string(&cache_path) {
+                    return contents
+                        .lines()
+                        .filter(|line| !line.is_empty())
+                        .map(|line| line.to_string())
+                        .collect();
+                }
+            }
+        }
+    }
+
+    let items = producer();
+
+    if fs::create_dir_all(&cache_root).is_ok() {
+        let tmp_path = cache_path.with_extension(format!("{}.tmp", std::process::id()));
+        let serialized = if items.is_empty() {
+            String::new()
+        } else {
+            format!("{}\n", items.join("\n"))
+        };
+        if fs::write(&tmp_path, serialized).is_ok() {
+            let _ = fs::rename(&tmp_path, &cache_path);
+        }
+    }
+
+    items
 }
 
 fn complete(
@@ -154,30 +253,32 @@ fn complete(
 
 /// Scan ROS workspaces for launch files
 fn find_launch_files() -> Vec<String> {
-    let mut launch_files = HashSet::new();
+    with_completion_cache("launch_files", "", SCAN_CACHE_TTL, || {
+        let mut launch_files = HashSet::new();
 
-    if let Ok(distro) = env::var("ROS_DISTRO") {
-        let ros_path = PathBuf::from(format!("/opt/ros/{}/share", distro));
-        if ros_path.exists() {
-            for entry in WalkDir::new(&ros_path)
-                .follow_links(true)
-                .max_depth(3)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                if entry.file_type().is_file() {
-                    let path = entry.path();
-                    if path.to_string_lossy().contains("/launch/") {
-                        if let Some(share_idx) = path.to_string_lossy().find("/share/") {
-                            let after_share = &path.to_string_lossy()[share_idx + 7..];
-                            if let Some(next_slash) = after_share.find('/') {
-                                let package_name = &after_share[..next_slash];
-                                if let Some(file_name) = path.file_name() {
-                                    launch_files.insert(format!(
-                                        "{}:{}",
-                                        package_name,
-                                        file_name.to_string_lossy()
-                                    ));
+        if let Ok(distro) = env::var("ROS_DISTRO") {
+            let ros_path = PathBuf::from(format!("/opt/ros/{}/share", distro));
+            if ros_path.exists() {
+                for entry in WalkDir::new(&ros_path)
+                    .follow_links(true)
+                    .max_depth(3)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    if entry.file_type().is_file() {
+                        let path = entry.path();
+                        if path.to_string_lossy().contains("/launch/") {
+                            if let Some(share_idx) = path.to_string_lossy().find("/share/") {
+                                let after_share = &path.to_string_lossy()[share_idx + 7..];
+                                if let Some(next_slash) = after_share.find('/') {
+                                    let package_name = &after_share[..next_slash];
+                                    if let Some(file_name) = path.file_name() {
+                                        launch_files.insert(format!(
+                                            "{}:{}",
+                                            package_name,
+                                            file_name.to_string_lossy()
+                                        ));
+                                    }
                                 }
                             }
                         }
@@ -185,40 +286,40 @@ fn find_launch_files() -> Vec<String> {
                 }
             }
         }
-    }
 
-    for workspace_path in get_ros_workspace_paths() {
-        if workspace_path.exists() && !workspace_path.to_string_lossy().contains("/opt/ros/") {
-            for entry in WalkDir::new(&workspace_path)
-                .follow_links(true)
-                .max_depth(6)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                if entry.file_type().is_file() {
-                    let path = entry.path();
-                    if path.to_string_lossy().contains("/launch/") {
-                        let mut current_path = path.parent();
-                        while let Some(dir) = current_path {
-                            if let Some(pkg_name) = find_package_name(&dir.to_path_buf()) {
-                                if let Some(file_name) = path.file_name() {
-                                    launch_files.insert(format!(
-                                        "{}:{}",
-                                        pkg_name,
-                                        file_name.to_string_lossy()
-                                    ));
+        for workspace_path in get_ros_workspace_paths() {
+            if workspace_path.exists() && !workspace_path.to_string_lossy().contains("/opt/ros/") {
+                for entry in WalkDir::new(&workspace_path)
+                    .follow_links(true)
+                    .max_depth(6)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    if entry.file_type().is_file() {
+                        let path = entry.path();
+                        if path.to_string_lossy().contains("/launch/") {
+                            let mut current_path = path.parent();
+                            while let Some(dir) = current_path {
+                                if let Some(pkg_name) = find_package_name(&dir.to_path_buf()) {
+                                    if let Some(file_name) = path.file_name() {
+                                        launch_files.insert(format!(
+                                            "{}:{}",
+                                            pkg_name,
+                                            file_name.to_string_lossy()
+                                        ));
+                                    }
+                                    break;
                                 }
-                                break;
+                                current_path = dir.parent();
                             }
-                            current_path = dir.parent();
                         }
                     }
                 }
             }
         }
-    }
 
-    sorted(launch_files)
+        sorted(launch_files)
+    })
 }
 
 fn find_packages_with_launch_files() -> Vec<String> {
@@ -266,81 +367,32 @@ fn find_executables_for_package(package_filter: Option<&str>) -> Vec<String> {
 }
 
 fn find_executables() -> Vec<String> {
-    let mut executables = HashSet::new();
+    with_completion_cache("executables", "", SCAN_CACHE_TTL, || {
+        let mut executables = HashSet::new();
 
-    if let Ok(distro) = env::var("ROS_DISTRO") {
-        let ros_lib_path = PathBuf::from(format!("/opt/ros/{}/lib", distro));
-        let ros_bin_path = PathBuf::from(format!("/opt/ros/{}/bin", distro));
+        if let Ok(distro) = env::var("ROS_DISTRO") {
+            let ros_lib_path = PathBuf::from(format!("/opt/ros/{}/lib", distro));
+            let ros_bin_path = PathBuf::from(format!("/opt/ros/{}/bin", distro));
 
-        if ros_lib_path.exists() {
-            for entry in WalkDir::new(&ros_lib_path)
-                .follow_links(true)
-                .max_depth(2)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                if entry.file_type().is_file() {
-                    let path = entry.path();
-                    if is_executable(path) {
-                        if let Some(lib_idx) = path.to_string_lossy().find("/lib/") {
-                            let after_lib = &path.to_string_lossy()[lib_idx + 5..];
-                            if let Some(next_slash) = after_lib.find('/') {
-                                let package_name = &after_lib[..next_slash];
-                                if let Some(exec_name) = path.file_name() {
-                                    executables.insert(format!(
-                                        "{}:{}",
-                                        package_name,
-                                        exec_name.to_string_lossy()
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if ros_bin_path.exists() {
-            for entry in WalkDir::new(&ros_bin_path)
-                .follow_links(true)
-                .max_depth(1)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                if entry.file_type().is_file() {
-                    let path = entry.path();
-                    if is_executable(path) {
-                        if let Some(exec_name) = path.file_name() {
-                            executables.insert(format!("system:{}", exec_name.to_string_lossy()));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    for workspace_path in get_ros_workspace_paths() {
-        if workspace_path.exists() && !workspace_path.to_string_lossy().contains("/opt/ros/") {
-            let install_path = workspace_path.join("install");
-            if install_path.exists() {
-                for entry in WalkDir::new(&install_path)
+            if ros_lib_path.exists() {
+                for entry in WalkDir::new(&ros_lib_path)
                     .follow_links(true)
-                    .max_depth(4)
+                    .max_depth(2)
                     .into_iter()
                     .filter_map(|e| e.ok())
                 {
                     if entry.file_type().is_file() {
                         let path = entry.path();
-                        if path.to_string_lossy().contains("/lib/") {
-                            if let Some(parent) = path.parent() {
-                                if let Some(pkg) = parent.file_name() {
-                                    if is_executable(path) {
+                        if is_executable(path) {
+                            if let Some(lib_idx) = path.to_string_lossy().find("/lib/") {
+                                let after_lib = &path.to_string_lossy()[lib_idx + 5..];
+                                if let Some(next_slash) = after_lib.find('/') {
+                                    let package_name = &after_lib[..next_slash];
+                                    if let Some(exec_name) = path.file_name() {
                                         executables.insert(format!(
                                             "{}:{}",
-                                            pkg.to_string_lossy(),
-                                            path.file_name()
-                                                .and_then(|n| n.to_str())
-                                                .unwrap_or_default()
+                                            package_name,
+                                            exec_name.to_string_lossy()
                                         ));
                                     }
                                 }
@@ -349,55 +401,109 @@ fn find_executables() -> Vec<String> {
                     }
                 }
             }
-        }
-    }
 
-    sorted(executables)
+            if ros_bin_path.exists() {
+                for entry in WalkDir::new(&ros_bin_path)
+                    .follow_links(true)
+                    .max_depth(1)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    if entry.file_type().is_file() {
+                        let path = entry.path();
+                        if is_executable(path) {
+                            if let Some(exec_name) = path.file_name() {
+                                executables
+                                    .insert(format!("system:{}", exec_name.to_string_lossy()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for workspace_path in get_ros_workspace_paths() {
+            if workspace_path.exists() && !workspace_path.to_string_lossy().contains("/opt/ros/") {
+                let install_path = workspace_path.join("install");
+                if install_path.exists() {
+                    for entry in WalkDir::new(&install_path)
+                        .follow_links(true)
+                        .max_depth(4)
+                        .into_iter()
+                        .filter_map(|e| e.ok())
+                    {
+                        if entry.file_type().is_file() {
+                            let path = entry.path();
+                            if path.to_string_lossy().contains("/lib/") {
+                                if let Some(parent) = path.parent() {
+                                    if let Some(pkg) = parent.file_name() {
+                                        if is_executable(path) {
+                                            executables.insert(format!(
+                                                "{}:{}",
+                                                pkg.to_string_lossy(),
+                                                path.file_name()
+                                                    .and_then(|n| n.to_str())
+                                                    .unwrap_or_default()
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        sorted(executables)
+    })
 }
 
 fn find_packages() -> Vec<String> {
-    let mut packages = HashSet::new();
+    with_completion_cache("packages", "", SCAN_CACHE_TTL, || {
+        let mut packages = HashSet::new();
 
-    if let Ok(distro) = env::var("ROS_DISTRO") {
-        let ros_share_path = PathBuf::from(format!("/opt/ros/{}/share", distro));
-        if ros_share_path.exists() {
-            for entry in WalkDir::new(&ros_share_path)
-                .follow_links(true)
-                .max_depth(2)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                if entry.file_type().is_file() && entry.file_name() == "package.xml" {
-                    if let Some(parent) = entry.path().parent() {
-                        if let Some(package_name) = parent.file_name().and_then(|n| n.to_str()) {
-                            packages.insert(package_name.to_string());
+        if let Ok(distro) = env::var("ROS_DISTRO") {
+            let ros_share_path = PathBuf::from(format!("/opt/ros/{}/share", distro));
+            if ros_share_path.exists() {
+                for entry in WalkDir::new(&ros_share_path)
+                    .follow_links(true)
+                    .max_depth(2)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    if entry.file_type().is_file() && entry.file_name() == "package.xml" {
+                        if let Some(parent) = entry.path().parent() {
+                            if let Some(package_name) = parent.file_name().and_then(|n| n.to_str()) {
+                                packages.insert(package_name.to_string());
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    for workspace_path in get_ros_workspace_paths() {
-        if workspace_path.exists() && !workspace_path.to_string_lossy().contains("/opt/ros/") {
-            for entry in WalkDir::new(&workspace_path)
-                .follow_links(true)
-                .max_depth(6)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                if entry.file_type().is_file() && entry.file_name() == "package.xml" {
-                    if let Some(parent) = entry.path().parent() {
-                        if let Some(name) = find_package_name(&parent.to_path_buf()) {
-                            packages.insert(name);
+        for workspace_path in get_ros_workspace_paths() {
+            if workspace_path.exists() && !workspace_path.to_string_lossy().contains("/opt/ros/") {
+                for entry in WalkDir::new(&workspace_path)
+                    .follow_links(true)
+                    .max_depth(6)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    if entry.file_type().is_file() && entry.file_name() == "package.xml" {
+                        if let Some(parent) = entry.path().parent() {
+                            if let Some(name) = find_package_name(&parent.to_path_buf()) {
+                                packages.insert(name);
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    sorted(packages)
+        sorted(packages)
+    })
 }
 
 fn find_package_name(dir: &PathBuf) -> Option<String> {
@@ -423,50 +529,66 @@ fn find_package_name(dir: &PathBuf) -> Option<String> {
 }
 
 fn find_topics() -> Vec<String> {
-    with_graph_context(|context| context.get_topic_names().unwrap_or_default())
+    with_completion_cache("graph_topics", "", GRAPH_CACHE_TTL, || {
+        with_graph_context(|context| context.get_topic_names().unwrap_or_default())
+    })
 }
 
 fn find_message_types() -> Vec<String> {
-    let interfaces = interface_operations::list_interfaces(true, false, false).unwrap_or_default();
-    sorted(interfaces.into_iter().collect())
+    with_completion_cache("message_types", "", SCAN_CACHE_TTL, || {
+        let interfaces =
+            interface_operations::list_interfaces(true, false, false).unwrap_or_default();
+        sorted(interfaces.into_iter().collect())
+    })
 }
 
 fn find_topic_types_for_name(topic_name: Option<&str>) -> Vec<String> {
-    with_graph_context(|context| {
-        let pairs = context.get_topic_names_and_types().unwrap_or_default();
-        let items: HashSet<String> = match topic_name {
-            Some(name) => pairs
-                .into_iter()
-                .filter(|(topic, _)| topic == name)
-                .map(|(_, ty)| ty)
-                .collect(),
-            None => pairs.into_iter().map(|(_, ty)| ty).collect(),
-        };
-        sorted(items)
+    let cache_key = topic_name.unwrap_or("*");
+    with_completion_cache("graph_topic_types", cache_key, GRAPH_CACHE_TTL, || {
+        with_graph_context(|context| {
+            let pairs = context.get_topic_names_and_types().unwrap_or_default();
+            let items: HashSet<String> = match topic_name {
+                Some(name) => pairs
+                    .into_iter()
+                    .filter(|(topic, _)| topic == name)
+                    .map(|(_, ty)| ty)
+                    .collect(),
+                None => pairs.into_iter().map(|(_, ty)| ty).collect(),
+            };
+            sorted(items)
+        })
     })
 }
 
 fn find_services() -> Vec<String> {
-    with_graph_context(|context| context.get_service_names().unwrap_or_default())
+    with_completion_cache("graph_services", "", GRAPH_CACHE_TTL, || {
+        with_graph_context(|context| context.get_service_names().unwrap_or_default())
+    })
 }
 
 fn find_service_types() -> Vec<String> {
-    let interfaces = interface_operations::list_interfaces(false, true, false).unwrap_or_default();
-    sorted(interfaces.into_iter().collect())
+    with_completion_cache("service_types", "", SCAN_CACHE_TTL, || {
+        let interfaces =
+            interface_operations::list_interfaces(false, true, false).unwrap_or_default();
+        sorted(interfaces.into_iter().collect())
+    })
 }
 
 fn find_service_types_for_name(service_name: Option<&str>) -> Vec<String> {
-    with_graph_context(|context| {
-        let pairs = context.get_service_names_and_types().unwrap_or_default();
-        let items: HashSet<String> = match service_name {
-            Some(name) => pairs
-                .into_iter()
-                .filter(|(service, _)| service == name)
-                .map(|(_, ty)| ty)
-                .collect(),
-            None => pairs.into_iter().map(|(_, ty)| ty).collect(),
-        };
-        sorted(items)
+    let cache_key = service_name.unwrap_or("*");
+    with_completion_cache("graph_service_types", cache_key, GRAPH_CACHE_TTL, || {
+        with_graph_context(|context| {
+            let pairs = context.get_service_names_and_types().unwrap_or_default();
+            let items: HashSet<String> = match service_name {
+                Some(name) => pairs
+                    .into_iter()
+                    .filter(|(service, _)| service == name)
+                    .map(|(_, ty)| ty)
+                    .collect(),
+                None => pairs.into_iter().map(|(_, ty)| ty).collect(),
+            };
+            sorted(items)
+        })
     })
 }
 
@@ -475,58 +597,69 @@ fn find_parameters(node_name: Option<&str>) -> Vec<String> {
         return Vec::new();
     };
 
-    let node_fqn = ParamClientContext::node_fqn(node_name);
-    let mut context = match ParamClientContext::new() {
-        Ok(context) => context,
-        Err(_) => return Vec::new(),
-    };
+    with_completion_cache("graph_parameters", node_name, PARAM_CACHE_TTL, || {
+        let node_fqn = ParamClientContext::node_fqn(node_name);
+        let mut context = match ParamClientContext::new() {
+            Ok(context) => context,
+            Err(_) => return Vec::new(),
+        };
 
-    context
-        .list_parameters(&node_fqn, Vec::new())
-        .map(|response| {
-            let items: HashSet<String> = response
-                .result
-                .names
-                .into_iter()
-                .map(|name| name.to_string())
-                .collect();
-            sorted(items)
-        })
-        .unwrap_or_default()
+        context
+            .list_parameters(&node_fqn, Vec::new())
+            .map(|response| {
+                let items: HashSet<String> = response
+                    .result
+                    .names
+                    .into_iter()
+                    .map(|name| name.to_string())
+                    .collect();
+                sorted(items)
+            })
+            .unwrap_or_default()
+    })
 }
 
 fn find_nodes() -> Vec<String> {
-    with_graph_context(|context| context.get_node_names().unwrap_or_default())
+    with_completion_cache("graph_nodes", "", GRAPH_CACHE_TTL, || {
+        with_graph_context(|context| context.get_node_names().unwrap_or_default())
+    })
 }
 
 fn find_actions() -> Vec<String> {
-    with_graph_context(|context| action_operations::get_action_names(context).unwrap_or_default())
+    with_completion_cache("graph_actions", "", GRAPH_CACHE_TTL, || {
+        with_graph_context(|context| action_operations::get_action_names(context).unwrap_or_default())
+    })
 }
 
 fn find_action_types_for_name(action_name: Option<&str>) -> Vec<String> {
-    with_graph_context(|context| {
-        let items: HashSet<String> = match action_name {
-            Some(name) => action_operations::get_action_type(context, name)
-                .ok()
-                .flatten()
-                .into_iter()
-                .collect(),
-            None => action_operations::get_action_names(context)
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|name| {
-                    action_operations::get_action_type(context, &name)
-                        .ok()
-                        .flatten()
-                })
-                .collect(),
-        };
-        sorted(items)
+    let cache_key = action_name.unwrap_or("*");
+    with_completion_cache("graph_action_types", cache_key, GRAPH_CACHE_TTL, || {
+        with_graph_context(|context| {
+            let items: HashSet<String> = match action_name {
+                Some(name) => action_operations::get_action_type(context, name)
+                    .ok()
+                    .flatten()
+                    .into_iter()
+                    .collect(),
+                None => action_operations::get_action_names(context)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|name| {
+                        action_operations::get_action_type(context, &name)
+                            .ok()
+                            .flatten()
+                    })
+                    .collect(),
+            };
+            sorted(items)
+        })
     })
 }
 
 fn find_interfaces() -> Vec<String> {
-    interface_operations::list_interfaces(false, false, false).unwrap_or_default()
+    with_completion_cache("interfaces", "", SCAN_CACHE_TTL, || {
+        interface_operations::list_interfaces(false, false, false).unwrap_or_default()
+    })
 }
 
 fn complete_idl_protobuf(current_args: &[String]) -> Vec<String> {
@@ -558,48 +691,51 @@ fn find_directories() -> Vec<String> {
 }
 
 fn find_completion_paths(file_extensions: &[&str], include_directories: bool) -> Vec<String> {
-    let mut matches = HashSet::new();
+    let cache_key = format!("dirs={include_directories};exts={}", file_extensions.join(","));
+    with_completion_cache("paths", &cache_key, PATH_CACHE_TTL, || {
+        let mut matches = HashSet::new();
 
-    for entry in WalkDir::new(".")
-        .follow_links(true)
-        .max_depth(6)
-        .into_iter()
-        .filter_entry(|entry| !should_skip_completion_entry(entry.path(), entry.depth()))
-        .filter_map(|entry| entry.ok())
-    {
-        if entry.depth() == 0 {
-            continue;
-        }
-
-        let path = entry.path();
-        let relative = relative_completion_path(path);
-        if relative.is_empty() {
-            continue;
-        }
-
-        if entry.file_type().is_dir() {
-            if include_directories {
-                matches.insert(format!("{relative}/"));
-            }
-            continue;
-        }
-
-        if !file_extensions.is_empty()
-            && path
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| {
-                    file_extensions
-                        .iter()
-                        .any(|candidate| candidate.eq_ignore_ascii_case(ext))
-                })
-                .unwrap_or(false)
+        for entry in WalkDir::new(".")
+            .follow_links(true)
+            .max_depth(6)
+            .into_iter()
+            .filter_entry(|entry| !should_skip_completion_entry(entry.path(), entry.depth()))
+            .filter_map(|entry| entry.ok())
         {
-            matches.insert(relative);
-        }
-    }
+            if entry.depth() == 0 {
+                continue;
+            }
 
-    sorted(matches)
+            let path = entry.path();
+            let relative = relative_completion_path(path);
+            if relative.is_empty() {
+                continue;
+            }
+
+            if entry.file_type().is_dir() {
+                if include_directories {
+                    matches.insert(format!("{relative}/"));
+                }
+                continue;
+            }
+
+            if !file_extensions.is_empty()
+                && path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| {
+                        file_extensions
+                            .iter()
+                            .any(|candidate| candidate.eq_ignore_ascii_case(ext))
+                    })
+                    .unwrap_or(false)
+            {
+                matches.insert(relative);
+            }
+        }
+
+        sorted(matches)
+    })
 }
 
 fn should_skip_completion_entry(path: &Path, depth: usize) -> bool {
@@ -635,49 +771,53 @@ fn relative_completion_path(path: &Path) -> String {
 }
 
 fn find_bag_files() -> Vec<String> {
-    let mut bags = HashSet::new();
-    if let Ok(entries) = fs::read_dir(".") {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() && path.join("metadata.yaml").is_file() {
-                bags.insert(path.display().to_string());
-            } else if path.is_file() {
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if matches!(ext, "mcap" | "db3") {
-                        bags.insert(path.display().to_string());
+    with_completion_cache("bags", "", PATH_CACHE_TTL, || {
+        let mut bags = HashSet::new();
+        if let Ok(entries) = fs::read_dir(".") {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() && path.join("metadata.yaml").is_file() {
+                    bags.insert(path.display().to_string());
+                } else if path.is_file() {
+                    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                        if matches!(ext, "mcap" | "db3") {
+                            bags.insert(path.display().to_string());
+                        }
                     }
                 }
             }
         }
-    }
-    sorted(bags)
+        sorted(bags)
+    })
 }
 
 fn find_frames() -> Vec<String> {
-    let Ok(index) = TfFrameIndex::new() else {
-        return Vec::new();
-    };
+    with_completion_cache("frames", "", FRAME_CACHE_TTL, || {
+        let Ok(index) = TfFrameIndex::new() else {
+            return Vec::new();
+        };
 
-    // Give /tf_static a brief chance to arrive before we snapshot the index.
-    let start = std::time::Instant::now();
-    while start.elapsed() < std::time::Duration::from_millis(300) {
-        if index.has_any_data() {
-            break;
+        // Give /tf_static a brief chance to arrive before we snapshot the index.
+        let start = std::time::Instant::now();
+        while start.elapsed() < std::time::Duration::from_millis(300) {
+            if index.has_any_data() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
         }
-        std::thread::sleep(std::time::Duration::from_millis(25));
-    }
 
-    let mut frames = HashSet::new();
-    for ((parent, child), _, _) in index.edges() {
-        if !parent.is_empty() {
-            frames.insert(parent);
+        let mut frames = HashSet::new();
+        for ((parent, child), _, _) in index.edges() {
+            if !parent.is_empty() {
+                frames.insert(parent);
+            }
+            if !child.is_empty() {
+                frames.insert(child);
+            }
         }
-        if !child.is_empty() {
-            frames.insert(child);
-        }
-    }
 
-    sorted(frames)
+        sorted(frames)
+    })
 }
 
 fn with_graph_context<F>(resolver: F) -> Vec<String>
@@ -697,7 +837,9 @@ fn sorted(items: HashSet<String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::complete;
+    use super::{complete, with_completion_cache_at};
+    use std::time::Duration;
+    use tempfile::tempdir;
 
     fn strings(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| value.to_string()).collect()
@@ -746,5 +888,52 @@ mod tests {
     #[test]
     fn unknown_position_returns_no_completions() {
         assert!(complete("topic", Some("list"), None, 4, &[]).is_empty());
+    }
+
+    #[test]
+    fn completion_cache_reuses_fresh_results() {
+        let cache_dir = tempdir().unwrap();
+
+        let initial = with_completion_cache_at(
+            Some(cache_dir.path().to_path_buf()),
+            "topics",
+            "all",
+            Duration::from_secs(60),
+            || vec!["/chatter".to_string()],
+        );
+        let cached = with_completion_cache_at(
+            Some(cache_dir.path().to_path_buf()),
+            "topics",
+            "all",
+            Duration::from_secs(60),
+            || vec!["/different".to_string()],
+        );
+
+        assert_eq!(initial, vec!["/chatter".to_string()]);
+        assert_eq!(cached, vec!["/chatter".to_string()]);
+    }
+
+    #[test]
+    fn completion_cache_expires_stale_results() {
+        let cache_dir = tempdir().unwrap();
+
+        let initial = with_completion_cache_at(
+            Some(cache_dir.path().to_path_buf()),
+            "topics",
+            "all",
+            Duration::from_millis(1),
+            || vec!["/chatter".to_string()],
+        );
+        std::thread::sleep(Duration::from_millis(20));
+        let refreshed = with_completion_cache_at(
+            Some(cache_dir.path().to_path_buf()),
+            "topics",
+            "all",
+            Duration::from_millis(1),
+            || vec!["/different".to_string()],
+        );
+
+        assert_eq!(initial, vec!["/chatter".to_string()]);
+        assert_eq!(refreshed, vec!["/different".to_string()]);
     }
 }
