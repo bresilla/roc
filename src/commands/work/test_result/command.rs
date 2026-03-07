@@ -72,6 +72,21 @@ fn parse_junit_counts(xml_path: &Path) -> Result<JUnitCounts, Box<dyn std::error
     let mut counts = JUnitCounts::default();
 
     match root.tag_name().name() {
+        "Site" => {
+            for testing in root
+                .descendants()
+                .filter(|node| node.has_tag_name("Testing"))
+            {
+                for test in testing.children().filter(|node| node.has_tag_name("Test")) {
+                    counts.tests += 1;
+                    match test.attribute("Status").unwrap_or("failed") {
+                        "passed" => {}
+                        "notrun" => counts.skipped += 1,
+                        _ => counts.failures += 1,
+                    }
+                }
+            }
+        }
         "testsuites" => {
             for suite in root
                 .children()
@@ -123,8 +138,9 @@ fn collect_result_entries(
         let package_name = package_dir.file_name().to_string_lossy().to_string();
         let package_path = package_dir.path();
 
+        let xml_paths = find_result_xml_files(&package_path);
         let rc_path = package_path.join("colcon_test.rc");
-        if rc_path.is_file() {
+        if xml_paths.is_empty() && rc_path.is_file() {
             let rc = fs::read_to_string(&rc_path).unwrap_or_default();
             let rc_code = rc.trim().parse::<i32>().unwrap_or(0);
             if rc_code != 0 {
@@ -138,7 +154,7 @@ fn collect_result_entries(
             }
         }
 
-        for xml_path in find_result_xml_files(&package_path) {
+        for xml_path in xml_paths {
             match parse_junit_counts(&xml_path) {
                 Ok(counts) => {
                     let status = if counts.errors > 0 {
@@ -190,7 +206,7 @@ fn find_result_xml_files(package_path: &Path) -> Vec<PathBuf> {
         .filter(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
-                .map(|name| name == "pytest.xml")
+                .map(|name| name == "pytest.xml" || name == "Test.xml")
                 .unwrap_or(false)
                 || path
                     .components()
@@ -393,6 +409,27 @@ mod tests {
     }
 
     #[test]
+    fn parse_junit_counts_supports_ctest_site_root() {
+        let temp = tempdir().unwrap();
+        let xml_path = temp.path().join("Test.xml");
+        fs::write(
+            &xml_path,
+            r#"<Site><Testing><Test Status="passed"></Test><Test Status="failed"></Test><Test Status="notrun"></Test></Testing></Site>"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            parse_junit_counts(&xml_path).unwrap(),
+            JUnitCounts {
+                tests: 3,
+                failures: 1,
+                errors: 0,
+                skipped: 1,
+            }
+        );
+    }
+
+    #[test]
     fn collect_result_entries_reads_xml_and_rc_files() {
         let temp = tempdir().unwrap();
         let build_base = temp.path().join("build");
@@ -424,10 +461,17 @@ mod tests {
         .unwrap();
 
         assert_eq!(entries.len(), 2);
-        assert!(entries
-            .iter()
-            .any(|entry| entry.path.ends_with("colcon_test.rc")
-                && entry.status == ResultStatus::Failed));
+        assert!(entries.iter().any(|entry| {
+            entry.path.ends_with("Test.xml")
+                && entry.status == ResultStatus::Passed
+                && entry.counts
+                    == Some(JUnitCounts {
+                        tests: 0,
+                        failures: 0,
+                        errors: 0,
+                        skipped: 0,
+                    })
+        }));
         assert!(entries.iter().any(|entry| {
             entry.path.ends_with("pytest.xml")
                 && entry.status == ResultStatus::Failed
@@ -439,6 +483,33 @@ mod tests {
                         skipped: 0,
                     })
         }));
+        assert!(!entries
+            .iter()
+            .any(|entry| entry.path.ends_with("colcon_test.rc")));
+    }
+
+    #[test]
+    fn collect_result_entries_uses_rc_file_when_no_xml_exists() {
+        let temp = tempdir().unwrap();
+        let build_base = temp.path().join("build");
+        let package_dir = build_base.join("demo_pkg");
+        fs::create_dir_all(&package_dir).unwrap();
+        fs::write(package_dir.join("colcon_test.rc"), "1\n").unwrap();
+
+        let entries = collect_result_entries(&ResultConfig {
+            result_base: build_base,
+            all: false,
+            verbose: false,
+            result_files_only: false,
+            delete_result_files: false,
+        })
+        .unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert!(entries
+            .iter()
+            .any(|entry| entry.path.ends_with("colcon_test.rc")
+                && entry.status == ResultStatus::Failed));
     }
 
     #[test]
