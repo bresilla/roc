@@ -1,4 +1,5 @@
 use crate::arguments::topic::CommonTopicArgs;
+use crate::commands::cli::handle_anyhow_result;
 use crate::graph::RclGraphContext;
 use crate::ui::{blocks, output};
 use anyhow::{anyhow, Result};
@@ -65,11 +66,5 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    match run_command(matches, common_args) {
-        Ok(()) => {}
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    }
+    handle_anyhow_result(run_command(matches, common_args));
 }

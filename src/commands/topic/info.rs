@@ -1,4 +1,5 @@
 use crate::arguments::topic::CommonTopicArgs;
+use crate::commands::cli::handle_anyhow_result;
 use crate::graph::RclGraphContext;
 use crate::ui::{blocks, output, table};
 use anyhow::{anyhow, Result};
@@ -22,7 +23,7 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 
     // Log a note about daemon usage if the flag is explicitly set
     if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+        blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
 
     // Get topic type
@@ -203,8 +204,5 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    if let Err(e) = run_command(matches, common_args) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    handle_anyhow_result(run_command(matches, common_args));
 }

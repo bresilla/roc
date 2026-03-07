@@ -152,22 +152,22 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         .ok_or_else(|| anyhow!("param_name (parameter file) is required"))?;
 
     if matches.get_flag("include_hidden_nodes") {
-        eprintln!("Note: --include-hidden-nodes is not yet supported in native mode");
+        blocks::eprint_note("--include-hidden-nodes is not yet supported in native mode");
     }
     if common_args.use_sim_time {
-        eprintln!("Note: --use-sim-time is not yet supported in native mode");
+        blocks::eprint_note("--use-sim-time is not yet supported in native mode");
     }
     if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+        blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
     if let Some(spin_time_value) = common_args.spin_time {
-        eprintln!(
-            "Note: --spin-time {} is not yet supported in native mode",
+        blocks::eprint_note(&format!(
+            "--spin-time {} is not yet supported in native mode",
             spin_time_value
-        );
+        ));
     }
     if matches.get_flag("no_use_wildcard") {
-        eprintln!("Note: --no-use-wildcard is not yet supported in native mode");
+        blocks::eprint_note("--no-use-wildcard is not yet supported in native mode");
     }
 
     let node_fqn = ParamClientContext::node_fqn(node_name);

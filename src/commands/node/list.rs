@@ -14,20 +14,20 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
     // NOTE: rclrs does not currently provide the same filtering as `ros2 node list`
     // for hidden nodes, so for now we always return what the graph exposes.
     if matches.get_flag("include_hidden_nodes") {
-        eprintln!("Note: --include-hidden-nodes is not yet supported in native mode");
+        blocks::eprint_note("--include-hidden-nodes is not yet supported in native mode");
     }
 
     if common_args.use_sim_time {
-        eprintln!("Note: --use-sim-time is not applicable to graph queries");
+        blocks::eprint_note("--use-sim-time is not applicable to graph queries");
     }
     if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+        blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
     if let Some(spin_time_value) = common_args.spin_time {
-        eprintln!(
-            "Note: --spin-time {} is not yet supported in native mode",
+        blocks::eprint_note(&format!(
+            "--spin-time {} is not yet supported in native mode",
             spin_time_value
-        );
+        ));
     }
 
     let context = RclGraphContext::new()
@@ -67,11 +67,10 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
         match output_mode {
             output::OutputMode::Json => output::print_json(&json!({ "nodes": [], "count": 0 }))?,
             _ => {
-                eprintln!(
-                    "{} {}",
-                    "No nodes found.".yellow(),
-                    format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
-                );
+                blocks::eprint_warning(&format!(
+                    "No nodes found. [{}]",
+                    RclGraphContext::get_daemon_status()
+                ));
             }
         }
         return Ok(());

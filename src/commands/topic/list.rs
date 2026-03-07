@@ -1,4 +1,5 @@
 use crate::arguments::topic::CommonTopicArgs;
+use crate::commands::cli::handle_anyhow_result;
 use crate::graph::RclGraphContext;
 use crate::ui::{blocks, output, table};
 use anyhow::Result;
@@ -15,7 +16,7 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 
     // Log a note about daemon usage if the flag is explicitly set
     if common_args.no_daemon {
-        eprintln!("Note: roc always uses direct DDS discovery (equivalent to --no-daemon)");
+        blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
 
     // Get topic names using direct RCL API calls
@@ -100,11 +101,10 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
                 table::print_table(&["Topic", "Type"], rows);
 
                 if filtered_topics.is_empty() {
-                    eprintln!(
-                        "{} {}",
-                        "No topics found.".yellow(),
-                        format!("[{}]", RclGraphContext::get_daemon_status()).bright_black()
-                    );
+                    blocks::eprint_warning(&format!(
+                        "No topics found. [{}]",
+                        RclGraphContext::get_daemon_status()
+                    ));
                 } else {
                     blocks::print_total(filtered_topics.len(), "topic", "topics");
                 }
@@ -148,7 +148,7 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     // Handle other flags (for future implementation)
     if common_args.use_sim_time {
         // TODO: Implement simulation time handling when needed
-        eprintln!("Warning: --use-sim-time flag not yet implemented in direct RCL mode");
+        blocks::eprint_warning("--use-sim-time flag not yet implemented in direct RCL mode");
     }
 
     if common_args.no_daemon {
@@ -158,10 +158,10 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 
     if let Some(spin_time_value) = common_args.spin_time {
         // TODO: Implement spin time logic when needed for live topic discovery
-        eprintln!(
-            "Warning: --spin-time {} flag not yet implemented in direct RCL mode",
+        blocks::eprint_warning(&format!(
+            "--spin-time {} flag not yet implemented in direct RCL mode",
             spin_time_value
-        );
+        ));
     }
 
     // Show helpful message if no topics found
@@ -169,13 +169,11 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         let daemon_status = RclGraphContext::get_daemon_status();
         match output_mode {
             output::OutputMode::Human => {
-                eprintln!(
-                    "{} {}",
-                    "No topics found.".yellow(),
-                    format!("[{}]", daemon_status).bright_black()
-                );
+                blocks::eprint_warning(&format!("No topics found. [{}]", daemon_status));
             }
-            output::OutputMode::Plain => eprintln!("No topics found. [{}]", daemon_status),
+            output::OutputMode::Plain => {
+                blocks::eprint_warning(&format!("No topics found. [{}]", daemon_status))
+            }
             output::OutputMode::Json => {}
         }
     }
@@ -184,11 +182,5 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
-    match run_command(matches, common_args) {
-        Ok(()) => {}
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    }
+    handle_anyhow_result(run_command(matches, common_args));
 }
