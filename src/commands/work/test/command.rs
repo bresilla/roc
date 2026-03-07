@@ -3,6 +3,7 @@ use crate::commands::work::build::dependency_graph;
 use crate::commands::work::build::environment_manager::EnvironmentManager;
 use crate::commands::work::build::{BuildType, PackageMeta};
 use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
+use crate::ui::{blocks, table};
 use clap::ArgMatches;
 use colored::Colorize;
 use std::collections::{HashMap, HashSet};
@@ -123,12 +124,19 @@ impl WorkspaceTester {
 
         self.apply_package_filters();
 
-        println!(
-            "{} {} {}",
-            "Discovered".bright_cyan().bold(),
-            self.packages.len().to_string().bright_white().bold(),
-            "packages for testing".bright_cyan().bold()
-        );
+        blocks::print_section("Packages");
+        let rows = self
+            .packages
+            .iter()
+            .map(|package| {
+                vec![
+                    package.name.clone(),
+                    Self::build_type_label(&package.build_type),
+                ]
+            })
+            .collect();
+        table::print_table(&["Package", "Build Type"], rows);
+        blocks::print_total(self.packages.len(), "package", "packages");
 
         Ok(())
     }
@@ -136,10 +144,15 @@ impl WorkspaceTester {
     fn resolve_dependencies(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.test_order = dependency_graph::topological_sort(&self.packages)?;
 
-        println!("{}", "Test order".bright_cyan().bold());
-        for &idx in &self.test_order {
-            println!("  {}", self.packages[idx].name.bright_white());
-        }
+        println!();
+        blocks::print_section("Test Order");
+        let rows = self
+            .test_order
+            .iter()
+            .enumerate()
+            .map(|(index, &idx)| vec![(index + 1).to_string(), self.packages[idx].name.clone()])
+            .collect();
+        table::print_table(&["Step", "Package"], rows);
 
         Ok(())
     }
@@ -148,9 +161,7 @@ impl WorkspaceTester {
         fs::create_dir_all(self.config.log_base.join("latest_test"))?;
         fs::create_dir_all(&self.run_log_dir)?;
 
-        let mut passed = 0usize;
         let mut failed = 0usize;
-        let mut skipped = 0usize;
         let mut records = HashMap::new();
 
         let test_order = self.test_order.clone();
@@ -158,12 +169,7 @@ impl WorkspaceTester {
             let package = self.packages[pkg_idx].clone();
             let start_time = Instant::now();
             self.event_log.push(format!("JobStarted {}", package.name));
-            println!(
-                "{} {} {}",
-                "Testing >>>".bright_cyan().bold(),
-                package.name.bright_white().bold(),
-                format!("({:?})", package.build_type).bright_black()
-            );
+            Self::print_test_started(&package);
 
             let mut env_manager =
                 EnvironmentManager::new(self.config.install_base.clone(), self.config.isolated);
@@ -211,39 +217,14 @@ impl WorkspaceTester {
 
             match record.status {
                 TestState::Passed => {
-                    passed += 1;
-                    println!(
-                        "{} {} {}",
-                        "Passed <<<".bright_green().bold(),
-                        package.name.bright_white().bold(),
-                        format!("[{:.2}s]", record.duration_ms as f64 / 1000.0).bright_black()
-                    );
+                    self.print_test_record(&package.name, &record);
                 }
                 TestState::Skipped => {
-                    skipped += 1;
-                    println!(
-                        "{} {} {}",
-                        "Skipped <<<".bright_yellow().bold(),
-                        package.name.bright_white().bold(),
-                        record
-                            .error
-                            .as_deref()
-                            .unwrap_or("No runnable tests detected")
-                            .bright_black()
-                    );
+                    self.print_test_record(&package.name, &record);
                 }
                 TestState::Failed => {
                     failed += 1;
-                    eprintln!(
-                        "{} {} - {}",
-                        "Failed <<<".bright_red().bold(),
-                        package.name.bright_white().bold(),
-                        record
-                            .error
-                            .as_deref()
-                            .unwrap_or("unknown failure")
-                            .bright_white()
-                    );
+                    self.print_test_record(&package.name, &record);
                     if !self.config.continue_on_error {
                         records.insert(package.name.clone(), record.clone());
                         self.write_package_state(&package.name, &record)?;
@@ -252,6 +233,7 @@ impl WorkspaceTester {
                             .push(format!("JobEnded {} failed", package.name));
                         self.write_test_summary(&records)?;
                         self.write_top_level_logs()?;
+                        self.print_test_report(&records);
                         return Err(format!("Tests failed for package {}", package.name).into());
                     }
                 }
@@ -271,29 +253,9 @@ impl WorkspaceTester {
             ));
         }
 
-        println!("\n{}", "Test Summary".bright_cyan().bold());
-        println!(
-            "  {} {}",
-            passed.to_string().bright_green().bold(),
-            "packages passed".bright_green()
-        );
-        if skipped > 0 {
-            println!(
-                "  {} {}",
-                skipped.to_string().bright_yellow().bold(),
-                "packages skipped".bright_yellow()
-            );
-        }
-        if failed > 0 {
-            println!(
-                "  {} {}",
-                failed.to_string().bright_red().bold(),
-                "packages failed".bright_red()
-            );
-        }
-
         self.write_test_summary(&records)?;
         self.write_top_level_logs()?;
+        self.print_test_report(&records);
 
         if failed > 0 {
             return Err("Some package tests failed".into());
@@ -459,11 +421,7 @@ impl WorkspaceTester {
         names.sort();
         for name in names {
             if let Some(record) = records.get(&name) {
-                let status = match record.status {
-                    TestState::Passed => "passed",
-                    TestState::Failed => "failed",
-                    TestState::Skipped => "skipped",
-                };
+                let status = Self::test_state_label(&record.status);
                 let mut line = format!(
                     "{name}: status={status} duration_ms={} log=log/latest_test/{name}",
                     record.duration_ms
@@ -632,6 +590,156 @@ impl WorkspaceTester {
         Ok(())
     }
 
+    fn latest_test_log_dir(&self, package_name: &str) -> PathBuf {
+        self.config.log_base.join("latest_test").join(package_name)
+    }
+
+    fn summary_log_path(&self) -> PathBuf {
+        self.config
+            .log_base
+            .join("latest_test")
+            .join("test_summary.log")
+    }
+
+    fn format_duration_ms(duration_ms: u128) -> String {
+        format!("{:.2}s", duration_ms as f64 / 1000.0)
+    }
+
+    fn build_type_label(build_type: &BuildType) -> String {
+        match build_type {
+            BuildType::AmentCmake => "ament_cmake".to_string(),
+            BuildType::AmentPython => "ament_python".to_string(),
+            BuildType::Cmake => "cmake".to_string(),
+            BuildType::Other(value) => value.clone(),
+        }
+    }
+
+    fn test_state_label(status: &TestState) -> String {
+        match status {
+            TestState::Passed => "passed".to_string(),
+            TestState::Failed => "failed".to_string(),
+            TestState::Skipped => "skipped".to_string(),
+        }
+    }
+
+    fn test_state_cell(status: &TestState) -> String {
+        match status {
+            TestState::Passed => "passed".bright_green().to_string(),
+            TestState::Failed => "failed".bright_red().to_string(),
+            TestState::Skipped => "skipped".bright_yellow().to_string(),
+        }
+    }
+
+    fn print_test_started(package: &PackageMeta) {
+        blocks::print_status(
+            "TEST",
+            &[
+                ("package", package.name.clone()),
+                ("type", Self::build_type_label(&package.build_type)),
+            ],
+        );
+    }
+
+    fn print_test_record(&self, package_name: &str, record: &TestRecord) {
+        match record.status {
+            TestState::Passed => blocks::print_status(
+                "PASS",
+                &[
+                    ("package", package_name.to_string()),
+                    ("time", Self::format_duration_ms(record.duration_ms)),
+                ],
+            ),
+            TestState::Skipped => {
+                blocks::print_status(
+                    "SKIP",
+                    &[
+                        ("package", package_name.to_string()),
+                        (
+                            "reason",
+                            record
+                                .error
+                                .clone()
+                                .unwrap_or_else(|| "No runnable tests detected".to_string()),
+                        ),
+                    ],
+                );
+            }
+            TestState::Failed => {
+                blocks::eprint_status(
+                    "FAIL",
+                    &[
+                        ("package", package_name.to_string()),
+                        ("time", Self::format_duration_ms(record.duration_ms)),
+                        (
+                            "logs",
+                            self.latest_test_log_dir(package_name).display().to_string(),
+                        ),
+                    ],
+                );
+                if let Some(error) = &record.error {
+                    eprintln!("{error}");
+                }
+            }
+        }
+    }
+
+    fn print_test_report(&self, records: &HashMap<String, TestRecord>) {
+        let mut rows = records
+            .iter()
+            .map(|(package_name, record)| {
+                vec![
+                    package_name.clone(),
+                    Self::test_state_cell(&record.status),
+                    Self::format_duration_ms(record.duration_ms),
+                    self.latest_test_log_dir(package_name).display().to_string(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        rows.sort_by(|left, right| left[0].cmp(&right[0]));
+
+        println!();
+        blocks::print_section("Test Summary");
+        if rows.is_empty() {
+            println!("No test records available");
+        } else {
+            table::print_table(&["Package", "Status", "Time", "Logs"], rows);
+        }
+
+        let failures = records
+            .iter()
+            .filter(|(_, record)| record.status == TestState::Failed)
+            .collect::<Vec<_>>();
+        if !failures.is_empty() {
+            println!();
+            blocks::eprint_section("Failures");
+            let mut failures = failures;
+            failures.sort_by(|left, right| left.0.cmp(right.0));
+            for (package_name, record) in failures {
+                blocks::eprint_status(
+                    "FAIL",
+                    &[
+                        ("package", package_name.clone()),
+                        (
+                            "logs",
+                            self.latest_test_log_dir(package_name).display().to_string(),
+                        ),
+                    ],
+                );
+                if let Some(error) = &record.error {
+                    eprintln!("{error}");
+                }
+            }
+        }
+
+        println!();
+        blocks::print_field(
+            "Latest Logs",
+            self.config.log_base.join("latest_test").display(),
+        );
+        blocks::print_field("Run Logs", self.run_log_dir.display());
+        blocks::print_field("Summary Log", self.summary_log_path().display());
+    }
+
     fn apply_package_filters(&mut self) {
         let mut selected_names: Option<HashSet<String>> = None;
 
@@ -741,10 +849,7 @@ fn config_from_matches(matches: &ArgMatches) -> Result<TestConfig, Box<dyn std::
 
     if !user_provided_base_paths && !config.workspace_root.join("src").exists() {
         config.base_paths = vec![config.workspace_root.clone()];
-        println!(
-            "{}",
-            "No 'src' directory found; scanning workspace root for packages".bright_yellow()
-        );
+        blocks::print_note("No 'src' directory found; scanning workspace root for packages");
     }
 
     Ok(config)
@@ -753,19 +858,28 @@ fn config_from_matches(matches: &ArgMatches) -> Result<TestConfig, Box<dyn std::
 fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let config = config_from_matches(&matches)?;
 
-    println!("{}", "Testing ROS2 workspace with roc".bright_cyan().bold());
-    println!(
-        "{} {}",
-        "Workspace:".bright_blue().bold(),
-        config.workspace_root.display().to_string().bright_white()
+    blocks::print_section("Test");
+    blocks::print_field("Workspace", config.workspace_root.display());
+    blocks::print_field("Build Base", config.build_base.display());
+    blocks::print_field("Install Base", config.install_base.display());
+    blocks::print_field("Log Base", config.log_base.display());
+    blocks::print_field(
+        "Layout",
+        if config.merge_install {
+            "merged"
+        } else {
+            "isolated"
+        },
     );
+    println!();
 
     let mut tester = WorkspaceTester::new(config);
     tester.discover_packages()?;
     tester.resolve_dependencies()?;
     tester.run_tests()?;
 
-    println!("\n{}", "Tests completed successfully".bright_green().bold());
+    println!();
+    blocks::print_success("Tests completed successfully");
     Ok(())
 }
 

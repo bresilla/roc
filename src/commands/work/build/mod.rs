@@ -12,13 +12,13 @@ mod compatibility_tests;
 // Re-export the handle function for easier access
 pub use command::handle;
 
-use colored::Colorize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
 use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
 pub use crate::shared::package_discovery::{BuildType, Package as PackageMeta};
+use crate::ui::{blocks, table};
 
 #[derive(Debug, Clone)]
 pub struct BuildConfig {
@@ -114,20 +114,14 @@ impl ColconBuilder {
         // Apply package filters
         self.apply_package_filters();
 
-        println!(
-            "{} {} {}",
-            "Discovered".bright_cyan().bold(),
-            self.packages.len().to_string().bright_white().bold(),
-            "packages".bright_cyan().bold()
-        );
-        for pkg in &self.packages {
-            println!(
-                "  {} {} {}",
-                "-".bright_black(),
-                pkg.name.bright_white().bold(),
-                format!("({:?})", pkg.build_type).bright_black()
-            );
-        }
+        blocks::print_section("Packages");
+        let rows = self
+            .packages
+            .iter()
+            .map(|pkg| vec![pkg.name.clone(), Self::build_type_label(&pkg.build_type)])
+            .collect();
+        table::print_table(&["Package", "Build Type"], rows);
+        blocks::print_total(self.packages.len(), "package", "packages");
 
         Ok(())
     }
@@ -135,10 +129,15 @@ impl ColconBuilder {
     pub fn resolve_dependencies(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.build_order = dependency_graph::topological_sort(&self.packages)?;
 
-        println!("{}", "Build order".bright_cyan().bold());
-        for &idx in &self.build_order {
-            println!("  {}", self.packages[idx].name.bright_white());
-        }
+        println!();
+        blocks::print_section("Build Order");
+        let rows = self
+            .build_order
+            .iter()
+            .enumerate()
+            .map(|(index, &idx)| vec![(index + 1).to_string(), self.packages[idx].name.clone()])
+            .collect();
+        table::print_table(&["Step", "Package"], rows);
 
         Ok(())
     }
@@ -282,6 +281,15 @@ impl ColconBuilder {
         }
 
         state
+    }
+
+    fn build_type_label(build_type: &BuildType) -> String {
+        match build_type {
+            BuildType::AmentCmake => "ament_cmake".to_string(),
+            BuildType::AmentPython => "ament_python".to_string(),
+            BuildType::Cmake => "cmake".to_string(),
+            BuildType::Other(value) => value.clone(),
+        }
     }
 }
 

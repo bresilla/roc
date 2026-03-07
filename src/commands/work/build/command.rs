@@ -1,8 +1,9 @@
 use clap::ArgMatches;
-use colored::Colorize;
 use std::path::PathBuf;
 
+use crate::commands::cli::run_async_command;
 use crate::commands::work::build::{BuildConfig, ColconBuilder};
+use crate::ui::blocks;
 
 fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std::error::Error>> {
     let mut config = BuildConfig::default();
@@ -78,10 +79,7 @@ fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std:
     // discover packages from the workspace root.
     if !user_provided_base_paths && !config.workspace_root.join("src").exists() {
         config.base_paths = vec![config.workspace_root.clone()];
-        println!(
-            "{}",
-            "No 'src' directory found; scanning workspace root for packages".bright_yellow()
-        );
+        blocks::print_note("No 'src' directory found; scanning workspace root for packages");
     }
 
     // Update isolated mode based on merge_install flag
@@ -92,18 +90,23 @@ fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std:
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let config = config_from_matches(&matches)?;
+    let setup_path = config.install_base.join("setup.bash");
 
-    println!(
-        "{}",
-        "Building ROS2 workspace with roc (colcon replacement)"
-            .bright_cyan()
-            .bold()
+    blocks::print_section("Build");
+    blocks::print_field("Workspace", config.workspace_root.display());
+    blocks::print_field("Build Base", config.build_base.display());
+    blocks::print_field("Install Base", config.install_base.display());
+    blocks::print_field("Log Base", config.log_base.display());
+    blocks::print_field(
+        "Layout",
+        if config.merge_install {
+            "merged"
+        } else {
+            "isolated"
+        },
     );
-    println!(
-        "{} {}",
-        "Workspace:".bright_blue().bold(),
-        config.workspace_root.display().to_string().bright_white()
-    );
+    blocks::print_field("Workers", config.parallel_workers);
+    println!();
 
     // Create and run the builder
     let mut builder = ColconBuilder::new(config);
@@ -117,28 +120,15 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
     // Build all packages
     builder.build_packages()?;
 
-    println!("\n{}", "Build completed successfully".bright_green().bold());
-    println!("{}", "To use the workspace, run: ".bright_blue().bold());
-    println!("  {}", "source install/setup.bash".bright_white());
+    println!();
+    blocks::print_success("Build completed successfully");
+    blocks::print_field("Setup", format!("source {}", setup_path.display()));
 
     Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    match rt.block_on(run_command(matches)) {
-        Ok(_) => {
-            println!("{}", "Done".bright_green().bold());
-        }
-        Err(e) => {
-            eprintln!(
-                "{} {}",
-                "Build failed:".bright_red().bold(),
-                e.to_string().bright_white()
-            );
-            std::process::exit(1);
-        }
-    }
+    run_async_command(run_command(matches));
 }
 
 #[cfg(test)]

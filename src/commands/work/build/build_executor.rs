@@ -10,6 +10,7 @@ use std::time::Instant;
 
 use super::environment_manager::EnvironmentManager;
 use crate::commands::work::build::{BuildConfig, BuildType, PackageMeta};
+use crate::ui::{blocks, table};
 
 pub struct BuildExecutor<'a> {
     config: &'a BuildConfig,
@@ -97,19 +98,13 @@ impl<'a> BuildExecutor<'a> {
         packages: &[PackageMeta],
         build_order: &[usize],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut successful_builds = 0;
         let mut failed_builds = 0;
         let mut build_records = HashMap::new();
 
         for &pkg_idx in build_order {
             let package = &packages[pkg_idx];
 
-            println!(
-                "{} {} {}",
-                "Starting >>>".bright_cyan().bold(),
-                package.name.bright_white().bold(),
-                format!("({:?})", package.build_type).bright_black()
-            );
+            Self::print_package_started(package, None);
             let start_time = Instant::now();
 
             // Create a fresh environment manager for this package (like parallel build does)
@@ -149,12 +144,7 @@ impl<'a> BuildExecutor<'a> {
             match build_result {
                 Ok(_) => {
                     let duration = start_time.elapsed();
-                    println!(
-                        "{} {} {}",
-                        "Finished <<<".bright_green().bold(),
-                        package.name.bright_white().bold(),
-                        format!("[{:.2}s]", duration.as_secs_f64()).bright_black()
-                    );
+                    Self::print_package_completed(&package.name, duration.as_millis(), None);
 
                     // Record install path for environment setup
                     let install_path = if self.config.merge_install {
@@ -182,15 +172,15 @@ impl<'a> BuildExecutor<'a> {
                             error: None,
                         },
                     )?;
-                    successful_builds += 1;
                 }
                 Err(e) => {
                     let duration = start_time.elapsed();
-                    eprintln!(
-                        "{} {} - {}",
-                        "Failed <<<".bright_red().bold(),
-                        package.name.bright_white().bold(),
-                        e.to_string().bright_white()
+                    Self::print_package_failed(
+                        self.config,
+                        &package.name,
+                        duration.as_millis(),
+                        &e.to_string(),
+                        None,
                     );
                     build_records.insert(
                         package.name.clone(),
@@ -213,6 +203,7 @@ impl<'a> BuildExecutor<'a> {
 
                     if !self.config.continue_on_error {
                         self.write_build_summary(packages, &build_records)?;
+                        self.print_build_report(packages, &build_records, false);
                         return Err(
                             format!("Build failed for package {}: {}", package.name, e).into()
                         );
@@ -221,24 +212,11 @@ impl<'a> BuildExecutor<'a> {
             }
         }
 
-        println!("\n{}", "Build Summary".bright_cyan().bold());
-        println!(
-            "  {} {}",
-            successful_builds.to_string().bright_green().bold(),
-            "packages succeeded".bright_green()
-        );
-        if failed_builds > 0 {
-            println!(
-                "  {} {}",
-                failed_builds.to_string().bright_red().bold(),
-                "packages failed".bright_red()
-            );
-        }
-
         self.write_build_summary(packages, &build_records)?;
 
         // Generate environment setup scripts
         self.generate_setup_scripts(packages)?;
+        self.print_build_report(packages, &build_records, true);
 
         if failed_builds > 0 {
             return Err("Some packages failed to build".into());
@@ -326,33 +304,20 @@ impl<'a> BuildExecutor<'a> {
             let records = build_state.build_records.lock().unwrap();
             self.write_build_summary(packages, &records)?;
         }
+        let build_records = {
+            let records = build_state.build_records.lock().unwrap();
+            records.clone()
+        };
 
-        // Print summary
-        let (successful_builds, failed_builds) = {
+        let (_, failed_builds) = {
             let counts = build_state.build_count.lock().unwrap();
             *counts
         };
-
-        println!("\n{}", "Build Summary".bright_cyan().bold());
-        println!(
-            "  {} {}",
-            successful_builds.to_string().bright_green().bold(),
-            "packages succeeded".bright_green()
-        );
-        if failed_builds > 0 {
-            println!(
-                "  {} {}",
-                failed_builds.to_string().bright_red().bold(),
-                "packages failed".bright_red()
-            );
-
-            if !self.config.continue_on_error {
-                return Err("Some packages failed to build".into());
-            }
+        let setup_generated = failed_builds == 0 || self.config.continue_on_error;
+        if setup_generated {
+            self.generate_setup_scripts(packages)?;
         }
-
-        // Generate environment setup scripts
-        self.generate_setup_scripts(packages)?;
+        self.print_build_report(packages, &build_records, setup_generated);
 
         if failed_builds > 0 {
             return Err("Some packages failed to build".into());
@@ -414,13 +379,7 @@ impl<'a> BuildExecutor<'a> {
                     // Find the package by name
                     let package = packages.iter().find(|p| p.name == pkg_name);
                     if let Some(package) = package {
-                        println!(
-                            "{} {} {} {}",
-                            format!("[Worker {}]", worker_id).bright_black(),
-                            "Starting >>>".bright_cyan().bold(),
-                            package.name.bright_white().bold(),
-                            format!("({:?})", package.build_type).bright_black()
-                        );
+                        Self::print_package_started(package, Some(worker_id));
                         let start_time = Instant::now();
 
                         // Update environment for dependencies
@@ -441,12 +400,10 @@ impl<'a> BuildExecutor<'a> {
 
                         match build_result {
                             Ok(_) => {
-                                println!(
-                                    "{} {} {} {}",
-                                    format!("[Worker {}]", worker_id).bright_black(),
-                                    "Finished <<<".bright_green().bold(),
-                                    package.name.bright_white().bold(),
-                                    format!("[{:.2}s]", duration.as_secs_f64()).bright_black()
+                                Self::print_package_completed(
+                                    &package.name,
+                                    duration.as_millis(),
+                                    Some(worker_id),
                                 );
 
                                 // Record install path
@@ -490,12 +447,12 @@ impl<'a> BuildExecutor<'a> {
                                 }
                             }
                             Err(e) => {
-                                eprintln!(
-                                    "{} {} {} - {}",
-                                    format!("[Worker {}]", worker_id).bright_black(),
-                                    "Failed <<<".bright_red().bold(),
-                                    package.name.bright_white().bold(),
-                                    e.to_string().bright_white()
+                                Self::print_package_failed(
+                                    &config,
+                                    &package.name,
+                                    duration.as_millis(),
+                                    &e,
+                                    Some(worker_id),
                                 );
 
                                 // Mark as failed
@@ -1071,6 +1028,155 @@ impl<'a> BuildExecutor<'a> {
         Self::package_log_dir(config, package_name).join("status.txt")
     }
 
+    fn build_summary_path(config: &BuildConfig) -> PathBuf {
+        config.log_base.join("latest").join("build_summary.log")
+    }
+
+    fn build_type_label(build_type: &BuildType) -> String {
+        match build_type {
+            BuildType::AmentCmake => "ament_cmake".to_string(),
+            BuildType::AmentPython => "ament_python".to_string(),
+            BuildType::Cmake => "cmake".to_string(),
+            BuildType::Other(value) => value.clone(),
+        }
+    }
+
+    fn format_duration_ms(duration_ms: u128) -> String {
+        format!("{:.2}s", duration_ms as f64 / 1000.0)
+    }
+
+    fn format_package_state(status: &PackageState) -> String {
+        match status {
+            PackageState::Pending => "pending".bright_black().to_string(),
+            PackageState::Building => "building".bright_blue().to_string(),
+            PackageState::Completed => "completed".bright_green().to_string(),
+            PackageState::Failed => "failed".bright_red().to_string(),
+        }
+    }
+
+    fn print_package_started(package: &PackageMeta, worker_id: Option<usize>) {
+        let mut fields = vec![
+            ("package", package.name.clone()),
+            ("type", Self::build_type_label(&package.build_type)),
+        ];
+        if let Some(worker_id) = worker_id {
+            fields.push(("worker", worker_id.to_string()));
+        }
+        blocks::print_status("BUILD", &fields);
+    }
+
+    fn print_package_completed(package_name: &str, duration_ms: u128, worker_id: Option<usize>) {
+        let mut fields = vec![
+            ("package", package_name.to_string()),
+            ("time", Self::format_duration_ms(duration_ms)),
+        ];
+        if let Some(worker_id) = worker_id {
+            fields.push(("worker", worker_id.to_string()));
+        }
+        blocks::print_status("BUILT", &fields);
+    }
+
+    fn print_package_failed(
+        config: &BuildConfig,
+        package_name: &str,
+        duration_ms: u128,
+        error: &str,
+        worker_id: Option<usize>,
+    ) {
+        let mut fields = vec![
+            ("package", package_name.to_string()),
+            ("time", Self::format_duration_ms(duration_ms)),
+            (
+                "logs",
+                Self::package_log_dir(config, package_name)
+                    .display()
+                    .to_string(),
+            ),
+        ];
+        if let Some(worker_id) = worker_id {
+            fields.push(("worker", worker_id.to_string()));
+        }
+        blocks::eprint_status("FAILED", &fields);
+        eprintln!("{error}");
+    }
+
+    fn print_build_report(
+        &self,
+        packages: &[PackageMeta],
+        records: &HashMap<String, BuildRecord>,
+        setup_generated: bool,
+    ) {
+        let mut ordered_packages = packages.iter().collect::<Vec<_>>();
+        ordered_packages.sort_by(|left, right| left.name.cmp(&right.name));
+
+        println!();
+        blocks::print_section("Build Summary");
+        let rows = ordered_packages
+            .into_iter()
+            .filter_map(|package| {
+                records.get(&package.name).map(|record| {
+                    vec![
+                        package.name.clone(),
+                        Self::format_package_state(&record.status),
+                        Self::format_duration_ms(record.duration_ms),
+                        Self::package_log_dir(self.config, &package.name)
+                            .display()
+                            .to_string(),
+                    ]
+                })
+            })
+            .collect::<Vec<_>>();
+        if rows.is_empty() {
+            println!("No build records available");
+        } else {
+            table::print_table(&["Package", "Status", "Time", "Logs"], rows);
+        }
+
+        let failures = packages
+            .iter()
+            .filter_map(|package| {
+                records
+                    .get(&package.name)
+                    .filter(|record| record.status == PackageState::Failed)
+                    .map(|record| (package.name.as_str(), record))
+            })
+            .collect::<Vec<_>>();
+        if !failures.is_empty() {
+            println!();
+            blocks::eprint_section("Failures");
+            for (package_name, record) in failures {
+                blocks::eprint_status(
+                    "FAILED",
+                    &[
+                        ("package", package_name.to_string()),
+                        (
+                            "logs",
+                            Self::package_log_dir(self.config, package_name)
+                                .display()
+                                .to_string(),
+                        ),
+                    ],
+                );
+                if let Some(error) = &record.error {
+                    eprintln!("{error}");
+                }
+            }
+        }
+
+        println!();
+        blocks::print_field("Latest Logs", self.config.log_base.join("latest").display());
+        blocks::print_field(
+            "Summary Log",
+            Self::build_summary_path(self.config).display(),
+        );
+        if setup_generated {
+            blocks::print_field(
+                "Setup",
+                self.config.install_base.join("setup.bash").display(),
+            );
+        }
+    }
+
     fn write_build_summary(
         &self,
         packages: &[PackageMeta],
@@ -1103,13 +1209,7 @@ impl<'a> BuildExecutor<'a> {
             summary.push('\n');
         }
 
-        fs::write(
-            self.config
-                .log_base
-                .join("latest")
-                .join("build_summary.log"),
-            summary,
-        )?;
+        fs::write(Self::build_summary_path(self.config), summary)?;
         Ok(())
     }
 

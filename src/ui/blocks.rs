@@ -104,3 +104,7 @@ pub fn print_success(message: &str) {
 pub fn print_status(label: &str, fields: &[(&str, String)]) {
     emit_status(label, fields, false);
 }
+
+pub fn eprint_status(label: &str, fields: &[(&str, String)]) {
+    emit_status(label, fields, true);
+}

@@ -1,4 +1,5 @@
 use crate::commands::cli::handle_boxed_command_result;
+use crate::ui::{blocks, table};
 use clap::ArgMatches;
 use colored::Colorize;
 use roxmltree::Document;
@@ -314,60 +315,12 @@ fn delete_result_files(entries: &[ResultEntry]) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-fn render_entry(entry: &ResultEntry, verbose: bool) -> Vec<String> {
-    let status = match entry.status {
-        ResultStatus::Passed => "passed".bright_green().bold(),
-        ResultStatus::Failed => "failed".bright_red().bold(),
-        ResultStatus::Error => "error".bright_red().bold(),
-    };
-    let mut lines = Vec::new();
-    if verbose {
-        let counts = entry
-            .counts
-            .as_ref()
-            .map(|counts| {
-                format!(
-                    " tests={} failures={} errors={} skipped={}",
-                    counts.tests, counts.failures, counts.errors, counts.skipped
-                )
-            })
-            .unwrap_or_default();
-        let detail = entry
-            .detail
-            .as_deref()
-            .map(|detail| format!(" detail={detail}"))
-            .unwrap_or_default();
-        lines.push(format!(
-            "{} {} {}{}{}",
-            entry.package_name.bright_white().bold(),
-            status,
-            entry.path.display(),
-            counts,
-            detail
-        ));
-        if entry.status != ResultStatus::Passed {
-            for failure in &entry.failures {
-                lines.push(format!("- {}", failure.name));
-                lines.push("  <<< failure message".to_string());
-                for line in failure
-                    .message
-                    .lines()
-                    .filter(|line| !line.trim().is_empty())
-                {
-                    lines.push(format!("    {line}"));
-                }
-                lines.push("  >>>".to_string());
-            }
-        }
-    } else {
-        lines.push(format!(
-            "{} {} {}",
-            entry.package_name.bright_white().bold(),
-            status,
-            entry.path.display()
-        ));
+fn result_status_cell(status: ResultStatus) -> String {
+    match status {
+        ResultStatus::Passed => "passed".bright_green().bold().to_string(),
+        ResultStatus::Failed => "failed".bright_red().bold().to_string(),
+        ResultStatus::Error => "error".bright_red().bold().to_string(),
     }
-    lines
 }
 
 fn print_summary(entries: &[ResultEntry], verbose: bool) {
@@ -393,31 +346,102 @@ fn print_summary(entries: &[ResultEntry], verbose: bool) {
         }
     }
 
-    println!("{}", "Test result summary".bright_cyan().bold());
-    println!(
-        "  {} {}",
-        entries.len().to_string().bright_white().bold(),
-        "result files".bright_cyan()
-    );
-    println!(
-        "  {} passed  {} failed  {} error",
-        passed_files.to_string().bright_green().bold(),
-        failed_files.to_string().bright_red().bold(),
-        error_files.to_string().bright_red().bold()
-    );
+    blocks::print_section("Result Summary");
+    blocks::print_field("Files", entries.len());
+    blocks::print_field("Passed", passed_files);
+    blocks::print_field("Failed", failed_files);
+    blocks::print_field("Errors", error_files);
 
     if verbose && !package_totals.is_empty() {
-        println!("{}", "Package totals".bright_cyan().bold());
-        for (package_name, counts) in package_totals {
-            println!(
-                "  {} tests={} failures={} errors={} skipped={}",
-                package_name.bright_white(),
-                counts.tests,
-                counts.failures,
-                counts.errors,
-                counts.skipped
-            );
+        println!();
+        blocks::print_section("Package Totals");
+        let rows = package_totals
+            .into_iter()
+            .map(|(package_name, counts)| {
+                vec![
+                    package_name,
+                    counts.tests.to_string(),
+                    counts.failures.to_string(),
+                    counts.errors.to_string(),
+                    counts.skipped.to_string(),
+                ]
+            })
+            .collect();
+        table::print_table(&["Package", "Tests", "Failures", "Errors", "Skipped"], rows);
+    }
+}
+
+fn print_entries(entries: &[ResultEntry], verbose: bool) {
+    println!();
+    blocks::print_section("Results");
+    if verbose {
+        let rows = entries
+            .iter()
+            .map(|entry| {
+                let counts = entry.counts.clone().unwrap_or_default();
+                vec![
+                    entry.package_name.clone(),
+                    result_status_cell(entry.status),
+                    counts.tests.to_string(),
+                    counts.failures.to_string(),
+                    counts.errors.to_string(),
+                    counts.skipped.to_string(),
+                    entry.path.display().to_string(),
+                ]
+            })
+            .collect();
+        table::print_table(
+            &[
+                "Package", "Status", "Tests", "Failures", "Errors", "Skipped", "File",
+            ],
+            rows,
+        );
+
+        let failed_entries = entries
+            .iter()
+            .filter(|entry| entry.status != ResultStatus::Passed)
+            .collect::<Vec<_>>();
+        if !failed_entries.is_empty() {
+            println!();
+            blocks::eprint_section("Failure Details");
+            for entry in failed_entries {
+                blocks::eprint_status(
+                    "RESULT",
+                    &[
+                        ("package", entry.package_name.clone()),
+                        ("status", result_status_cell(entry.status)),
+                        ("file", entry.path.display().to_string()),
+                    ],
+                );
+                if let Some(detail) = &entry.detail {
+                    eprintln!("{detail}");
+                }
+                for failure in &entry.failures {
+                    eprintln!("- {}", failure.name);
+                    eprintln!("  <<< failure message");
+                    for line in failure
+                        .message
+                        .lines()
+                        .filter(|line| !line.trim().is_empty())
+                    {
+                        eprintln!("    {line}");
+                    }
+                    eprintln!("  >>>");
+                }
+            }
         }
+    } else {
+        let rows = entries
+            .iter()
+            .map(|entry| {
+                vec![
+                    entry.package_name.clone(),
+                    result_status_cell(entry.status),
+                    entry.path.display().to_string(),
+                ]
+            })
+            .collect();
+        table::print_table(&["Package", "Status", "File"], rows);
     }
 }
 
@@ -429,21 +453,17 @@ fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if entries.is_empty() {
-        println!("{}", "No matching test result files found".bright_yellow());
+        blocks::print_note("No matching test result files found");
         return Ok(());
     }
 
     if config.delete {
         if !confirm_delete(&entries, config.delete_yes)? {
-            println!("{}", "Deletion cancelled".bright_yellow());
+            blocks::print_note("Deletion cancelled");
             return Ok(());
         }
         delete_result_files(&entries)?;
-        println!(
-            "{} {}",
-            "Deleted".bright_green().bold(),
-            format!("{} test result files", entries.len()).bright_white()
-        );
+        blocks::print_success(&format!("Deleted {} test result files", entries.len()));
         return Ok(());
     }
 
@@ -454,12 +474,11 @@ fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    blocks::print_section("Test Results");
+    blocks::print_field("Result Base", config.result_base.display());
+    blocks::print_field("Filter", if config.all { "all" } else { "failures only" });
     print_summary(&entries, config.verbose);
-    for entry in &entries {
-        for line in render_entry(entry, config.verbose) {
-            println!("{line}");
-        }
-    }
+    print_entries(&entries, config.verbose);
 
     Ok(())
 }
