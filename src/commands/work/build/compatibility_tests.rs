@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use crate::commands::work::build::PackageMeta;
 use crate::commands::work::build::dependency_graph;
-use crate::shared::package_discovery::{DiscoveryConfig, discover_packages};
+use crate::commands::work::build::PackageMeta;
+use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
 
 fn fixture_workspace(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

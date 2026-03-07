@@ -1531,9 +1531,7 @@ function _colcon_prefix_powershell_source_script {{
             }
         }
 
-        content.push_str(
-            "Remove-Item Env:\\COLCON_CURRENT_PREFIX -ErrorAction SilentlyContinue\n",
-        );
+        content.push_str("Remove-Item Env:\\COLCON_CURRENT_PREFIX -ErrorAction SilentlyContinue\n");
         content
     }
 
@@ -1707,7 +1705,10 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
                 .join("colcon-core")
                 .join("packages")
         } else if let Some(package_prefix) = self.install_paths.get(package_name) {
-            package_prefix.join("share").join("colcon-core").join("packages")
+            package_prefix
+                .join("share")
+                .join("colcon-core")
+                .join("packages")
         } else {
             self.config
                 .install_base
@@ -2243,13 +2244,11 @@ mod tests {
             fs::read_to_string(config.install_base.join(".colcon_install_layout")).unwrap(),
             "isolated"
         );
-        assert!(
-            config
-                .log_base
-                .join("latest")
-                .join("COLCON_IGNORE")
-                .exists()
-        );
+        assert!(config
+            .log_base
+            .join("latest")
+            .join("COLCON_IGNORE")
+            .exists());
     }
 
     #[test]
@@ -2667,14 +2666,12 @@ mod tests {
         let script = executor.render_local_setup_sh("demo_pkg", &prefix);
 
         assert!(script.contains(&prefix.join("bin").display().to_string()));
-        assert!(
-            script.contains(
-                &prefix
-                    .join("lib/python3.12/site-packages")
-                    .display()
-                    .to_string()
-            )
-        );
+        assert!(script.contains(
+            &prefix
+                .join("lib/python3.12/site-packages")
+                .display()
+                .to_string()
+        ));
         assert!(!script.contains("python3.10"));
     }
 
@@ -2804,16 +2801,12 @@ mod tests {
 
         let site_packages = install_prefix.join("lib/python3.12/site-packages");
         assert!(site_packages.join("demo_python_pkg/__init__.py").exists());
-        assert!(
-            site_packages
-                .join("demo_python_pkg-0.1.0-py3.12.egg-info/PKG-INFO")
-                .exists()
-        );
-        assert!(
-            !install_prefix
-                .join("local/lib/python3.12/dist-packages")
-                .exists()
-        );
+        assert!(site_packages
+            .join("demo_python_pkg-0.1.0-py3.12.egg-info/PKG-INFO")
+            .exists());
+        assert!(!install_prefix
+            .join("local/lib/python3.12/dist-packages")
+            .exists());
     }
 
     #[test]
@@ -2831,16 +2824,12 @@ mod tests {
 
         BuildExecutor::normalize_python_install_layout(&install_prefix).unwrap();
 
-        assert!(
-            install_prefix
-                .join("share/ament_index/resource_index/packages/demo_python_pkg")
-                .exists()
-        );
-        assert!(
-            install_prefix
-                .join("share/demo_python_pkg/package.xml")
-                .exists()
-        );
+        assert!(install_prefix
+            .join("share/ament_index/resource_index/packages/demo_python_pkg")
+            .exists());
+        assert!(install_prefix
+            .join("share/demo_python_pkg/package.xml")
+            .exists());
         assert!(!install_prefix.join("local/share").exists());
     }
 

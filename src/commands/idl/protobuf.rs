@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::discovery::{discover_idl_projects, ProjectDiscoveryOptions};
+use super::discovery::{ProjectDiscoveryOptions, discover_idl_projects};
 
 #[derive(Debug, Clone)]
 enum ConversionDirection {

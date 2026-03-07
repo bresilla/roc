@@ -1,6 +1,6 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::graph::RclGraphContext;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 use colored::*;
 

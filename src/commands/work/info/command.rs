@@ -1,5 +1,5 @@
 use crate::commands::cli::{required_string, run_async_command};
-use crate::shared::package_discovery::{BuildType, DiscoveryConfig, discover_packages};
+use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
@@ -304,7 +304,7 @@ pub fn handle(matches: ArgMatches) {
 
 #[cfg(test)]
 mod tests {
-    use super::{InstallLayout, detect_install_layout, has_isolated_install, has_merged_install};
+    use super::{detect_install_layout, has_isolated_install, has_merged_install, InstallLayout};
     use std::fs;
     use tempfile::tempdir;
 

@@ -1,6 +1,6 @@
 use crate::arguments::action::CommonActionArgs;
-use crate::graph::{action_operations, RclGraphContext};
-use anyhow::{anyhow, Result};
+use crate::graph::{RclGraphContext, action_operations};
+use anyhow::{Result, anyhow};
 use clap::ArgMatches;
 
 fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<()> {

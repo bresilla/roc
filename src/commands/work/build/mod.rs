@@ -17,8 +17,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
 pub use crate::shared::package_discovery::{BuildType, Package as PackageMeta};
-use crate::shared::package_discovery::{DiscoveryConfig, discover_packages};
 
 #[derive(Debug, Clone)]
 pub struct BuildConfig {

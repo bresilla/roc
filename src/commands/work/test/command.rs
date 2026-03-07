@@ -2,7 +2,7 @@ use crate::commands::cli::handle_boxed_command_result;
 use crate::commands::work::build::dependency_graph;
 use crate::commands::work::build::environment_manager::EnvironmentManager;
 use crate::commands::work::build::{BuildType, PackageMeta};
-use crate::shared::package_discovery::{DiscoveryConfig, discover_packages};
+use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
 use clap::ArgMatches;
 use colored::Colorize;
 use std::collections::{HashMap, HashSet};
@@ -775,7 +775,7 @@ pub fn handle(matches: ArgMatches) {
 
 #[cfg(test)]
 mod tests {
-    use super::{TestConfig, WorkspaceTester, config_from_matches};
+    use super::{config_from_matches, TestConfig, WorkspaceTester};
     use crate::commands::work::build::{BuildType, PackageMeta};
     use std::path::PathBuf;
     use tempfile::tempdir;

@@ -1,5 +1,5 @@
 use crate::commands::cli::run_async_command;
-use crate::shared::package_discovery::{BuildType, DiscoveryConfig, discover_packages};
+use crate::shared::package_discovery::{discover_packages, BuildType, DiscoveryConfig};
 use anyhow::Result;
 use clap::ArgMatches;
 use colored::*;
