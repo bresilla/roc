@@ -76,3 +76,25 @@ fn completion_help_lists_print_path_flag() {
     assert!(stdout.contains("--install"));
     assert!(stdout.contains("--print-path"));
 }
+
+#[test]
+fn run_help_lists_output_mode_flag() {
+    let output = run_roc(&["run", "--help"]);
+    assert_success(&output, "roc run --help");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Run an executable"));
+    assert!(stdout.contains("--output <MODE>"));
+    assert!(stdout.contains("human, plain, or json"));
+}
+
+#[test]
+fn launch_help_lists_output_mode_flag() {
+    let output = run_roc(&["launch", "--help"]);
+    assert_success(&output, "roc launch --help");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Launch a launch file"));
+    assert!(stdout.contains("--output <MODE>"));
+    assert!(stdout.contains("human, plain, or json"));
+}

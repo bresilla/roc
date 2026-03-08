@@ -58,6 +58,57 @@ roc completion fish --install
 - Set `ROC_DISABLE_COMPLETION_CACHE=1` to disable that cache.
 - Set `ROC_COMPLETION_CACHE_DIR=/path/to/cache` to override the cache location.
 
+### `roc run`
+
+Run a ROS executable discovered from the current workspace or sourced install prefixes.
+
+**Syntax:**
+```bash
+roc run <PACKAGE> <EXECUTABLE> [argv] [--prefix <PREFIX>] [--output <human|plain|json>]
+```
+
+**Examples:**
+```bash
+# Interactive run
+roc run demo_nodes_cpp talker
+
+# Wrap the executable with another command
+roc run demo_nodes_cpp talker --prefix "gdb -ex run --args"
+
+# Capture execution details for a script
+roc run demo_nodes_cpp talker --output json
+```
+
+**Notes:**
+- `--output human` keeps the child process attached to the terminal.
+- `--output plain` and `--output json` capture child stdout/stderr and include them in the summary output.
+
+### `roc launch`
+
+Resolve a launch file from the current ROS environment and execute it through `ros2 launch`.
+
+**Syntax:**
+```bash
+roc launch <PACKAGE> <LAUNCH_FILE> [launch_arguments] [--output <human|plain|json>]
+```
+
+**Examples:**
+```bash
+# Interactive launch
+roc launch demo_nodes_cpp talker.launch.py
+
+# Print the launch description only
+roc launch demo_nodes_cpp talker.launch.py --print
+
+# Capture wrapper output in machine-readable form
+roc launch demo_nodes_cpp talker.launch.py --output plain
+```
+
+**Notes:**
+- `roc launch` still delegates execution to `ros2 launch`.
+- `--output human` keeps the child process attached to the terminal.
+- `--output plain` and `--output json` capture child stdout/stderr and include them in the summary output.
+
 ## Topic Commands
 
 ### `roc topic list`

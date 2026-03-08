@@ -122,6 +122,30 @@ roc work create my_pkg --build_type ament_cmake --node_name talker
 roc work info my_pkg
 ```
 
+## Execution commands
+
+`roc run` and `roc launch` now support the same `--output human|plain|json` contract as the
+inspection commands.
+
+Examples:
+
+```bash
+# Interactive execution with child stdio attached to the terminal
+roc run demo_nodes_cpp talker
+
+# Capture launch output in a machine-readable summary
+roc launch demo_nodes_cpp talker.launch.py --output json
+
+# Capture runner output in plain text for shell scripts
+roc run demo_nodes_cpp talker --output plain
+```
+
+Behavior:
+
+- `--output human` keeps the child process attached to the terminal
+- `--output plain` and `--output json` capture child stdout/stderr and print a structured summary
+- `roc launch` still delegates execution to `ros2 launch`; only discovery, wrapping, and output shaping are handled in `roc`
+
 ## IDL and protobuf conversion
 
 `roc idl protobuf` converts between `.proto` and `.msg` files.

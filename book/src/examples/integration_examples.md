@@ -500,6 +500,19 @@ nodes, action names, workspace packages, launch files, and interface paths.
 They also use a short-lived cache by default; set `ROC_DISABLE_COMPLETION_CACHE=1` to disable it
 or `ROC_COMPLETION_CACHE_DIR=/path/to/cache` to move it.
 
+## Execution Automation
+
+For `roc run` and `roc launch`, `--output human` keeps the child process attached to the terminal.
+Use `--output plain` or `--output json` when the command is being driven by another script.
+
+```bash
+# Capture a structured run summary
+roc run demo_nodes_cpp talker --output json
+
+# Capture launch wrapper output without inheriting the terminal
+roc launch demo_nodes_cpp talker.launch.py --show_args --output plain
+```
+
 ## Systemd Service Integration
 
 ### Service Configuration
