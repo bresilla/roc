@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use crate::shared::graph_context::{parse_discovery_duration, DEFAULT_DISCOVERY_TIME};
+use crate::shared::ros_names::is_hidden_node_name;
 use rclrs::{Client, Context, CreateBasicExecutor, Executor, Node, RclrsErrorFilter, SpinOptions};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
@@ -58,6 +59,35 @@ impl ParamClientContext {
             trimmed.to_string()
         } else {
             format!("/{trimmed}")
+        }
+    }
+
+    pub fn ensure_node_available(
+        &self,
+        node_fqn: &str,
+        include_hidden_nodes: bool,
+    ) -> Result<()> {
+        let nodes = self.node.get_node_names()?;
+        let found = nodes.into_iter().any(|node| {
+            let full_name = if node.namespace == "/" {
+                format!("/{}", node.name)
+            } else if node.namespace.ends_with('/') {
+                format!("{}{}", node.namespace, node.name)
+            } else {
+                format!("{}/{}", node.namespace, node.name)
+            };
+
+            if !include_hidden_nodes && is_hidden_node_name(&full_name) {
+                return false;
+            }
+
+            full_name == node_fqn
+        });
+
+        if found {
+            Ok(())
+        } else {
+            Err(anyhow!("Node '{}' not found", node_fqn))
         }
     }
 

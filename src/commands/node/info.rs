@@ -6,7 +6,7 @@ use serde_json::json;
 
 use crate::arguments::node::CommonNodeArgs;
 use crate::graph::RclGraphContext;
-use crate::shared::ros_names::is_hidden_name;
+use crate::shared::ros_names::is_hidden_node_name;
 
 fn flatten_names_and_types(map: rclrs::TopicNamesAndTypes) -> Vec<(String, String)> {
     let mut pairs = Vec::new();
@@ -68,7 +68,7 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
             format!("{namespace}/{name}")
         };
 
-        if !matches.get_flag("include_hidden_nodes") && is_hidden_name(&fqn) {
+        if !matches.get_flag("include_hidden_nodes") && is_hidden_node_name(&fqn) {
             continue;
         }
 

@@ -16,9 +16,6 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         .get_one::<String>("node_name")
         .ok_or_else(|| anyhow!("node_name is required"))?;
 
-    if matches.get_flag("include_hidden_nodes") {
-        blocks::eprint_note("--include-hidden-nodes is not yet supported in native mode");
-    }
     if common_args.use_sim_time {
         blocks::eprint_note("--use-sim-time is not yet supported in native mode");
     }
@@ -27,6 +24,7 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
     }
     let node_fqn = ParamClientContext::node_fqn(node_name);
     let mut ctx = ParamClientContext::new_with_spin_time(common_args.spin_time.as_deref())?;
+    ctx.ensure_node_available(&node_fqn, matches.get_flag("include_hidden_nodes"))?;
 
     let prefixes: Vec<String> = matches
         .get_many::<String>("param_prefixes")

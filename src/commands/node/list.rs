@@ -7,7 +7,7 @@ use serde_json::json;
 
 use crate::arguments::node::CommonNodeArgs;
 use crate::graph::RclGraphContext;
-use crate::shared::ros_names::is_hidden_name;
+use crate::shared::ros_names::is_hidden_node_name;
 
 fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
     let output_mode = output::OutputMode::from_matches(&matches);
@@ -35,7 +35,7 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
         }
     }
     if !matches.get_flag("include_hidden_nodes") {
-        full_names.retain(|name| !is_hidden_name(name));
+        full_names.retain(|name| !is_hidden_node_name(name));
     }
     full_names.sort();
 
