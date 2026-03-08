@@ -3,6 +3,7 @@ use crate::ui::{blocks, output};
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use serde_yaml::Value;
+use std::collections::BTreeMap;
 use std::fs;
 
 use crate::arguments::param::CommonParamArgs;
@@ -142,6 +143,60 @@ fn collect_params_from_yaml_mapping(
     Ok(())
 }
 
+fn parameters_from_yaml_mapping(mapping: &serde_yaml::Mapping) -> Result<Vec<Parameter>> {
+    let mut out = Vec::new();
+    collect_params_from_yaml_mapping(mapping, "", &mut out)?;
+    Ok(out)
+}
+
+fn selected_ros_parameter_mapping<'a>(
+    root: &'a serde_yaml::Mapping,
+    node_key: &str,
+) -> Result<Option<&'a serde_yaml::Mapping>> {
+    let Some(node_val) = root.get(Value::String(node_key.to_string())) else {
+        return Ok(None);
+    };
+
+    let node_map = node_val
+        .as_mapping()
+        .ok_or_else(|| anyhow!("Node entry '{node_key}' must be a mapping"))?;
+    let ros_params_val = node_map
+        .get(Value::String("ros__parameters".to_string()))
+        .ok_or_else(|| anyhow!("Missing 'ros__parameters' under '{node_key}'"))?;
+
+    ros_params_val
+        .as_mapping()
+        .map(Some)
+        .ok_or_else(|| anyhow!("'ros__parameters' must be a mapping"))
+}
+
+fn selected_parameters_from_yaml(
+    root: &serde_yaml::Mapping,
+    node_fqn: &str,
+    include_wildcard: bool,
+) -> Result<Vec<Parameter>> {
+    let mut merged = BTreeMap::new();
+
+    if include_wildcard {
+        if let Some(wildcard_map) = selected_ros_parameter_mapping(root, "/**")? {
+            for parameter in parameters_from_yaml_mapping(wildcard_map)? {
+                merged.insert(parameter.name, parameter.value);
+            }
+        }
+    }
+
+    if let Some(node_map) = selected_ros_parameter_mapping(root, node_fqn)? {
+        for parameter in parameters_from_yaml_mapping(node_map)? {
+            merged.insert(parameter.name, parameter.value);
+        }
+    }
+
+    Ok(merged
+        .into_iter()
+        .map(|(name, value)| Parameter { name, value })
+        .collect())
+}
+
 fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
     let output_mode = output::OutputMode::from_matches(&matches);
     let node_name = matches
@@ -160,9 +215,6 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
     if common_args.no_daemon {
         blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
-    if matches.get_flag("no_use_wildcard") {
-        blocks::eprint_note("--no-use-wildcard is not yet supported in native mode");
-    }
 
     let node_fqn = ParamClientContext::node_fqn(node_name);
     let mut ctx = ParamClientContext::new_with_spin_time(common_args.spin_time.as_deref())?;
@@ -176,31 +228,11 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         .as_mapping()
         .ok_or_else(|| anyhow!("Top-level YAML must be a mapping"))?;
 
-    // This is a simplified loader that supports two common layouts:
-    // 1) '<node_fqn>': { ros__parameters: { ... } }
-    // 2) '/**': { ros__parameters: { ... } }  (wildcard is accepted but not selectively disabled)
-    let mut param_sets: Vec<Parameter> = Vec::new();
-    for (node_key, node_val) in root {
-        let Some(node_key_str) = node_key.as_str() else {
-            continue;
-        };
-
-        if node_key_str != node_fqn && node_key_str != "/**" {
-            continue;
-        }
-
-        let node_map = node_val
-            .as_mapping()
-            .ok_or_else(|| anyhow!("Node entry '{node_key_str}' must be a mapping"))?;
-        let ros_params_val = node_map
-            .get(&Value::String("ros__parameters".to_string()))
-            .ok_or_else(|| anyhow!("Missing 'ros__parameters' under '{node_key_str}'"))?;
-        let ros_params_map = ros_params_val
-            .as_mapping()
-            .ok_or_else(|| anyhow!("'ros__parameters' must be a mapping"))?;
-
-        collect_params_from_yaml_mapping(ros_params_map, "", &mut param_sets)?;
-    }
+    let param_sets = selected_parameters_from_yaml(
+        root,
+        &node_fqn,
+        !matches.get_flag("no_use_wildcard"),
+    )?;
 
     if param_sets.is_empty() {
         return Err(anyhow!(
@@ -249,4 +281,78 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
 
 pub fn handle(matches: ArgMatches, common_args: CommonParamArgs) {
     handle_anyhow_result(run_command(matches, common_args));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::selected_parameters_from_yaml;
+    use serde_yaml::Value;
+
+    fn load_root(yaml: &str) -> serde_yaml::Mapping {
+        serde_yaml::from_str::<Value>(yaml)
+            .expect("valid yaml")
+            .as_mapping()
+            .expect("top level mapping")
+            .clone()
+    }
+
+    #[test]
+    fn selected_parameters_can_skip_wildcard_entries() {
+        let root = load_root(
+            r#"
+"/**":
+  ros__parameters:
+    shared: 1
+"/talker":
+  ros__parameters:
+    local: true
+"#,
+        );
+
+        let parameters =
+            selected_parameters_from_yaml(&root, "/talker", false).expect("parameters");
+        let names = parameters
+            .iter()
+            .map(|parameter| parameter.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, vec!["local"]);
+    }
+
+    #[test]
+    fn selected_parameters_merge_wildcard_and_node_specific_values() {
+        let root = load_root(
+            r#"
+"/**":
+  ros__parameters:
+    shared: 1
+    override_me: 2
+"/talker":
+  ros__parameters:
+    local: true
+    override_me: 42
+"#,
+        );
+
+        let parameters =
+            selected_parameters_from_yaml(&root, "/talker", true).expect("parameters");
+
+        let shared = parameters
+            .iter()
+            .find(|parameter| parameter.name == "shared")
+            .expect("shared parameter");
+        assert_eq!(shared.value.integer_value, 1);
+
+        let local = parameters
+            .iter()
+            .find(|parameter| parameter.name == "local")
+            .expect("local parameter");
+        assert!(local.value.bool_value);
+
+        let override_me = parameters
+            .iter()
+            .find(|parameter| parameter.name == "override_me")
+            .expect("override parameter");
+        assert_eq!(override_me.value.integer_value, 42);
+    }
 }
