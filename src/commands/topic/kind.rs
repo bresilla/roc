@@ -5,7 +5,6 @@ use crate::ui::{blocks, output};
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use serde_json::json;
-use std::time::Duration;
 
 // Topic Type (Kind) Implementation
 //
@@ -21,18 +20,8 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         .ok_or_else(|| anyhow!("Topic name is required"))?;
 
     // Create RCL context for direct API access
-    let context = RclGraphContext::new()
+    let context = RclGraphContext::new_with_spin_time(common_args.spin_time.as_deref())
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
-
-    // Wait for topic to appear (especially useful for /chatter)
-    if !context.wait_for_topic(topic_name, Duration::from_secs(3))? {
-        let daemon_status = RclGraphContext::get_daemon_status();
-        return Err(anyhow!(
-            "Topic '{}' not found. [{}]",
-            topic_name,
-            daemon_status
-        ));
-    }
 
     // Get topic type
     let topic_type = {

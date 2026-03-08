@@ -19,14 +19,7 @@ fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<()>
     if common_args.no_daemon {
         blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
-    if let Some(spin_time_value) = common_args.spin_time {
-        blocks::eprint_note(&format!(
-            "--spin-time {} is not yet supported in native mode",
-            spin_time_value
-        ));
-    }
-
-    let context = RclGraphContext::new()
+    let context = RclGraphContext::new_with_spin_time(common_args.spin_time.as_deref())
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
     let ty = action_operations::get_action_type(&context, action_name)?;

@@ -3,6 +3,8 @@ use rclrs::{Context, CreateBasicExecutor, Node};
 use std::net::TcpStream;
 use std::time::Duration;
 
+pub const DEFAULT_DISCOVERY_TIME: Duration = Duration::from_millis(300);
+
 /// A small, safe wrapper around an `rclrs` context + node.
 ///
 /// This is used for ROS graph queries (topics, services, nodes) and lightweight
@@ -15,7 +17,7 @@ pub struct RclGraphContext {
 impl RclGraphContext {
     /// Create a new graph context.
     pub fn new() -> Result<Self> {
-        Self::new_with_discovery(Duration::from_millis(300))
+        Self::new_with_discovery(DEFAULT_DISCOVERY_TIME)
     }
 
     /// Create a new graph context.
@@ -23,6 +25,11 @@ impl RclGraphContext {
     pub fn new_no_daemon() -> Result<Self> {
         // This tool always does direct DDS discovery.
         Self::new()
+    }
+
+    /// Create a new graph context honoring a ROS-style `--spin-time` argument.
+    pub fn new_with_spin_time(spin_time: Option<&str>) -> Result<Self> {
+        Self::new_with_discovery(parse_discovery_duration(spin_time)?)
     }
 
     /// Create a new graph context and wait for a short discovery window.
@@ -104,5 +111,68 @@ impl RclGraphContext {
         } else {
             "No daemon running".to_string()
         }
+    }
+}
+
+fn parse_discovery_duration(spin_time: Option<&str>) -> Result<Duration> {
+    let Some(raw_value) = spin_time.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(DEFAULT_DISCOVERY_TIME);
+    };
+
+    let (numeric, scale) = if let Some(value) = raw_value.strip_suffix("ms") {
+        (value.trim(), 0.001)
+    } else if let Some(value) = raw_value.strip_suffix('s') {
+        (value.trim(), 1.0)
+    } else {
+        (raw_value, 1.0)
+    };
+
+    let seconds = numeric
+        .parse::<f64>()
+        .map_err(|_| anyhow!("Invalid --spin-time value '{}'", raw_value))?
+        * scale;
+
+    if !seconds.is_finite() || seconds < 0.0 {
+        return Err(anyhow!("Invalid --spin-time value '{}'", raw_value));
+    }
+
+    Ok(Duration::from_secs_f64(seconds))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_discovery_duration, DEFAULT_DISCOVERY_TIME};
+    use std::time::Duration;
+
+    #[test]
+    fn parse_discovery_duration_defaults_when_missing() {
+        assert_eq!(parse_discovery_duration(None).unwrap(), DEFAULT_DISCOVERY_TIME);
+        assert_eq!(parse_discovery_duration(Some("")).unwrap(), DEFAULT_DISCOVERY_TIME);
+    }
+
+    #[test]
+    fn parse_discovery_duration_accepts_seconds() {
+        assert_eq!(
+            parse_discovery_duration(Some("0.5")).unwrap(),
+            Duration::from_millis(500)
+        );
+        assert_eq!(
+            parse_discovery_duration(Some("2s")).unwrap(),
+            Duration::from_secs(2)
+        );
+    }
+
+    #[test]
+    fn parse_discovery_duration_accepts_milliseconds() {
+        assert_eq!(
+            parse_discovery_duration(Some("750ms")).unwrap(),
+            Duration::from_millis(750)
+        );
+    }
+
+    #[test]
+    fn parse_discovery_duration_rejects_invalid_values() {
+        assert!(parse_discovery_duration(Some("-1")).is_err());
+        assert!(parse_discovery_duration(Some("abc")).is_err());
     }
 }

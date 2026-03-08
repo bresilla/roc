@@ -18,8 +18,8 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     // Create a single RCL context for all operations
     // Note: Our implementation always does direct DDS discovery (daemon-free by design)
     // so --no-daemon doesn't change our behavior, but we acknowledge it for compatibility
-    let context =
-        RclGraphContext::new().map_err(|e| anyhow!("Failed to initialize RCL context: {}", e))?;
+    let context = RclGraphContext::new_with_spin_time(common_args.spin_time.as_deref())
+        .map_err(|e| anyhow!("Failed to initialize RCL context: {}", e))?;
 
     // Log a note about daemon usage if the flag is explicitly set
     if common_args.no_daemon {
@@ -92,9 +92,6 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         let publishers_info = context
             .get_publishers_info(topic_name)
             .map_err(|e| anyhow!("Failed to get publishers info: {}", e))?;
-
-        // Allow some time for any internal RCL state to settle after the first call
-        std::thread::sleep(std::time::Duration::from_millis(50));
 
         // Get detailed subscriber info
         let subscribers_info = context
