@@ -18,32 +18,45 @@ use tokio::time::sleep;
 // 3. Displaying bandwidth statistics in real-time
 // 4. Supporting the same options as ros2 topic bw
 
+const NANOS_PER_SECOND: f64 = 1_000_000_000.0;
+
 struct BandwidthCalculator {
-    message_sizes: VecDeque<(Instant, usize)>,
-    window_duration: Duration,
+    message_sizes: VecDeque<(i64, usize)>,
+    window_duration_ns: i64,
     total_messages: usize,
     total_bytes: usize,
-    start_time: Instant,
+    start_time_ns: Option<i64>,
 }
 
 impl BandwidthCalculator {
     fn new(window_duration: Duration) -> Self {
         Self {
             message_sizes: VecDeque::new(),
-            window_duration,
+            window_duration_ns: window_duration.as_nanos().min(i64::MAX as u128) as i64,
             total_messages: 0,
             total_bytes: 0,
-            start_time: Instant::now(),
+            start_time_ns: None,
         }
     }
 
-    fn add_message(&mut self, timestamp: Instant, message_size: usize) {
-        self.message_sizes.push_back((timestamp, message_size));
+    fn add_message(&mut self, timestamp_ns: i64, message_size: usize) -> bool {
+        let reset = matches!(self.message_sizes.back(), Some((last, _)) if timestamp_ns < *last);
+
+        if reset {
+            self.message_sizes.clear();
+            self.total_messages = 0;
+            self.total_bytes = 0;
+            self.start_time_ns = Some(timestamp_ns);
+        } else if self.start_time_ns.is_none() {
+            self.start_time_ns = Some(timestamp_ns);
+        }
+
+        self.message_sizes.push_back((timestamp_ns, message_size));
         self.total_messages += 1;
         self.total_bytes += message_size;
 
         // Remove old entries outside the window
-        let cutoff_time = timestamp - self.window_duration;
+        let cutoff_time = timestamp_ns.saturating_sub(self.window_duration_ns);
         while let Some((time, _)) = self.message_sizes.front() {
             if *time < cutoff_time {
                 self.message_sizes.pop_front();
@@ -51,6 +64,8 @@ impl BandwidthCalculator {
                 break;
             }
         }
+
+        reset
     }
 
     fn get_current_bandwidth(&self) -> f64 {
@@ -59,43 +74,81 @@ impl BandwidthCalculator {
         }
 
         let total_size: usize = self.message_sizes.iter().map(|(_, size)| size).sum();
-        let time_span = match (self.message_sizes.front(), self.message_sizes.back()) {
-            (Some((first, _)), Some((last, _))) => *last - *first,
+        let time_span_ns = match (self.message_sizes.front(), self.message_sizes.back()) {
+            (Some((first, _)), Some((last, _))) => last - first,
             _ => return 0.0,
         };
 
-        if time_span.as_secs_f64() == 0.0 {
+        if time_span_ns <= 0 {
             return 0.0;
         }
 
-        total_size as f64 / time_span.as_secs_f64()
+        total_size as f64 * NANOS_PER_SECOND / time_span_ns as f64
     }
 
     fn get_average_bandwidth(&self) -> f64 {
-        if self.total_messages == 0 {
+        let Some(start_time_ns) = self.start_time_ns else {
+            return 0.0;
+        };
+        let Some((last_timestamp_ns, _)) = self.message_sizes.back() else {
+            return 0.0;
+        };
+
+        let total_time_ns = last_timestamp_ns - start_time_ns;
+        if total_time_ns <= 0 {
             return 0.0;
         }
 
-        let total_time = self.start_time.elapsed().as_secs_f64();
-        if total_time == 0.0 {
-            return 0.0;
-        }
-
-        self.total_bytes as f64 / total_time
+        self.total_bytes as f64 * NANOS_PER_SECOND / total_time_ns as f64
     }
 
     fn get_message_count(&self) -> usize {
         self.total_messages
     }
+
+    fn get_window_size(&self) -> usize {
+        self.message_sizes.len()
+    }
+
+    fn get_bandwidth_samples(&self) -> Vec<f64> {
+        self.message_sizes
+            .iter()
+            .zip(self.message_sizes.iter().skip(1))
+            .map(|((t1, s1), (t2, _))| {
+                let time_diff_ns = *t2 - *t1;
+                if time_diff_ns > 0 {
+                    *s1 as f64 * NANOS_PER_SECOND / time_diff_ns as f64
+                } else {
+                    0.0
+                }
+            })
+            .filter(|bandwidth| *bandwidth > 0.0)
+            .collect()
+    }
+}
+
+fn topic_bandwidth_clock_label(use_sim_time: bool) -> &'static str {
+    if use_sim_time {
+        "ros"
+    } else {
+        "system"
+    }
+}
+
+fn topic_bandwidth_timestamp_ns(graph_context: &RclGraphContext) -> Option<i64> {
+    let timestamp_ns = graph_context.node().get_clock().now().nsec;
+    (timestamp_ns > 0).then_some(timestamp_ns)
 }
 
 async fn monitor_topic_bandwidth(
     topic_name: &str,
     window_size: Duration,
+    spin_time: Option<&str>,
+    use_sim_time: bool,
     running: Arc<AtomicBool>,
 ) -> Result<()> {
     // Create RCL context for subscription
-    let graph_context = RclGraphContext::new()
+    let graph_context = RclGraphContext::new_with_options(spin_time, use_sim_time)
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
     // Wait for topic to appear
@@ -128,6 +181,7 @@ async fn monitor_topic_bandwidth(
     blocks::print_field("Topic", topic_name);
     blocks::print_field("Type", &topic_type);
     blocks::print_field("Window", format!("{:.2} s", window_size.as_secs_f64()));
+    blocks::print_field("Clock", topic_bandwidth_clock_label(use_sim_time));
     println!();
 
     let bandwidth_calc = Arc::new(Mutex::new(BandwidthCalculator::new(window_size)));
@@ -137,6 +191,7 @@ async fn monitor_topic_bandwidth(
     let mut stats_print_timer = Instant::now();
     let stats_print_interval = Duration::from_secs(1);
     let mut last_no_publisher_warning: Option<Instant> = None;
+    let mut waiting_for_clock_warned = false;
 
     blocks::print_note("Press Ctrl+C to stop");
 
@@ -147,14 +202,24 @@ async fn monitor_topic_bandwidth(
         // Check for new messages
         match subscription.take_message() {
             Ok(Some(received)) => {
-                // Message received - record timestamp and size
-                let current_time = Instant::now();
+                let Some(current_time_ns) = topic_bandwidth_timestamp_ns(&graph_context) else {
+                    if use_sim_time && !waiting_for_clock_warned {
+                        blocks::eprint_note("Waiting for /clock before measuring topic bandwidth");
+                        waiting_for_clock_warned = true;
+                    }
+                    continue;
+                };
+                waiting_for_clock_warned = false;
                 let message_size = format!("{:?}", received.message.view()).len();
 
                 let mut calc = bandwidth_calc_clone
                     .lock()
                     .map_err(|_| anyhow!("Bandwidth calculator state poisoned"))?;
-                calc.add_message(current_time, message_size);
+                if calc.add_message(current_time_ns, message_size) {
+                    blocks::eprint_warning(
+                        "Detected time moving backwards; resetting bandwidth statistics",
+                    );
+                }
             }
             Ok(None) => {
                 // No message available, continue polling
@@ -175,22 +240,9 @@ async fn monitor_topic_bandwidth(
 
             if msg_count > 0 {
                 // Calculate min/max/mean bandwidth from recent measurements
-                let bandwidth_samples: Vec<f64> = calc
-                    .message_sizes
-                    .iter()
-                    .zip(calc.message_sizes.iter().skip(1))
-                    .map(|((t1, s1), (t2, _s2))| {
-                        let time_diff = t2.duration_since(*t1).as_secs_f64();
-                        if time_diff > 0.0 {
-                            *s1 as f64 / time_diff
-                        } else {
-                            0.0
-                        }
-                    })
-                    .filter(|&bw| bw > 0.0)
-                    .collect();
+                let bandwidth_samples = calc.get_bandwidth_samples();
 
-                let (min_bw, max_bw) = if bandwidth_samples.len() > 0 {
+                let (min_bw, max_bw) = if !bandwidth_samples.is_empty() {
                     let min_bw = bandwidth_samples
                         .iter()
                         .fold(f64::INFINITY, |a, &b| a.min(b));
@@ -208,13 +260,7 @@ async fn monitor_topic_bandwidth(
                         ("mean", format!("{average_bw:.2} B/s")),
                         ("min", format!("{min_bw:.2} B/s")),
                         ("max", format!("{max_bw:.2} B/s")),
-                        (
-                            "window",
-                            calc.message_sizes
-                                .len()
-                                .min(window_size.as_secs() as usize * 10)
-                                .to_string(),
-                        ),
+                        ("window", calc.get_window_size().to_string()),
                         ("messages", msg_count.to_string()),
                     ],
                 );
@@ -265,6 +311,10 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(100);
 
+    if window_size == 0 {
+        return Err(anyhow!("--window must be greater than 0"));
+    }
+
     let window_duration = Duration::from_millis(window_size * 10); // Convert to reasonable duration
 
     // Handle common arguments
@@ -293,9 +343,47 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     });
 
     // Start monitoring
-    monitor_topic_bandwidth(topic_name, window_duration, running).await
+    monitor_topic_bandwidth(
+        topic_name,
+        window_duration,
+        common_args.spin_time.as_deref(),
+        common_args.use_sim_time,
+        running,
+    )
+    .await
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
     run_async_command(run_command(matches, common_args));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BandwidthCalculator;
+    use std::time::Duration;
+
+    #[test]
+    fn bandwidth_calculator_uses_window_timestamps() {
+        let mut calc = BandwidthCalculator::new(Duration::from_secs(10));
+        calc.add_message(1_000_000_000, 100);
+        calc.add_message(2_000_000_000, 200);
+        calc.add_message(3_000_000_000, 300);
+
+        assert_eq!(calc.get_message_count(), 3);
+        assert!((calc.get_current_bandwidth() - 300.0).abs() < 1e-6);
+        assert!((calc.get_average_bandwidth() - 300.0).abs() < 1e-6);
+        assert_eq!(calc.get_window_size(), 3);
+    }
+
+    #[test]
+    fn bandwidth_calculator_resets_when_time_moves_backwards() {
+        let mut calc = BandwidthCalculator::new(Duration::from_secs(10));
+        calc.add_message(2_000_000_000, 100);
+        calc.add_message(3_000_000_000, 200);
+
+        assert!(calc.add_message(1_000_000_000, 50));
+        assert_eq!(calc.get_message_count(), 1);
+        assert_eq!(calc.get_window_size(), 1);
+        assert_eq!(calc.get_current_bandwidth(), 0.0);
+    }
 }

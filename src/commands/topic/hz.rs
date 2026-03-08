@@ -10,11 +10,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
+const NANOS_PER_SECOND: f64 = 1_000_000_000.0;
+
 struct RateCalculator {
-    timestamps: VecDeque<Instant>,
+    timestamps: VecDeque<i64>,
     window_size: usize,
     total_messages: usize,
-    start_time: Instant,
+    start_time_ns: Option<i64>,
 }
 
 impl RateCalculator {
@@ -23,18 +25,30 @@ impl RateCalculator {
             timestamps: VecDeque::new(),
             window_size,
             total_messages: 0,
-            start_time: Instant::now(),
+            start_time_ns: None,
         }
     }
 
-    fn add_message(&mut self, timestamp: Instant) {
-        self.timestamps.push_back(timestamp);
+    fn add_message(&mut self, timestamp_ns: i64) -> bool {
+        let reset = matches!(self.timestamps.back(), Some(last) if timestamp_ns < *last);
+
+        if reset {
+            self.timestamps.clear();
+            self.total_messages = 0;
+            self.start_time_ns = Some(timestamp_ns);
+        } else if self.start_time_ns.is_none() {
+            self.start_time_ns = Some(timestamp_ns);
+        }
+
+        self.timestamps.push_back(timestamp_ns);
         self.total_messages += 1;
 
         // Keep only the last window_size timestamps
         while self.timestamps.len() > self.window_size {
             self.timestamps.pop_front();
         }
+
+        reset
     }
 
     fn get_current_rate(&self) -> f64 {
@@ -42,44 +56,89 @@ impl RateCalculator {
             return 0.0;
         }
 
-        let time_span = match (self.timestamps.front(), self.timestamps.back()) {
-            (Some(first), Some(last)) => last.duration_since(*first),
+        let time_span_ns = match (self.timestamps.front(), self.timestamps.back()) {
+            (Some(first), Some(last)) => last - first,
             _ => return 0.0,
         };
 
-        if time_span.as_secs_f64() == 0.0 {
+        if time_span_ns <= 0 {
             return 0.0;
         }
 
-        (self.timestamps.len() - 1) as f64 / time_span.as_secs_f64()
+        (self.timestamps.len() - 1) as f64 * NANOS_PER_SECOND / time_span_ns as f64
     }
 
     fn get_average_rate(&self) -> f64 {
-        if self.total_messages == 0 {
+        let Some(start_time_ns) = self.start_time_ns else {
+            return 0.0;
+        };
+        let Some(last_timestamp_ns) = self.timestamps.back() else {
+            return 0.0;
+        };
+
+        let total_time_ns = last_timestamp_ns - start_time_ns;
+        if total_time_ns <= 0 {
             return 0.0;
         }
 
-        let total_time = self.start_time.elapsed().as_secs_f64();
-        if total_time == 0.0 {
-            return 0.0;
-        }
-
-        self.total_messages as f64 / total_time
+        self.total_messages.saturating_sub(1) as f64 * NANOS_PER_SECOND / total_time_ns as f64
     }
 
     fn get_total_messages(&self) -> usize {
         self.total_messages
+    }
+
+    fn get_periods(&self) -> Vec<f64> {
+        self.timestamps
+            .iter()
+            .zip(self.timestamps.iter().skip(1))
+            .map(|(t1, t2)| (*t2 - *t1) as f64 / NANOS_PER_SECOND)
+            .filter(|period| *period > 0.0)
+            .collect()
+    }
+
+    fn get_window_size(&self) -> usize {
+        self.timestamps.len()
+    }
+}
+
+fn wall_timestamp_ns(started_at: Instant) -> i64 {
+    started_at.elapsed().as_nanos().min(i64::MAX as u128) as i64
+}
+
+fn topic_rate_clock_label(use_wall_time: bool, use_sim_time: bool) -> &'static str {
+    if use_wall_time {
+        "wall"
+    } else if use_sim_time {
+        "ros"
+    } else {
+        "system"
+    }
+}
+
+fn topic_rate_timestamp_ns(
+    graph_context: &RclGraphContext,
+    started_at: Instant,
+    use_wall_time: bool,
+) -> Option<i64> {
+    if use_wall_time {
+        Some(wall_timestamp_ns(started_at))
+    } else {
+        let timestamp_ns = graph_context.node().get_clock().now().nsec;
+        (timestamp_ns > 0).then_some(timestamp_ns)
     }
 }
 
 async fn monitor_topic_rate(
     topic_name: &str,
     window_size: usize,
+    spin_time: Option<&str>,
+    use_sim_time: bool,
     use_wall_time: bool,
     running: Arc<AtomicBool>,
 ) -> Result<()> {
     // Create RCL context for subscription
-    let graph_context = RclGraphContext::new()
+    let graph_context = RclGraphContext::new_with_options(spin_time, use_sim_time)
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
     // Wait for topic to appear
@@ -112,16 +171,18 @@ async fn monitor_topic_rate(
     blocks::print_field("Topic", topic_name);
     blocks::print_field("Type", &topic_type);
     blocks::print_field("Window", window_size);
-    blocks::print_field("Clock", if use_wall_time { "wall" } else { "ros" });
+    blocks::print_field("Clock", topic_rate_clock_label(use_wall_time, use_sim_time));
     println!();
 
     let rate_calculator = Arc::new(Mutex::new(RateCalculator::new(window_size)));
     let rate_calc_clone = Arc::clone(&rate_calculator);
 
     let check_interval = Duration::from_millis(10); // High frequency polling for accurate rate measurement
+    let started_at = Instant::now();
     let mut stats_print_timer = Instant::now();
     let stats_print_interval = Duration::from_secs(1);
     let mut last_no_publisher_warning: Option<Instant> = None;
+    let mut waiting_for_clock_warned = false;
 
     blocks::print_note("Press Ctrl+C to stop");
 
@@ -132,19 +193,25 @@ async fn monitor_topic_rate(
         // Check for new messages
         match subscription.take_message() {
             Ok(Some(_received)) => {
-                // Message received - record timestamp
-                let current_time = if use_wall_time {
-                    Instant::now()
-                } else {
-                    // For now use wall time - in a full implementation, this would
-                    // extract ROS time from the message header
-                    Instant::now()
+                let Some(current_time_ns) =
+                    topic_rate_timestamp_ns(&graph_context, started_at, use_wall_time)
+                else {
+                    if use_sim_time && !use_wall_time && !waiting_for_clock_warned {
+                        blocks::eprint_note("Waiting for /clock before measuring topic rate");
+                        waiting_for_clock_warned = true;
+                    }
+                    continue;
                 };
+                waiting_for_clock_warned = false;
 
                 let mut calc = rate_calc_clone
                     .lock()
                     .map_err(|_| anyhow!("Rate calculator state poisoned"))?;
-                calc.add_message(current_time);
+                if calc.add_message(current_time_ns) {
+                    blocks::eprint_warning(
+                        "Detected time moving backwards; resetting rate statistics",
+                    );
+                }
             }
             Ok(None) => {
                 // No message available, continue polling
@@ -165,14 +232,9 @@ async fn monitor_topic_rate(
 
             if total_msgs > 0 {
                 // Calculate statistics for display
-                let periods: Vec<f64> = calc
-                    .timestamps
-                    .iter()
-                    .zip(calc.timestamps.iter().skip(1))
-                    .map(|(t1, t2)| t2.duration_since(*t1).as_secs_f64())
-                    .collect();
+                let periods = calc.get_periods();
 
-                let (min_period, max_period, std_dev) = if periods.len() > 0 {
+                let (min_period, max_period, std_dev) = if !periods.is_empty() {
                     let min_p = periods.iter().fold(f64::INFINITY, |a, &b| a.min(b));
                     let max_p = periods.iter().fold(0.0f64, |a, &b| a.max(b));
 
@@ -194,7 +256,7 @@ async fn monitor_topic_rate(
                         ("min", format!("{min_period:.3} s")),
                         ("max", format!("{max_period:.3} s")),
                         ("stddev", format!("{std_dev:.3} s")),
-                        ("window", calc.timestamps.len().min(window_size).to_string()),
+                        ("window", calc.get_window_size().to_string()),
                         ("messages", total_msgs.to_string()),
                     ],
                 );
@@ -242,6 +304,10 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(10000);
 
+    if window_size == 0 {
+        return Err(anyhow!("--window must be greater than 0"));
+    }
+
     let use_wall_time = matches.get_flag("wall_time");
 
     // Handle common arguments
@@ -253,7 +319,7 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
         blocks::eprint_note("Using simulation time for rate calculations");
     }
 
-    if let Some(spin_time_value) = common_args.spin_time {
+    if let Some(ref spin_time_value) = common_args.spin_time {
         blocks::eprint_note(&format!("Using spin time {spin_time_value} for discovery"));
     }
 
@@ -270,9 +336,47 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
     });
 
     // Start monitoring
-    monitor_topic_rate(topic_name, window_size, use_wall_time, running).await
+    monitor_topic_rate(
+        topic_name,
+        window_size,
+        common_args.spin_time.as_deref(),
+        common_args.use_sim_time,
+        use_wall_time,
+        running,
+    )
+    .await
 }
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
     run_async_command(run_command(matches, common_args));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RateCalculator;
+
+    #[test]
+    fn rate_calculator_uses_sample_span() {
+        let mut calc = RateCalculator::new(10);
+        calc.add_message(1_000_000_000);
+        calc.add_message(1_500_000_000);
+        calc.add_message(2_000_000_000);
+
+        assert_eq!(calc.get_total_messages(), 3);
+        assert!((calc.get_current_rate() - 2.0).abs() < 1e-6);
+        assert!((calc.get_average_rate() - 2.0).abs() < 1e-6);
+        assert_eq!(calc.get_window_size(), 3);
+    }
+
+    #[test]
+    fn rate_calculator_resets_when_time_moves_backwards() {
+        let mut calc = RateCalculator::new(10);
+        calc.add_message(2_000_000_000);
+        calc.add_message(3_000_000_000);
+
+        assert!(calc.add_message(1_000_000_000));
+        assert_eq!(calc.get_total_messages(), 1);
+        assert_eq!(calc.get_window_size(), 1);
+        assert_eq!(calc.get_current_rate(), 0.0);
+    }
 }

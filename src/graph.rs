@@ -81,9 +81,11 @@ impl RclGraphContext {
         topic_name: &str,
         message_type: &str,
     ) -> Result<DynamicSubscriber> {
-        // For now this uses an internal node+executor dedicated to the subscription.
-        // Later we can share the graph node and executor to reduce DDS entities.
-        let _ = self; // keep API compatible
-        DynamicSubscriber::new(topic_name, message_type)
+        DynamicSubscriber::new_with_node(
+            self.node().clone(),
+            self.take_executor()?,
+            topic_name,
+            message_type,
+        )
     }
 }

@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
-use rclrs::{Context, CreateBasicExecutor, IntoNodeOptions, Node};
+use rclrs::{Context, CreateBasicExecutor, Executor, IntoNodeOptions, Node};
 use std::net::TcpStream;
+use std::sync::Mutex;
 use std::time::Duration;
 
 pub const DEFAULT_DISCOVERY_TIME: Duration = Duration::from_millis(300);
@@ -12,6 +13,7 @@ pub const DEFAULT_DISCOVERY_TIME: Duration = Duration::from_millis(300);
 pub struct RclGraphContext {
     context: Context,
     node: Node,
+    executor: Mutex<Option<Executor>>,
 }
 
 impl RclGraphContext {
@@ -39,12 +41,17 @@ impl RclGraphContext {
     ) -> Result<Self> {
         let context = Context::default_from_env()?;
         let executor = context.create_basic_executor();
-        let node = executor.create_node("roc_graph_node".arguments(cli_node_arguments(use_sim_time)))?;
+        let node =
+            executor.create_node("roc_graph_node".arguments(cli_node_arguments(use_sim_time)))?;
 
         // Give DDS time to discover peers/topics.
         std::thread::sleep(discovery_time);
 
-        Ok(Self { context, node })
+        Ok(Self {
+            context,
+            node,
+            executor: Mutex::new(Some(executor)),
+        })
     }
 
     /// Check if the context is valid.
@@ -55,6 +62,14 @@ impl RclGraphContext {
     /// Get the `rclrs` node used for graph queries.
     pub fn node(&self) -> &Node {
         &self.node
+    }
+
+    pub(crate) fn take_executor(&self) -> Result<Executor> {
+        self.executor
+            .lock()
+            .map_err(|_| anyhow!("RCL executor state poisoned"))?
+            .take()
+            .ok_or_else(|| anyhow!("RCL executor is already attached to an active subscription"))
     }
 
     /// Wait for a topic to appear in the graph.
@@ -161,8 +176,14 @@ mod tests {
 
     #[test]
     fn parse_discovery_duration_defaults_when_missing() {
-        assert_eq!(parse_discovery_duration(None).unwrap(), DEFAULT_DISCOVERY_TIME);
-        assert_eq!(parse_discovery_duration(Some("")).unwrap(), DEFAULT_DISCOVERY_TIME);
+        assert_eq!(
+            parse_discovery_duration(None).unwrap(),
+            DEFAULT_DISCOVERY_TIME
+        );
+        assert_eq!(
+            parse_discovery_duration(Some("")).unwrap(),
+            DEFAULT_DISCOVERY_TIME
+        );
     }
 
     #[test]
