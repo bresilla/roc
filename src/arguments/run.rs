@@ -1,3 +1,4 @@
+use crate::ui::output;
 use clap::{arg, Command};
 
 pub fn cmd() -> Command {
@@ -19,6 +20,7 @@ pub fn cmd() -> Command {
             arg!([argv] "Pass arbitrary arguments to the executable (e.g. '__log_level:=debug')")
         )
         .arg(arg!(--prefix <PREFIX> "Prefix command, which should go before the executable (e.g. --prefix 'gdb -ex run --args')"))
+        .arg(output::arg())
 }
 
 fn package_value_parser(s: &str) -> Result<String, String> {

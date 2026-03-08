@@ -96,6 +96,9 @@ complete -c roc -n "__fish_seen_subcommand_from launch" -s s -l show_args
 complete -c roc -n "__fish_seen_subcommand_from launch" -s a -l show_all
 complete -c roc -n "__fish_seen_subcommand_from launch" -l launch_prefix
 complete -c roc -n "__fish_seen_subcommand_from launch" -l launch_prefix_filter
+complete -c roc -n "__fish_seen_subcommand_from launch" -l output
+complete -c roc -n "__fish_seen_subcommand_from run" -l prefix
+complete -c roc -n "__fish_seen_subcommand_from run" -l output
 
 complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l base-paths
 complete -c roc -n "__fish_seen_subcommand_from work; and test (__roc_sub_cmd) = build" -l build-base

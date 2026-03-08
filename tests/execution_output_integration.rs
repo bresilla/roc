@@ -50,6 +50,22 @@ fn run_failure_prints_execution_block() {
 }
 
 #[test]
+fn run_json_failure_is_structured() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &["run", "missing_pkg", "missing_exec", "--output", "json"],
+    );
+    assert_failure(&output, "roc run --output json");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\"command\": \"run\""));
+    assert!(stdout.contains("\"package\": \"missing_pkg\""));
+    assert!(stdout.contains("\"executable\": \"missing_exec\""));
+    assert!(stdout.contains("\"status\": \"error\""));
+}
+
+#[test]
 fn launch_failure_prints_execution_block() {
     let temp = tempdir().unwrap();
     let output = run_roc(temp.path(), &["launch", "missing_pkg", "missing.launch.py"]);
@@ -63,6 +79,28 @@ fn launch_failure_prints_execution_block() {
     assert!(stdout.contains("missing_pkg"));
     assert!(stdout.contains("missing.launch.py"));
     assert!(stderr.contains("Launch file"));
+}
+
+#[test]
+fn launch_plain_failure_is_structured() {
+    let temp = tempdir().unwrap();
+    let output = run_roc(
+        temp.path(),
+        &[
+            "launch",
+            "missing_pkg",
+            "missing.launch.py",
+            "--output",
+            "plain",
+        ],
+    );
+    assert_failure(&output, "roc launch --output plain");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("launch:"));
+    assert!(stdout.contains("package: missing_pkg"));
+    assert!(stdout.contains("launch_file: missing.launch.py"));
+    assert!(stdout.contains("status: error"));
 }
 
 #[test]

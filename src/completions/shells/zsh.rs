@@ -16,8 +16,9 @@ _roc_dynamic_lines() {
 _roc() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
-    local -a launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_kind_flags topic_bw_flags topic_find_flags topic_delay_flags frame_pub_flags service_call_flags service_find_flags service_list_flags service_kind_flags action_goal_flags param_get_flags param_list_flags param_set_flags param_export_flags param_remove_flags param_describe_flags param_import_flags bag_list_flags bag_info_flags daemon_flags middleware_list_flags middleware_get_flags middleware_set_flags idl_protobuf_flags idl_ros2msg_flags interface_list_flags interface_all_flags interface_package_flags interface_show_flags interface_model_flags
-    launch_flags=(-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter)
+    local -a run_flags launch_flags work_build_flags work_test_flags work_test_result_flags topic_echo_flags topic_hz_flags topic_info_flags topic_list_flags topic_pub_flags topic_kind_flags topic_bw_flags topic_find_flags topic_delay_flags frame_pub_flags service_call_flags service_find_flags service_list_flags service_kind_flags action_goal_flags param_get_flags param_list_flags param_set_flags param_export_flags param_remove_flags param_describe_flags param_import_flags bag_list_flags bag_info_flags daemon_flags middleware_list_flags middleware_get_flags middleware_set_flags idl_protobuf_flags idl_ros2msg_flags interface_list_flags interface_all_flags interface_package_flags interface_show_flags interface_model_flags
+    run_flags=(--prefix --output)
+    launch_flags=(-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter --output)
     work_build_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor)
     work_test_flags=(--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --merge-install --continue-on-error --ctest-args --pytest-args)
     work_test_result_flags=(--test-result-base --all --verbose --result-files-only --delete --delete-yes)
@@ -59,6 +60,7 @@ _roc() {
 
     if [[ "$words[$CURRENT]" == -* ]]; then
         case "$words[2]" in
+            run) _describe 'run flags' run_flags; return ;;
             launch) _describe 'launch flags' launch_flags; return ;;
             work)
                 if [[ "$words[3]" == "build" ]]; then

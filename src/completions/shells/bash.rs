@@ -10,7 +10,8 @@ _roc_completion() {
     _init_completion || return
 
     local top="${words[1]}"
-    local launch_flags="-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter"
+    local run_flags="--prefix --output"
+    local launch_flags="-n --noninteractive -d --debug -p --print -s --show_args -a --show_all --launch_prefix --launch_prefix_filter --output"
     local work_build_flags="--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --packages-select-build-failed --packages-select-build-finished --packages-skip-build-finished --packages-skip-build-failed --parallel-workers --merge-install --symlink-install --cmake-args --cmake-target --continue-on-error --event-handlers --executor"
     local work_test_flags="--base-paths --build-base --install-base --log-base --packages-select --packages-ignore --packages-skip --packages-up-to --merge-install --continue-on-error --ctest-args --pytest-args"
     local work_test_result_flags="--test-result-base --all --verbose --result-files-only --delete --delete-yes"
@@ -54,6 +55,10 @@ _roc_completion() {
         case "$top" in
             launch)
                 COMPREPLY=($(compgen -W "$launch_flags" -- "$cur"))
+                return
+                ;;
+            run)
+                COMPREPLY=($(compgen -W "$run_flags" -- "$cur"))
                 return
                 ;;
             work)
