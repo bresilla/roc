@@ -1,7 +1,10 @@
 use anyhow::{anyhow, Result};
 use crate::shared::graph_context::{parse_discovery_duration, DEFAULT_DISCOVERY_TIME};
 use crate::shared::ros_names::is_hidden_node_name;
-use rclrs::{Client, Context, CreateBasicExecutor, Executor, Node, RclrsErrorFilter, SpinOptions};
+use rclrs::{
+    Client, Context, CreateBasicExecutor, Executor, IntoNodeOptions, Node, RclrsErrorFilter,
+    SpinOptions,
+};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -31,17 +34,17 @@ pub struct ParamClientContext {
 
 impl ParamClientContext {
     pub fn new() -> Result<Self> {
-        Self::new_with_discovery(DEFAULT_DISCOVERY_TIME)
+        Self::new_with_discovery_options(DEFAULT_DISCOVERY_TIME, false)
     }
 
-    pub fn new_with_spin_time(spin_time: Option<&str>) -> Result<Self> {
-        Self::new_with_discovery(parse_discovery_duration(spin_time)?)
+    pub fn new_with_options(spin_time: Option<&str>, use_sim_time: bool) -> Result<Self> {
+        Self::new_with_discovery_options(parse_discovery_duration(spin_time)?, use_sim_time)
     }
 
-    pub fn new_with_discovery(discovery_time: Duration) -> Result<Self> {
+    pub fn new_with_discovery_options(discovery_time: Duration, use_sim_time: bool) -> Result<Self> {
         let context = Context::default_from_env()?;
         let executor = context.create_basic_executor();
-        let node = executor.create_node("roc_param_cli")?;
+        let node = executor.create_node("roc_param_cli".arguments(cli_node_arguments(use_sim_time)))?;
 
         // Give DDS a short discovery window so parameter service servers
         // show up before we try to wait on readiness.
@@ -250,6 +253,18 @@ impl ParamClientContext {
         self.wait_for_service_ready(&client, DEFAULT_SERVICE_READY_TIMEOUT)?;
         let request = SetParameters_Request { parameters };
         self.call_and_capture(&client, &request, DEFAULT_CALL_TIMEOUT)
+    }
+}
+
+fn cli_node_arguments(use_sim_time: bool) -> Vec<String> {
+    if use_sim_time {
+        vec![
+            "--ros-args".to_string(),
+            "-p".to_string(),
+            "use_sim_time:=true".to_string(),
+        ]
+    } else {
+        Vec::new()
     }
 }
 
@@ -497,4 +512,22 @@ pub fn filter_parameter_names(names: Vec<String>, filter: Option<&str>) -> Resul
     };
     let re = Regex::new(filter).map_err(|e| anyhow!("Invalid regex '{filter}': {e}"))?;
     Ok(names.into_iter().filter(|n| re.is_match(n)).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cli_node_arguments;
+
+    #[test]
+    fn cli_node_arguments_enable_sim_time_when_requested() {
+        assert_eq!(
+            cli_node_arguments(true),
+            vec!["--ros-args", "-p", "use_sim_time:=true"]
+        );
+    }
+
+    #[test]
+    fn cli_node_arguments_are_empty_by_default() {
+        assert!(cli_node_arguments(false).is_empty());
+    }
 }

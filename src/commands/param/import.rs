@@ -206,15 +206,13 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
         .get_one::<String>("param_name")
         .ok_or_else(|| anyhow!("param_name (parameter file) is required"))?;
 
-    if common_args.use_sim_time {
-        blocks::eprint_note("--use-sim-time is not yet supported in native mode");
-    }
     if common_args.no_daemon {
         blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
 
     let node_fqn = ParamClientContext::node_fqn(node_name);
-    let mut ctx = ParamClientContext::new_with_spin_time(common_args.spin_time.as_deref())?;
+    let mut ctx =
+        ParamClientContext::new_with_options(common_args.spin_time.as_deref(), common_args.use_sim_time)?;
     ctx.ensure_node_available(&node_fqn, matches.get_flag("include_hidden_nodes"))?;
 
     let content = fs::read_to_string(param_file)
