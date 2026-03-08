@@ -12,7 +12,8 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     let output_mode = output::OutputMode::from_matches_with_compat(&matches, common_args.ros_style);
     // Create RCL graph context for direct API access
     // Note: Our implementation always does direct DDS discovery (daemon-free by design)
-    let graph_context = RclGraphContext::new_with_spin_time(common_args.spin_time.as_deref())
+    let graph_context =
+        RclGraphContext::new_with_options(common_args.spin_time.as_deref(), common_args.use_sim_time)
         .map_err(|e| anyhow::anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
     // Log a note about daemon usage if the flag is explicitly set
@@ -143,17 +144,6 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
             let count = filtered_topics.len();
             output::print_json(&json!({ "topics": filtered_topics, "count": count }))?;
         }
-    }
-
-    // Handle other flags (for future implementation)
-    if common_args.use_sim_time {
-        // TODO: Implement simulation time handling when needed
-        blocks::eprint_warning("--use-sim-time flag not yet implemented in direct RCL mode");
-    }
-
-    if common_args.no_daemon {
-        // TODO: Our implementation already bypasses daemon, so this is effectively handled
-        // We could add logic here to ensure no daemon interaction if needed
     }
 
     // Show helpful message if no topics found

@@ -20,7 +20,7 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         .ok_or_else(|| anyhow!("Topic name is required"))?;
 
     // Create RCL context for direct API access
-    let context = RclGraphContext::new_with_spin_time(common_args.spin_time.as_deref())
+    let context = RclGraphContext::new_with_options(common_args.spin_time.as_deref(), common_args.use_sim_time)
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
     // Get topic type

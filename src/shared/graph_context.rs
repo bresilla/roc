@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use rclrs::{Context, CreateBasicExecutor, Node};
+use rclrs::{Context, CreateBasicExecutor, IntoNodeOptions, Node};
 use std::net::TcpStream;
 use std::time::Duration;
 
@@ -17,7 +17,7 @@ pub struct RclGraphContext {
 impl RclGraphContext {
     /// Create a new graph context.
     pub fn new() -> Result<Self> {
-        Self::new_with_discovery(DEFAULT_DISCOVERY_TIME)
+        Self::new_with_discovery_options(DEFAULT_DISCOVERY_TIME, false)
     }
 
     /// Create a new graph context.
@@ -27,16 +27,19 @@ impl RclGraphContext {
         Self::new()
     }
 
-    /// Create a new graph context honoring a ROS-style `--spin-time` argument.
-    pub fn new_with_spin_time(spin_time: Option<&str>) -> Result<Self> {
-        Self::new_with_discovery(parse_discovery_duration(spin_time)?)
+    /// Create a new graph context honoring ROS-style CLI discovery options.
+    pub fn new_with_options(spin_time: Option<&str>, use_sim_time: bool) -> Result<Self> {
+        Self::new_with_discovery_options(parse_discovery_duration(spin_time)?, use_sim_time)
     }
 
-    /// Create a new graph context and wait for a short discovery window.
-    pub fn new_with_discovery(discovery_time: Duration) -> Result<Self> {
+    /// Create a new graph context with explicit discovery and sim-time options.
+    pub fn new_with_discovery_options(
+        discovery_time: Duration,
+        use_sim_time: bool,
+    ) -> Result<Self> {
         let context = Context::default_from_env()?;
         let executor = context.create_basic_executor();
-        let node = executor.create_node("roc_graph_node")?;
+        let node = executor.create_node("roc_graph_node".arguments(cli_node_arguments(use_sim_time)))?;
 
         // Give DDS time to discover peers/topics.
         std::thread::sleep(discovery_time);
@@ -114,6 +117,18 @@ impl RclGraphContext {
     }
 }
 
+fn cli_node_arguments(use_sim_time: bool) -> Vec<String> {
+    if use_sim_time {
+        vec![
+            "--ros-args".to_string(),
+            "-p".to_string(),
+            "use_sim_time:=true".to_string(),
+        ]
+    } else {
+        Vec::new()
+    }
+}
+
 pub(crate) fn parse_discovery_duration(spin_time: Option<&str>) -> Result<Duration> {
     let Some(raw_value) = spin_time.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(DEFAULT_DISCOVERY_TIME);
@@ -141,7 +156,7 @@ pub(crate) fn parse_discovery_duration(spin_time: Option<&str>) -> Result<Durati
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_discovery_duration, DEFAULT_DISCOVERY_TIME};
+    use super::{cli_node_arguments, parse_discovery_duration, DEFAULT_DISCOVERY_TIME};
     use std::time::Duration;
 
     #[test]
@@ -174,5 +189,18 @@ mod tests {
     fn parse_discovery_duration_rejects_invalid_values() {
         assert!(parse_discovery_duration(Some("-1")).is_err());
         assert!(parse_discovery_duration(Some("abc")).is_err());
+    }
+
+    #[test]
+    fn cli_node_arguments_enable_sim_time_when_requested() {
+        assert_eq!(
+            cli_node_arguments(true),
+            vec!["--ros-args", "-p", "use_sim_time:=true"]
+        );
+    }
+
+    #[test]
+    fn cli_node_arguments_are_empty_by_default() {
+        assert!(cli_node_arguments(false).is_empty());
     }
 }

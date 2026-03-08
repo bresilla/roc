@@ -18,7 +18,7 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     // Create a single RCL context for all operations
     // Note: Our implementation always does direct DDS discovery (daemon-free by design)
     // so --no-daemon doesn't change our behavior, but we acknowledge it for compatibility
-    let context = RclGraphContext::new_with_spin_time(common_args.spin_time.as_deref())
+    let context = RclGraphContext::new_with_options(common_args.spin_time.as_deref(), common_args.use_sim_time)
         .map_err(|e| anyhow!("Failed to initialize RCL context: {}", e))?;
 
     // Log a note about daemon usage if the flag is explicitly set

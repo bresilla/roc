@@ -13,13 +13,10 @@ fn run_command(matches: ArgMatches, common_args: CommonActionArgs) -> Result<()>
         .get_one::<String>("action_name")
         .ok_or_else(|| anyhow!("action_name is required"))?;
 
-    if common_args.use_sim_time {
-        blocks::eprint_note("--use-sim-time is not applicable to graph queries");
-    }
     if common_args.no_daemon {
         blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
-    let context = RclGraphContext::new_with_spin_time(common_args.spin_time.as_deref())
+    let context = RclGraphContext::new_with_options(common_args.spin_time.as_deref(), common_args.use_sim_time)
         .map_err(|e| anyhow!("Failed to initialize RCL graph context: {}", e))?;
 
     let ty = action_operations::get_action_type(&context, action_name)?;
