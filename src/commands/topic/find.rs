@@ -1,6 +1,7 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::handle_anyhow_result;
 use crate::graph::RclGraphContext;
+use crate::shared::ros_names::is_hidden_name;
 use crate::ui::{blocks, output, table};
 use anyhow::{anyhow, Result};
 use clap::ArgMatches;
@@ -42,7 +43,7 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     if !matches.get_flag("include_hidden_topics") {
         matching_topics = matching_topics
             .into_iter()
-            .filter(|topic| !topic.starts_with("/_"))
+            .filter(|topic| !is_hidden_name(topic))
             .collect();
     }
 

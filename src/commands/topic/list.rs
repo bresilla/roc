@@ -1,6 +1,7 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::handle_anyhow_result;
 use crate::graph::RclGraphContext;
+use crate::shared::ros_names::is_hidden_name;
 use crate::ui::{blocks, output, table};
 use anyhow::Result;
 use clap::ArgMatches;
@@ -28,10 +29,9 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
     let filtered_topics: Vec<String> = if matches.get_flag("include_hidden_topics") {
         topics
     } else {
-        // Filter out hidden topics (those starting with underscore)
         topics
             .into_iter()
-            .filter(|topic| !topic.starts_with("/_"))
+            .filter(|topic| !is_hidden_name(topic))
             .collect()
     };
 
@@ -66,7 +66,7 @@ fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Result<()> 
         } else {
             topics_with_types
                 .into_iter()
-                .filter(|topic| !topic.name.starts_with("/_"))
+                .filter(|topic| !is_hidden_name(&topic.name))
                 .collect()
         };
 

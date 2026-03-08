@@ -7,15 +7,10 @@ use serde_json::json;
 
 use crate::arguments::node::CommonNodeArgs;
 use crate::graph::RclGraphContext;
+use crate::shared::ros_names::is_hidden_name;
 
 fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
     let output_mode = output::OutputMode::from_matches(&matches);
-
-    // NOTE: rclrs does not currently provide the same filtering as `ros2 node list`
-    // for hidden nodes, so for now we always return what the graph exposes.
-    if matches.get_flag("include_hidden_nodes") {
-        blocks::eprint_note("--include-hidden-nodes is not yet supported in native mode");
-    }
 
     if common_args.use_sim_time {
         blocks::eprint_note("--use-sim-time is not applicable to graph queries");
@@ -38,6 +33,9 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
         } else {
             full_names.push(format!("{}/{}", namespace, name));
         }
+    }
+    if !matches.get_flag("include_hidden_nodes") {
+        full_names.retain(|name| !is_hidden_name(name));
     }
     full_names.sort();
 

@@ -6,13 +6,11 @@ use serde_json::json;
 
 use crate::arguments::service::CommonServiceArgs;
 use crate::graph::RclGraphContext;
+use crate::shared::ros_names::is_hidden_name;
 use crate::ui::{blocks, output, table};
 
 fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()> {
     let output_mode = output::OutputMode::from_matches(&matches);
-    if matches.get_flag("include_hidden_services") {
-        blocks::eprint_note("--include-hidden-services is not yet supported in native mode");
-    }
     if common_args.use_sim_time {
         blocks::eprint_note("--use-sim-time is not applicable to graph queries");
     }
@@ -31,6 +29,9 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
             .get_service_names_and_types()
             .map_err(|e| anyhow!("Failed to query services: {}", e))?;
         for (name, ty) in pairs {
+            if !matches.get_flag("include_hidden_services") && is_hidden_name(&name) {
+                continue;
+            }
             items.push((name, Some(ty)));
         }
     } else {
@@ -38,6 +39,9 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
             .get_service_names()
             .map_err(|e| anyhow!("Failed to query services: {}", e))?;
         for name in services {
+            if !matches.get_flag("include_hidden_services") && is_hidden_name(&name) {
+                continue;
+            }
             items.push((name, None));
         }
     }

@@ -6,6 +6,7 @@ use serde_json::json;
 
 use crate::arguments::node::CommonNodeArgs;
 use crate::graph::RclGraphContext;
+use crate::shared::ros_names::is_hidden_name;
 
 fn flatten_names_and_types(map: rclrs::TopicNamesAndTypes) -> Vec<(String, String)> {
     let mut pairs = Vec::new();
@@ -39,10 +40,6 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
         .get_one::<String>("node_name")
         .ok_or_else(|| anyhow!("node_name is required"))?;
 
-    if matches.get_flag("include_hidden_nodes") {
-        blocks::eprint_note("--include-hidden-nodes is not yet supported in native mode");
-    }
-
     if common_args.use_sim_time {
         blocks::eprint_note("--use-sim-time is not applicable to graph queries");
     }
@@ -63,6 +60,18 @@ fn run_command(matches: ArgMatches, common_args: CommonNodeArgs) -> Result<()> {
 
     let mut matches_nodes = Vec::new();
     for (name, namespace) in nodes {
+        let fqn = if namespace == "/" {
+            format!("/{name}")
+        } else if namespace.ends_with('/') {
+            format!("{namespace}{name}")
+        } else {
+            format!("{namespace}/{name}")
+        };
+
+        if !matches.get_flag("include_hidden_nodes") && is_hidden_name(&fqn) {
+            continue;
+        }
+
         if name == requested {
             matches_nodes.push((name, namespace));
         }

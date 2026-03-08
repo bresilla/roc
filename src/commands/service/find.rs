@@ -5,6 +5,7 @@ use serde_json::json;
 
 use crate::arguments::service::CommonServiceArgs;
 use crate::graph::RclGraphContext;
+use crate::shared::ros_names::is_hidden_name;
 use crate::ui::{blocks, output, table};
 
 fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()> {
@@ -13,9 +14,6 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
         .get_one::<String>("service_type")
         .ok_or_else(|| anyhow!("service_type is required"))?;
 
-    if matches.get_flag("include_hidden_services") {
-        blocks::eprint_note("--include-hidden-services is not yet supported in native mode");
-    }
     if common_args.use_sim_time {
         blocks::eprint_note("--use-sim-time is not applicable to graph queries");
     }
@@ -31,7 +29,9 @@ fn run_command(matches: ArgMatches, common_args: CommonServiceArgs) -> Result<()
 
     let mut names = Vec::new();
     for (name, ty) in pairs {
-        if ty == *service_type {
+        if ty == *service_type
+            && (matches.get_flag("include_hidden_services") || !is_hidden_name(&name))
+        {
             names.push(name);
         }
     }
