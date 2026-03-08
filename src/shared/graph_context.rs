@@ -114,7 +114,7 @@ impl RclGraphContext {
     }
 }
 
-fn parse_discovery_duration(spin_time: Option<&str>) -> Result<Duration> {
+pub(crate) fn parse_discovery_duration(spin_time: Option<&str>) -> Result<Duration> {
     let Some(raw_value) = spin_time.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(DEFAULT_DISCOVERY_TIME);
     };

@@ -44,16 +44,9 @@ fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> 
     if common_args.no_daemon {
         blocks::eprint_note("roc always uses direct DDS discovery (equivalent to --no-daemon)");
     }
-    if let Some(spin_time_value) = common_args.spin_time {
-        blocks::eprint_note(&format!(
-            "--spin-time {} is not yet supported in native mode",
-            spin_time_value
-        ));
-    }
-
     let hide_type = matches.get_flag("hide_type");
     let node_fqn = ParamClientContext::node_fqn(node_name);
-    let mut ctx = ParamClientContext::new()?;
+    let mut ctx = ParamClientContext::new_with_spin_time(common_args.spin_time.as_deref())?;
 
     let response = ctx.get_parameters(&node_fqn, vec![param_name.to_string()])?;
     let value = response

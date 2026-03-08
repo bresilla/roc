@@ -1,4 +1,5 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use crate::shared::graph_context::{parse_discovery_duration, DEFAULT_DISCOVERY_TIME};
 use rclrs::{Client, Context, CreateBasicExecutor, Executor, Node, RclrsErrorFilter, SpinOptions};
 use regex::Regex;
 use std::sync::{Arc, Mutex};
@@ -29,13 +30,21 @@ pub struct ParamClientContext {
 
 impl ParamClientContext {
     pub fn new() -> Result<Self> {
+        Self::new_with_discovery(DEFAULT_DISCOVERY_TIME)
+    }
+
+    pub fn new_with_spin_time(spin_time: Option<&str>) -> Result<Self> {
+        Self::new_with_discovery(parse_discovery_duration(spin_time)?)
+    }
+
+    pub fn new_with_discovery(discovery_time: Duration) -> Result<Self> {
         let context = Context::default_from_env()?;
         let executor = context.create_basic_executor();
         let node = executor.create_node("roc_param_cli")?;
 
         // Give DDS a short discovery window so parameter service servers
         // show up before we try to wait on readiness.
-        std::thread::sleep(Duration::from_millis(300));
+        std::thread::sleep(discovery_time);
         Ok(Self {
             _context: context,
             executor,
