@@ -143,7 +143,11 @@ impl<'a> BuildExecutor<'a> {
                         .map_err(|e| e.into())
                 }
                 BuildType::Other(ref build_type) => {
-                    Err(format!("Unsupported build type: {}", build_type).into())
+                    Err(format!(
+                        "Unsupported or ambiguous build type: {}. Declare an explicit <build_type> or add the expected build markers.",
+                        build_type
+                    )
+                    .into())
                 }
             };
 
@@ -741,7 +745,10 @@ impl<'a> BuildExecutor<'a> {
                 Self::build_python_package_with_env(package, env_manager, config)
             }
             BuildType::Other(ref build_type) => {
-                Err(format!("Unsupported build type: {}", build_type))
+                Err(format!(
+                    "Unsupported or ambiguous build type: {}. Declare an explicit <build_type> or add the expected build markers.",
+                    build_type
+                ))
             }
         }
     }

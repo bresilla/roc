@@ -656,7 +656,7 @@ Definition of done:
 
 - users can choose between permissive discovery and fail-fast discovery with explicit diagnostics
 
-### Slice 6.7: Harden Build-Type Inference And Unsupported-Type Reporting
+### Slice 6.7: Harden Build-Type Inference And Unsupported-Type Reporting [complete]
 
 Problem:
 

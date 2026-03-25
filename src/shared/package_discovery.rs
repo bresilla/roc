@@ -362,12 +362,23 @@ where
 }
 
 fn infer_build_type(package_path: &Path) -> BuildType {
-    if package_path.join("CMakeLists.txt").exists() {
+    let has_cmake = package_path.join("CMakeLists.txt").exists();
+    let has_python =
+        package_path.join("setup.py").exists() || package_path.join("setup.cfg").exists();
+
+    if has_cmake && has_python {
+        BuildType::Other(
+            "ambiguous inferred build type (found both CMake and Python build markers)".to_string(),
+        )
+    } else if has_cmake {
         BuildType::AmentCmake
-    } else if package_path.join("setup.py").exists() || package_path.join("setup.cfg").exists() {
+    } else if has_python {
         BuildType::AmentPython
     } else {
-        BuildType::AmentCmake // Default
+        BuildType::Other(
+            "unknown inferred build type (missing CMakeLists.txt and setup.py/setup.cfg)"
+                .to_string(),
+        )
     }
 }
 
@@ -475,6 +486,78 @@ mod tests {
         assert_eq!(
             packages[0].runtime_deps(),
             vec!["std_msgs", "rcutils", "rclcpp"]
+        );
+    }
+
+    #[test]
+    fn package_discovery_marks_packages_without_build_markers_as_unknown() {
+        let temp_dir = TempDir::new().unwrap();
+        let package_dir = temp_dir.path().join("mystery_pkg");
+        fs::create_dir_all(&package_dir).unwrap();
+
+        let package_xml = r#"<?xml version="1.0"?>
+<package format="3">
+  <name>mystery_pkg</name>
+  <version>1.0.0</version>
+  <description>Unknown build markers</description>
+  <maintainer email="test@example.com">Test User</maintainer>
+  <license>MIT</license>
+</package>"#;
+
+        fs::write(package_dir.join("package.xml"), package_xml).unwrap();
+
+        let config = DiscoveryConfig {
+            base_paths: vec![temp_dir.path().to_path_buf()],
+            ..Default::default()
+        };
+
+        let packages = discover_packages(&config).unwrap();
+        assert_eq!(packages.len(), 1);
+        assert_eq!(
+            packages[0].build_type,
+            BuildType::Other(
+                "unknown inferred build type (missing CMakeLists.txt and setup.py/setup.cfg)"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn package_discovery_marks_packages_with_multiple_build_markers_as_ambiguous() {
+        let temp_dir = TempDir::new().unwrap();
+        let package_dir = temp_dir.path().join("hybrid_pkg");
+        fs::create_dir_all(&package_dir).unwrap();
+
+        let package_xml = r#"<?xml version="1.0"?>
+<package format="3">
+  <name>hybrid_pkg</name>
+  <version>1.0.0</version>
+  <description>Multiple build markers</description>
+  <maintainer email="test@example.com">Test User</maintainer>
+  <license>MIT</license>
+</package>"#;
+
+        fs::write(package_dir.join("package.xml"), package_xml).unwrap();
+        fs::write(
+            package_dir.join("CMakeLists.txt"),
+            "cmake_minimum_required(VERSION 3.8)",
+        )
+        .unwrap();
+        fs::write(package_dir.join("setup.py"), "from setuptools import setup").unwrap();
+
+        let config = DiscoveryConfig {
+            base_paths: vec![temp_dir.path().to_path_buf()],
+            ..Default::default()
+        };
+
+        let packages = discover_packages(&config).unwrap();
+        assert_eq!(packages.len(), 1);
+        assert_eq!(
+            packages[0].build_type,
+            BuildType::Other(
+                "ambiguous inferred build type (found both CMake and Python build markers)"
+                    .to_string()
+            )
         );
     }
 }
