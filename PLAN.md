@@ -1,497 +1,480 @@
-# ROC Parity And CLI Output Plan
+# ROC Hardening Plan
 
 ## Goal
 
-Keep two tracks moving in parallel:
+Move `roc` from "featureful but uneven" to "predictable, debuggable, and safe to extend".
 
-1. finish the explicit release gate for practical `colcon` workflow parity on Linux/Jazzy
-2. modernize `roc` output so the whole CLI feels coherent, dense, and readable
+This plan focuses on:
 
-This does not replace `ament`. It replaces workspace orchestration around standard `ament_cmake` and `ament_python` packages, while also improving the user-facing CLI presentation.
+1. eliminating the highest-risk runtime and orchestration bugs
+2. making default build/test workflows trustworthy
+3. tightening environment handling and process execution
+4. reducing the gap between implemented behavior and documented promises
+5. improving validation so regressions are caught earlier
 
-## Track A: Colcon Workflow Parity
+The current codebase already has useful breadth. The problem is not lack of features. The problem is that several important paths rely on optimistic assumptions, partial implementations, or validation that only exists in ignored/infrequently-run tests.
 
-Current validated scope:
+## Current Assessment
 
-- `roc work build`
-- `roc work test`
-- `roc work test-result`
+### Major strengths
 
-Primary validation reference:
+- native ROS graph and dynamic message support is already substantial
+- workspace build/test parity work is more advanced than most of the CLI surface
+- the codebase is modular enough to harden incrementally
+- compile-time health is decent:
+  - `cargo check` passes
+  - `cargo test --no-run` passes
 
-- [COMPAT_VALIDATION.md](/doc/code/tools/roc/COMPAT_VALIDATION.md)
+### Major weaknesses
 
-Executable validation reference:
+- default `cargo test` does not run successfully in the current environment
+- parallel workspace build logic has correctness risks
+- long-running ROS helpers have weak lifecycle control
+- subprocess argument/env handling is lossy or heuristic-heavy in key paths
+- some commands are still obviously partial or placeholder-grade
+- runtime parity confidence depends too heavily on ignored ROS/colcon tests
 
-- [tests/real_workspace_validation.rs](/doc/code/tools/roc/tests/real_workspace_validation.rs)
+## Hardening Principles
 
-Completed slices:
+- Prefer deterministic behavior over clever behavior.
+- Prefer explicit unsupported/error states over partial silent behavior.
+- Treat environment construction as part of correctness, not convenience.
+- Make long-running helpers stoppable and observable.
+- Make the default dev loop (`build`, `test`, targeted command checks) work without tribal knowledge.
+- Add tests around failures and edge conditions, not just happy paths.
 
-- Slice 0: baseline and compatibility fixtures
-- Slice 1: configurable build/install/log base paths
-- Slice 2: richer package metadata model
-- Slice 3: colcon package metadata generation
-- Slice 4: package-level setup scripts
-- Slice 5: workspace setup chaining
-- Slice 6: installed artifact scanning
-- Slice 7: environment hooks and `.dsv`
-- Slice 8: `--symlink-install`
-- Slice 9: build execution fidelity
-- Slice 10: logging and build state
-- Slice 11: package selection and resume semantics
-- Slice 12: validation against real ROS 2 packages
-- Slice 13: documentation cleanup
-- Slice 14: `ament_python` install layout
-- Slice 15: Python package registration and resource index layout
-- Slice 16: full hook set and helper scripts
-- Slice 17: package metadata placement and prefix chaining edge cases
-- Slice 18: selector and build-state parity
-- Slice 19: PowerShell and install-layout metadata parity
-- Slice 20: real workspace build parity matrix
-- Slice 21: native `work test`
-- Slice 22: test execution defaults and result artifacts
-- Slice 23: native `work test-result`
-- Slice 24: `test-result` parser and verbose output parity
-- Slice 25: `test-result` delete flag parity
-- Slice 26: real workspace test/test-result validation
+## Priority Order
 
-Remaining parity slice:
-
-### Slice 27: Release Gate
+## Phase 0: Stabilize The Base
 
 Objective:
 
-- define a hard gate before claiming full practical `colcon` workflow parity
+- stop carrying known runtime hazards while continuing normal feature work
 
-Tasks:
+Deliverables:
 
-- create one explicit checklist covering:
-  - build parity matrix
-  - test parity matrix
-  - test-result parity matrix
-  - shell completion sanity for the newer verbs
-  - required ignored real-workspace validations
-- document exactly which ignored validations must be run before release
-- keep product docs conservative until that gate is green
+- one tracked hardening backlog
+- clear separation between:
+  - correctness bugs
+  - reliability issues
+  - missing functionality
+  - documentation drift
 
 Definition of done:
 
-- parity is backed by an explicit release process instead of scattered notes and ignored tests
+- this plan exists and is the working backlog for hardening work
 
-Suggested commit title:
+## Phase 1: Fix High-Risk Correctness Bugs
 
-- `Add release gate for validated colcon workflow parity`
+These are the first items to implement because they can produce hangs, invalid builds, or broken user execution even when the CLI appears to work.
 
-## Track B: CLI Output Modernization
+### Slice 1.1: Parallel Build Deadlock And Failure Propagation
 
-### Problem Statement
+Problem:
 
-The current CLI output works, but it is inconsistent:
+- the parallel build scheduler can leave packages stuck in `Pending` forever if one of their dependencies fails
+- workers then keep polling because `all_done` never becomes true
 
-- repeated hand-written headers and totals
-- mixed note/warning/error phrasing
-- flat list output for commands that really want tables
-- duplicated color logic across commands
-- poor width handling for long names, types, paths, and error details
-- no single shared output model across graph, workspace, bag, and test commands
+Relevant code:
 
-The issue is not “not enough color”. The issue is lack of structure and a missing shared rendering layer.
+- [src/commands/work/build/build_executor.rs](/home/bresilla/data/code/tools/roc/src/commands/work/build/build_executor.rs)
 
-### Cargo Library Research
+Tasks:
 
-Checked current Rust crates on March 7, 2026.
+- model blocked packages explicitly
+  - add a `Blocked` or `SkippedDueToDependencyFailure` package state
+- when a package fails:
+  - mark direct and transitive dependents as blocked, or
+  - make scheduler detect that a pending package can never become ready
+- terminate worker loop when all packages are in terminal states
+  - `Completed`
+  - `Failed`
+  - `Blocked`
+- make the build summary distinguish:
+  - failed packages
+  - unbuilt packages blocked by dependency failures
+- add tests for:
+  - dependency failure with `continue_on_error = false`
+  - dependency failure with `continue_on_error = true`
+  - multi-worker build where one worker fails early
 
-Recommended stack:
+Definition of done:
 
-- `comfy-table` 7.2.2
-  - strong fit for runtime-built terminal tables
-  - dynamic arrangement by width
-  - ANSI-aware styling
-  - presets, alignment, padding, borders
-  - good match for `topic list`, `node list`, `service list`, `work list`, `test-result`
-- `console` 0.16.2
-  - terminal-aware styling
-  - text width measurement
-  - padding and truncation helpers
-  - stronger primitive layer than the current ad hoc `colored` usage
-- `textwrap` 0.16.2
-  - wrapping and indentation for notes, help blocks, and verbose failure details
-- `indicatif` 0.18.4
-  - progress bars, spinners, and human formatting
-  - good fit for `work build`, `work test`, bag record/play progress, long discovery waits
+- no infinite polling after dependency failures
+- summaries accurately reflect blocked downstream packages
 
-Useful optional additions:
+### Slice 1.2: Hermetic Package Environment Per Build Job
 
-- `miette` 7.6.0
-  - better user-facing diagnostics for command failures
-  - especially useful for parse errors, build/test failures, and invalid user input
-- `owo-colors` 4.3.0
-  - reasonable upgrade path if replacing `colored`
-  - terminal-support-aware styling via `supports-color`
-- `supports-color` 3.0.2
-  - useful if color policy needs to be managed explicitly
-- `unicode-width` 0.2.2
-  - direct use only if custom renderers need width logic outside `console` / `comfy-table`
+Problem:
 
-Libraries considered but not the default choice:
+- parallel workers reuse a mutable `EnvironmentManager` across packages
+- this can leak state from unrelated packages into later builds on the same worker
 
-- `tabled` 0.20.0
-  - good crate, especially for derive-driven static tables
-  - weaker fit than `comfy-table` for highly dynamic graph/workspace listings built at runtime
-- full TUI crates such as `ratatui`
-  - too heavy for the current non-interactive CLI
-  - wrong abstraction unless `roc` grows a real interactive dashboard mode
+Relevant code:
 
-### Recommended Dependency Decision
+- [src/commands/work/build/build_executor.rs](/home/bresilla/data/code/tools/roc/src/commands/work/build/build_executor.rs)
+- [src/commands/work/build/environment_manager.rs](/home/bresilla/data/code/tools/roc/src/commands/work/build/environment_manager.rs)
 
-Primary recommendation:
+Tasks:
 
-- keep the CLI non-interactive
-- adopt:
-  - `comfy-table`
-  - `console`
-  - `textwrap`
-  - `indicatif`
-- keep `colored` temporarily during migration
-- decide later whether to consolidate on `console` only or switch styling to `owo-colors`
+- stop reusing a single environment manager inside worker threads
+- construct a fresh package-specific environment for each package build
+- ensure dependency-derived env is built only from:
+  - base shell environment
+  - selected underlay/install prefixes
+  - current package context
+- add tests that verify:
+  - worker A building package X does not pollute package Y
+  - package env contents are stable regardless of worker assignment
 
-Reason:
+Definition of done:
 
-- lowest-risk path
-- immediate payoff on list/info/build/test outputs
-- avoids a big-bang renderer rewrite
+- package build environment is reproducible and independent of worker history
 
-### Target Output Model
+### Slice 1.3: Fix `roc run` Argument And Prefix Parsing
 
-Introduce a shared `src/ui/` layer:
+Problem:
 
-- `ui/theme.rs`
-  - shared colors, emphasis, status chips, fallback styles
-- `ui/output_mode.rs`
-  - `human`, `plain`, `json`, `ros-style`
-- `ui/table.rs`
-  - reusable table builder wrappers around `comfy-table`
-- `ui/block.rs`
-  - headers, key/value sections, notes, warnings, summaries
-- `ui/tree.rs`
-  - lightweight tree rendering for frames and dependency views
-- `ui/progress.rs`
-  - `indicatif` wrappers and non-TTY fallbacks
+- `argv` and `prefix` are split with `split_whitespace()`
+- quoted values and escaped spaces are broken
 
-Design rules:
+Relevant code:
 
-- human mode should be compact, aligned, and colorful
-- plain mode should be stable and pipe-friendly
-- json mode should be explicit and scripting-safe
-- ros-style mode should preserve compatibility where needed
-- no spinners or ANSI noise when stdout is not a TTY
+- [src/commands/run/mod.rs](/home/bresilla/data/code/tools/roc/src/commands/run/mod.rs)
 
-### Commands To Improve First
+Tasks:
 
-Highest-value first wave:
+- redesign CLI parsing for executable args
+  - prefer repeated trailing args captured by clap
+  - avoid storing shell-like command strings where possible
+- redesign prefix handling
+  - either parse with a shellwords-compatible parser
+  - or model prefix as repeated arguments too
+- add tests for:
+  - spaces in arguments
+  - nested quotes
+  - prefixed execution
+  - package executable plus user args
 
-- `topic list`
-- `node list`
-- `service list`
-- `action list`
-- `work list`
-- `work test-result`
+Definition of done:
 
-Second wave:
+- `roc run` preserves user intent for normal quoted arguments and prefixes
 
-- `topic info`
-- `node info`
-- `service info`
-- `action info`
-- `frame info`
-- `bag info`
-- `work info`
+### Slice 1.4: Add Lifecycle Control To Long-Running ROS Helpers
 
-Third wave:
+Problem:
 
-- `param list`
-- `interface list`
-- `bag list`
-- `frame list`
-- long-running monitor commands like `topic hz`, `topic bw`, `topic delay`
+- helper threads and loops are effectively immortal
+- `DynamicSubscriber` spins forever in a dedicated thread
+- bag record/play loops have weak or missing stop/finalization behavior depending on command version
 
-### Output Features To Add
+Relevant code:
 
-Global:
+- [src/shared/dynamic_messages.rs](/home/bresilla/data/code/tools/roc/src/shared/dynamic_messages.rs)
+- [src/commands/bag/record.rs](/home/bresilla/data/code/tools/roc/src/commands/bag/record.rs)
+- [src/commands/bag/play.rs](/home/bresilla/data/code/tools/roc/src/commands/bag/play.rs)
 
-- consistent section headers
-- consistent totals/footers
-- consistent note/warning/error formatting
-- terminal-width-aware truncation and wrapping
-- optional icons only if they degrade cleanly in plain mode
+Tasks:
 
-Lists:
+- add explicit shutdown signaling to dynamic subscriber helper
+- ensure dropped helpers stop their executor threads cleanly
+- standardize signal handling in bag commands
+  - ctrl-c
+  - loop termination
+  - summary flush/final writer drop
+- add tests where feasible for:
+  - helper drop semantics
+  - command stop behavior
+  - no lost file-finalization on interrupt
 
-- aligned tables instead of loose colored lines
-- stable column order per command
-- path/type truncation with full values still available in JSON mode
+Definition of done:
 
-Info commands:
+- no helper relies on "thread ends when process exits" as its primary lifecycle model
 
-- compact key/value blocks
-- grouped subsections
-- better empty-state rendering
-
-Build and test:
-
-- package progress rows
-- clearer failure groups
-- summary tables with counts, elapsed time, and log paths
-
-Trees:
-
-- frame hierarchy mode
-- workspace/package dependency tree mode
-
-Machine-readable:
-
-- JSON output for all list/info/state commands
-- stable field names
-
-### Proposed Rollout Slices
-
-### Slice U0: UI Foundation
+## Phase 2: Make Environment And Runtime Assumptions Explicit
 
 Objective:
 
-- create the shared rendering layer without changing every command at once
+- reduce "works only in the right shell" failures
+
+### Slice 2.1: Python Install Layout Detection
+
+Problem:
+
+- Python site-packages paths are guessed using `python3/site-packages`
+- many systems install under versioned dirs such as `python3.11/site-packages`
+
+Relevant code:
+
+- [src/commands/work/build/environment_manager.rs](/home/bresilla/data/code/tools/roc/src/commands/work/build/environment_manager.rs)
 
 Tasks:
 
-- add `src/ui/`
-- add shared theme/status helpers
-- add a minimal table wrapper and block renderer
-- add a small `OutputMode` enum
+- detect versioned Python lib dirs dynamically
+- prefer scanning install prefix for `site-packages` or `dist-packages`
+- verify both isolated and merged layouts
+- validate against at least:
+  - typical system Python layout
+  - local install layout produced by `ament_python`
 
 Definition of done:
 
-- one or two commands can render through shared helpers
+- Python package discovery/import behavior is not pinned to a fake `python3/` directory shape
 
-Suggested commit title:
+### Slice 2.2: Runtime Library Preconditions [complete]
 
-- `Add shared CLI UI rendering foundation`
+Problem:
 
-### Slice U1: Global Output Modes
+- `cargo test` currently fails because runtime libraries such as `libspdlog.so.1.12` are not resolvable in the default environment
+
+Tasks:
+
+- identify the minimal runtime env required for executing unit/integration binaries
+- decide on one of:
+  - make tests source/setup the necessary runtime env
+  - skip/runtime-gate ROS-linked tests more explicitly
+  - document and codify a dev-shell contract
+- ensure `cargo test` or a clearly documented alternative becomes a trustworthy default
+
+Definition of done:
+
+- test execution expectations are explicit and reproducible
+
+### Slice 2.3: Tighten Build/Run Preflight Checks
+
+Problem:
+
+- several commands assume ROS env, runtime libraries, or external tools are available and only fail deep into execution
+
+Tasks:
+
+- add targeted preflight checks for commands that require:
+  - ROS environment
+  - `colcon`
+  - `ros2`
+  - `ctest`
+  - `python3`
+- provide actionable errors that say exactly what is missing
+- avoid placeholder or vague output for missing dependencies
+
+Definition of done:
+
+- the first error a user sees is close to the real root cause
+
+## Phase 3: Reduce Half-Baked Surface Area
 
 Objective:
 
-- standardize how commands choose between human/plain/json/ros-style output
+- stop exposing commands that look finished but are not
+
+### Slice 3.1: Audit Placeholder And Delegated Commands
+
+Problem:
+
+- some commands are intentionally delegated to `ros2`
+- some are minimal wrappers
+- some are placeholders
 
 Tasks:
 
-- add global or per-command `--output`
-- keep `--ros-style` behavior intact
-- disable rich formatting when stdout is not a TTY
+- classify every command into:
+  - native and production-worthy
+  - delegated by design
+  - partial/experimental
+  - placeholder
+- make placeholder paths explicit in help and docs
+- ensure delegated commands report that they delegate
+- either remove or hide obviously misleading stubs
+  - especially daemon-related placeholders
 
 Definition of done:
 
-- at least list commands can switch modes consistently
+- users can tell which commands are fully native, delegated, or unfinished
 
-Suggested commit title:
+### Slice 3.2: Harden Bag Record/Play Surface
 
-- `Standardize CLI output modes across commands`
+Problem:
 
-### Slice U2: Graph List Commands
+- bag commands are powerful but operationally fragile
+- they depend on serialized transport behavior, raw loops, and MCAP assumptions
+
+Tasks:
+
+- add signal-safe shutdown and summary behavior
+- validate type resolution errors and empty topic cases
+- add playback validation for:
+  - missing schema/channel metadata
+  - unknown message type names
+  - empty inputs
+  - loop mode interruption
+- add record validation for:
+  - non-existent output directories
+  - duplicate topics
+  - unresolved topic types
+  - separated-output edge cases
+
+Definition of done:
+
+- bag commands fail clearly and stop cleanly
+
+### Slice 3.3: Dynamic Message Publish/Echo Capability Matrix
+
+Problem:
+
+- dynamic publish and echo paths are useful, but some field types and nested structures are only partially supported
+
+Relevant code:
+
+- [src/commands/topic/pub_.rs](/home/bresilla/data/code/tools/roc/src/commands/topic/pub_.rs)
+- [src/commands/topic/echo.rs](/home/bresilla/data/code/tools/roc/src/commands/topic/echo.rs)
+
+Tasks:
+
+- document what message shapes are supported today
+- add explicit unsupported errors for complex unhandled cases
+- expand support in the most common missing categories:
+  - nested structures
+  - sequence handling in publish path
+  - bounded strings/messages
+- add focused tests around message conversion behavior
+
+Definition of done:
+
+- topic publish/echo behavior is predictable and documented for dynamic messages
+
+## Phase 4: Strengthen Validation
 
 Objective:
 
-- convert the most-used discovery commands to structured tables
+- catch real regressions with normal development workflows
+
+### Slice 4.1: Rebalance Test Pyramid
+
+Current state:
+
+- completion tests run by default
+- the strongest workspace parity checks are ignored and environment-dependent
 
 Tasks:
 
-- migrate:
-  - `topic list`
-  - `node list`
-  - `service list`
-  - `action list`
-- add columns such as:
-  - name
-  - type
-  - counts where available
+- add default-running tests for pure logic:
+  - dependency filtering
+  - build state transitions
+  - env var construction
+  - bag metadata parsing
+  - argument parsing
+- keep ROS-heavy parity tests, but separate them clearly as validation/integration gates
+- add deterministic fixtures for:
+  - blocked dependency propagation
+  - Python env path detection
+  - run/prefix argument parsing
 
 Definition of done:
 
-- these commands all share the same header/footer/status style
+- meaningful correctness coverage exists without requiring a full ROS machine
 
-Suggested commit title:
+### Slice 4.2: Add Command-Focused Smoke Matrix
 
-- `Render graph list commands as structured tables`
+Tasks:
 
-### Slice U3: Workspace And Bag Listings
+- create a small smoke matrix for the most important commands:
+  - `roc topic list`
+  - `roc topic echo --help`
+  - `roc topic pub --help`
+  - `roc work build --help`
+  - `roc work test --help`
+  - `roc work test-result --help`
+  - `roc run --help`
+  - `roc bag info --help`
+- add lightweight assertions on exit status and stable output markers
+
+Definition of done:
+
+- obvious command breakage is caught before deeper validation
+
+### Slice 4.3: Add Hardening Regression Tests
+
+Target regressions to lock down:
+
+- no parallel build deadlock after dependency failure
+- no environment leakage between parallel jobs
+- quoted args preserved in `roc run`
+- long-running helpers shut down correctly
+- Python install path handling supports versioned site-packages
+
+Definition of done:
+
+- each major hardening fix gets at least one regression test
+
+## Phase 5: Documentation And Operational Clarity
 
 Objective:
 
-- make workspace and bag commands match the same UI standard
+- make the real maturity level legible
+
+### Slice 5.1: Align README And Docs With Reality
 
 Tasks:
 
-- migrate:
-  - `work list`
-  - `bag list`
-  - `interface list`
-  - `frame list`
-- add status columns where meaningful
+- audit README claims against actual behavior
+- call out commands that still delegate to `ros2`
+- describe environment prerequisites more concretely
+- document bag command limitations and workspace validation scope
+- document how to run the strongest validation suite
 
 Definition of done:
 
-- list-style commands feel like one product instead of separate scripts
+- docs are conservative, specific, and operationally useful
 
-Suggested commit title:
-
-- `Unify workspace and bag list output formatting`
-
-### Slice U4: Info Command Cards
-
-Objective:
-
-- replace free-form line dumps with compact, readable sections
+### Slice 5.2: Add Developer Runbooks
 
 Tasks:
 
-- migrate:
-  - `topic info`
-  - `node info`
-  - `service info`
-  - `action info`
-  - `frame info`
-  - `bag info`
-  - `work info`
+- add a short developer workflow doc covering:
+  - build
+  - test
+  - ROS env setup
+  - parity validation
+  - how submodule/forked `rclrs` changes are handled
+- document expected local dependencies and troubleshooting steps
 
 Definition of done:
 
-- info commands use shared key/value blocks and grouped sections
+- a new contributor can reproduce the intended dev/test environment without guessing
 
-Suggested commit title:
+## Immediate Execution Plan
 
-- `Render info commands with shared section blocks`
+Recommended next implementation order:
 
-### Slice U5: Build/Test Progress And Summaries
+1. fix parallel build deadlock and dependency-failure propagation
+2. make worker build environments fresh per package
+3. fix `roc run` argument/prefix parsing
+4. add shutdown/lifecycle control to dynamic subscriber and bag commands
+5. make Python env detection version-aware
+6. make default test execution story explicit and reproducible
 
-Objective:
+## Release Gate For Hardening Phase
 
-- make the build and test flows easier to scan live and after completion
+Before calling the codebase materially hardened, the following should be true:
 
-Tasks:
+- no known infinite-loop or deadlock condition in workspace build/test orchestration
+- `roc run` preserves quoted arguments correctly
+- bag record/play stop cleanly and finalize outputs
+- dynamic subscriber helper has explicit shutdown semantics
+- Python package env handling works for versioned site-packages layouts
+- default compile/test workflow is documented and reproducible
+- the highest-risk fixes have regression tests
 
-- add `indicatif` progress/spinner support with non-TTY fallback
-- improve package start/finish lines
-- render final summary tables for:
-  - `work build`
-  - `work test`
-  - `work test-result`
+## Suggested Commit Strategy
 
-Definition of done:
+Keep hardening work sliced by failure mode, not by module.
 
-- long-running commands are easier to read without losing plain/log-friendly output
+Recommended commit titles:
 
-Suggested commit title:
-
-- `Improve build and test progress presentation`
-
-### Slice U6: Tree Views
-
-Objective:
-
-- add hierarchical views where flat lists are the wrong shape
-
-Tasks:
-
-- add `frame tree`
-- add package dependency tree views for workspace commands
-- ensure ASCII fallback exists for non-Unicode terminals
-
-Definition of done:
-
-- hierarchy-heavy commands no longer force users to mentally reconstruct trees from flat text
-
-Suggested commit title:
-
-- `Add tree views for frames and package dependencies`
-
-### Slice U7: JSON Output Coverage
-
-Objective:
-
-- make scripting and machine consumption first-class
-
-Tasks:
-
-- add JSON output for all migrated list/info/state commands
-- document stable field names
-- ensure no ANSI or presentation-only data leaks into JSON mode
-
-Definition of done:
-
-- users can script against `roc` without scraping terminal text
-
-Suggested commit title:
-
-- `Add JSON output mode for structured CLI commands`
-
-### Slice U8: Diagnostics Cleanup
-
-Objective:
-
-- improve command failures and warnings so they read like one system
-
-Tasks:
-
-- unify warnings/notes/errors through the UI layer
-- consider introducing `miette` for richer diagnostic output in selected high-value paths
-- remove remaining raw `eprintln!("Error: ...")` formatting drift
-
-Definition of done:
-
-- failures are more readable and consistent across command families
-
-Suggested commit title:
-
-- `Unify command diagnostics and warning presentation`
-
-### Slice U9: Snapshot And Integration Coverage
-
-Objective:
-
-- keep the new output layer from drifting
-
-Tasks:
-
-- add snapshot tests for representative outputs in:
-  - human mode
-  - plain mode
-  - json mode
-- keep completion integration tests for command discovery
-- add width-sensitive cases to catch wrapping/truncation regressions
-
-Definition of done:
-
-- output regressions are caught automatically
-
-Suggested commit title:
-
-- `Add snapshot coverage for CLI output rendering`
-
-## Delivery Rule
-
-Every completed feature slice must be committed separately.
-
-Commit rule:
-
-- one git commit per completed slice
-- commit message title only
-- no commit body
-
-## Recommended Next Step
-
-Do Slice U0 first, not another one-off command tweak.
-
-Reason:
-
-- the current problem is systemic inconsistency
-- a shared UI layer is what unlocks prettier output everywhere
-- once that exists, migrating list/info/build/test commands becomes straightforward
+- `Fix parallel build deadlock after dependency failures`
+- `Reset worker build environments per package`
+- `Preserve quoted argv and prefix handling in roc run`
+- `Add shutdown control to dynamic ROS subscription helpers`
+- `Detect versioned Python site-packages in workspace env setup`
+- `Document and gate runtime prerequisites for test execution`
+- `Add regression tests for hardening fixes`

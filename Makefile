@@ -17,6 +17,7 @@ $(info ------------------------------------------)
 .PHONY: build b compile c run r test t help h clean docs release
 
 SHELL := /bin/bash
+RUNTIME_WRAPPER := $(TOP_DIR)/scripts/with_runtime_env.sh
 
 
 build:
@@ -31,18 +32,18 @@ compile:
 c: compile
 
 run:
-	@cargo run
+	@$(RUNTIME_WRAPPER) cargo run
 
 r: run
 
 # Run the built binary directly (like run.sh does)
 run-binary:
-	@./target/release/roc
+	@$(RUNTIME_WRAPPER) ./target/release/roc
 
 rb: run-binary
 
 test:
-	@cargo test
+	@$(RUNTIME_WRAPPER) cargo test
 
 t: test
 
