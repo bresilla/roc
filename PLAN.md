@@ -131,7 +131,7 @@ Definition of done:
 
 - package build environment is reproducible and independent of worker history
 
-### Slice 1.3: Fix `roc run` Argument And Prefix Parsing
+### Slice 1.3: Fix `roc run` Argument And Prefix Parsing [complete]
 
 Problem:
 

@@ -2,10 +2,48 @@ use crate::commands::cli::{required_string, run_async_command};
 use crate::utils::{get_ros_workspace_paths, is_executable};
 use clap::ArgMatches;
 use std::env;
+use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
 use walkdir::WalkDir;
+
+fn parse_shell_args(
+    value: &str,
+    field_name: &str,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    shlex::split(value)
+        .ok_or_else(|| format!("Failed to parse {field_name}: unmatched quotes or escapes").into())
+}
+
+fn resolve_command_line(
+    executable_path: &std::path::Path,
+    argv: Option<&str>,
+    prefix: Option<&str>,
+) -> Result<(OsString, Vec<OsString>), Box<dyn std::error::Error>> {
+    let executable_args = match argv {
+        Some(argv) => parse_shell_args(argv, "argv")?
+            .into_iter()
+            .map(OsString::from)
+            .collect(),
+        None => Vec::new(),
+    };
+
+    if let Some(prefix) = prefix {
+        let mut prefix_parts = parse_shell_args(prefix, "prefix")?;
+        if prefix_parts.is_empty() {
+            return Err("Prefix command cannot be empty".into());
+        }
+
+        let program = OsString::from(prefix_parts.remove(0));
+        let mut args: Vec<OsString> = prefix_parts.into_iter().map(OsString::from).collect();
+        args.push(executable_path.as_os_str().to_os_string());
+        args.extend(executable_args);
+        return Ok((program, args));
+    }
+
+    Ok((executable_path.as_os_str().to_os_string(), executable_args))
+}
 
 async fn find_executable(
     package_name: &str,
@@ -101,45 +139,20 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
 
     println!("Running: {}", executable_path.display());
 
+    let (program, args) = resolve_command_line(
+        &executable_path,
+        matches.get_one::<String>("argv").map(String::as_str),
+        matches.get_one::<String>("prefix").map(String::as_str),
+    )?;
+
     // Set up environment for ROS2
-    let mut cmd = Command::new(&executable_path);
+    let mut cmd = Command::new(program);
 
     // Add current environment, making sure ROS environment is preserved
     for (key, value) in env::vars() {
         cmd.env(key, value);
     }
-
-    // Add executable arguments if provided
-    if let Some(argv) = matches.get_one::<String>("argv") {
-        // Parse and add arguments
-        for arg in argv.split_whitespace() {
-            cmd.arg(arg);
-        }
-    }
-
-    // Apply prefix if provided
-    if let Some(prefix) = matches.get_one::<String>("prefix") {
-        // For prefix, we need to run the prefix command with our executable as an argument
-        let prefix_parts: Vec<&str> = prefix.split_whitespace().collect();
-        if !prefix_parts.is_empty() {
-            let mut prefixed_cmd = Command::new(prefix_parts[0]);
-
-            // Add prefix arguments
-            for part in &prefix_parts[1..] {
-                prefixed_cmd.arg(part);
-            }
-
-            // Add the executable and its arguments
-            prefixed_cmd.arg(&executable_path);
-            if let Some(argv) = matches.get_one::<String>("argv") {
-                for arg in argv.split_whitespace() {
-                    prefixed_cmd.arg(arg);
-                }
-            }
-
-            cmd = prefixed_cmd;
-        }
-    }
+    cmd.args(args);
 
     cmd.stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -155,4 +168,63 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
 
 pub fn handle(matches: ArgMatches) {
     run_async_command(run_command(matches));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_shell_args, resolve_command_line};
+    use std::ffi::OsString;
+    use std::path::Path;
+
+    #[test]
+    fn parse_shell_args_preserves_quoted_arguments() {
+        let args = parse_shell_args("--name 'demo node' \"__ns:=/qa team\"", "argv").unwrap();
+
+        assert_eq!(args, vec!["--name", "demo node", "__ns:=/qa team"]);
+    }
+
+    #[test]
+    fn parse_shell_args_rejects_unmatched_quotes() {
+        let err = parse_shell_args("--name 'broken", "argv").unwrap_err();
+
+        assert!(err.to_string().contains("Failed to parse argv"));
+    }
+
+    #[test]
+    fn resolve_command_line_applies_prefix_and_preserves_nested_quotes() {
+        let executable = Path::new("/tmp/demo executable");
+        let (program, args) = resolve_command_line(
+            executable,
+            Some("--ros-args -r '__ns:=/demo node'"),
+            Some("gdb -ex 'run --verbose' --args"),
+        )
+        .unwrap();
+
+        assert_eq!(program, OsString::from("gdb"));
+        assert_eq!(
+            args,
+            vec![
+                OsString::from("-ex"),
+                OsString::from("run --verbose"),
+                OsString::from("--args"),
+                OsString::from("/tmp/demo executable"),
+                OsString::from("--ros-args"),
+                OsString::from("-r"),
+                OsString::from("__ns:=/demo node"),
+            ]
+        );
+    }
+
+    #[test]
+    fn resolve_command_line_without_prefix_preserves_argument_spacing() {
+        let executable = Path::new("/tmp/talker");
+        let (program, args) =
+            resolve_command_line(executable, Some("--label 'hello world'"), None).unwrap();
+
+        assert_eq!(program, OsString::from("/tmp/talker"));
+        assert_eq!(
+            args,
+            vec![OsString::from("--label"), OsString::from("hello world")]
+        );
+    }
 }
