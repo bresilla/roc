@@ -1,9 +1,9 @@
 use colored::Colorize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
@@ -2343,12 +2343,38 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
             .get_args()
             .map(|arg| arg.to_string_lossy().to_string())
             .collect::<Vec<_>>();
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-        let output = command
-            .output()
+        let mut child = command
+            .spawn()
             .map_err(|e| format!("{label} failed to start: {e}"))?;
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout_reader = child
+            .stdout
+            .take()
+            .ok_or_else(|| format!("{label} failed to capture stdout"))?;
+        let stderr_reader = child
+            .stderr
+            .take()
+            .ok_or_else(|| format!("{label} failed to capture stderr"))?;
+        let stdout_handle = thread::spawn(move || Self::stream_output(stdout_reader, false));
+        let stderr_handle = thread::spawn(move || Self::stream_output(stderr_reader, true));
+        let status = child
+            .wait()
+            .map_err(|e| format!("{label} failed while waiting for completion: {e}"))?;
+        let stdout = String::from_utf8_lossy(
+            &stdout_handle
+                .join()
+                .map_err(|_| format!("{label} stdout reader panicked"))?,
+        )
+        .trim()
+        .to_string();
+        let stderr = String::from_utf8_lossy(
+            &stderr_handle
+                .join()
+                .map_err(|_| format!("{label} stderr reader panicked"))?,
+        )
+        .trim()
+        .to_string();
         let command_line = std::iter::once(program)
             .chain(args.into_iter())
             .collect::<Vec<_>>()
@@ -2357,12 +2383,12 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
             log_path,
             label,
             &command_line,
-            output.status.code(),
+            status.code(),
             &stdout,
             &stderr,
         )
         .map_err(|e| format!("Failed to write {label} log: {e}"))?;
-        if output.status.success() {
+        if status.success() {
             return Ok(());
         }
 
@@ -2375,6 +2401,34 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
         }
 
         Err(message)
+    }
+
+    fn stream_output<R: Read>(mut reader: R, stderr: bool) -> Vec<u8> {
+        let mut collected = Vec::new();
+        let mut buffer = [0u8; 4096];
+
+        loop {
+            let bytes_read = match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(bytes_read) => bytes_read,
+                Err(_) => break,
+            };
+
+            let chunk = &buffer[..bytes_read];
+            collected.extend_from_slice(chunk);
+
+            if stderr {
+                let mut handle = io::stderr().lock();
+                let _ = handle.write_all(chunk);
+                let _ = handle.flush();
+            } else {
+                let mut handle = io::stdout().lock();
+                let _ = handle.write_all(chunk);
+                let _ = handle.flush();
+            }
+        }
+
+        collected
     }
 
     fn write_command_log(
@@ -3298,6 +3352,25 @@ mod tests {
         assert!(log.contains("hello stdout"));
         assert!(log.contains("[stderr]"));
         assert!(log.contains("oops stderr"));
+    }
+
+    #[test]
+    fn run_command_checked_preserves_partial_stream_output_in_logs() {
+        let temp = tempdir().unwrap();
+        let log_path = temp.path().join("latest/demo_pkg/stream.log");
+
+        let mut command = Command::new("sh");
+        command.args([
+            "-c",
+            "printf 'stdout-part-1'; sleep 0.1; printf ' stdout-part-2'; printf 'stderr-part-1' >&2; sleep 0.1; printf ' stderr-part-2' >&2",
+        ]);
+
+        BuildExecutor::run_command_checked(command, "Streaming command", &log_path).unwrap();
+
+        let log = fs::read_to_string(log_path).unwrap();
+        assert!(log.contains("[Streaming command]"));
+        assert!(log.contains("stdout-part-1 stdout-part-2"));
+        assert!(log.contains("stderr-part-1 stderr-part-2"));
     }
 
     #[test]

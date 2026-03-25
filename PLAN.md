@@ -556,7 +556,7 @@ Definition of done:
 
 - workspace setup ordering is deterministic and metadata-driven
 
-### Slice 6.3: Replace Buffered Subprocess Execution With Streaming Phase Execution
+### Slice 6.3: Replace Buffered Subprocess Execution With Streaming Phase Execution [complete]
 
 Problem:
 
