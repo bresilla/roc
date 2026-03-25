@@ -5,3 +5,4 @@
 .vscode
 proto2ros
 test
+.nix-ament-prefix/
