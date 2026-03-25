@@ -377,8 +377,6 @@ impl<'a> BuildExecutor<'a> {
         dependencies: Arc<HashMap<String, HashSet<String>>>,
         config: Arc<BuildConfig>,
     ) -> Result<(), String> {
-        let mut env_manager = EnvironmentManager::new(config.install_base.clone(), config.isolated);
-
         loop {
             // Find a package that's ready to build
             let package_to_build = {
@@ -442,13 +440,8 @@ impl<'a> BuildExecutor<'a> {
                         let start_time = Instant::now();
 
                         // Update environment for dependencies
-                        Self::update_worker_environment(
-                            &mut env_manager,
-                            package,
-                            &build_state,
-                            &config,
-                        )
-                        .map_err(|e| format!("Environment setup failed: {}", e))?;
+                        let env_manager =
+                            Self::prepare_package_environment(package, &build_state, &config)?;
 
                         // Build the package
                         let build_result =
@@ -601,6 +594,17 @@ impl<'a> BuildExecutor<'a> {
         }
 
         Ok(())
+    }
+
+    fn prepare_package_environment(
+        package: &PackageMeta,
+        build_state: &BuildState,
+        config: &BuildConfig,
+    ) -> Result<EnvironmentManager, String> {
+        let mut env_manager = EnvironmentManager::new(config.install_base.clone(), config.isolated);
+        Self::update_worker_environment(&mut env_manager, package, build_state, config)
+            .map_err(|e| format!("Environment setup failed: {}", e))?;
+        Ok(env_manager)
     }
 
     /// Update environment for a worker thread
@@ -2354,6 +2358,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::process::Command;
+    use std::sync::{Arc, Mutex};
     use tempfile::tempdir;
 
     fn fixture_package(name: &str, deps: &[&str]) -> PackageMeta {
@@ -3210,6 +3215,59 @@ mod tests {
         assert_eq!(
             records.get("pending_a").unwrap().error.as_deref(),
             Some("Build stopped after dependency failure in failed")
+        );
+    }
+
+    #[test]
+    fn prepare_package_environment_is_fresh_for_each_package() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let install_base = workspace_root.join("install");
+        let dep_a_prefix = install_base.join("dep_a");
+        let dep_b_prefix = install_base.join("dep_b");
+        fs::create_dir_all(dep_a_prefix.join("bin")).unwrap();
+        fs::create_dir_all(dep_b_prefix.join("bin")).unwrap();
+
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = install_base.clone();
+
+        let build_state = super::BuildState {
+            package_states: Arc::new(Mutex::new(HashMap::new())),
+            install_paths: Arc::new(Mutex::new(HashMap::from([
+                ("dep_a".to_string(), dep_a_prefix.clone()),
+                ("dep_b".to_string(), dep_b_prefix.clone()),
+            ]))),
+            build_count: Arc::new(Mutex::new((0, 0, 0))),
+            build_records: Arc::new(Mutex::new(HashMap::new())),
+        };
+
+        let package_a = fixture_package("pkg_a", &["dep_a"]);
+        let package_b = fixture_package("pkg_b", &["dep_b"]);
+
+        let env_a = BuildExecutor::prepare_package_environment(&package_a, &build_state, &config)
+            .unwrap();
+        let env_b = BuildExecutor::prepare_package_environment(&package_b, &build_state, &config)
+            .unwrap();
+
+        let prefix_a = env_a.get_env_var("CMAKE_PREFIX_PATH").unwrap();
+        assert!(prefix_a.contains(dep_a_prefix.to_string_lossy().as_ref()));
+        assert!(!prefix_a.contains(dep_b_prefix.to_string_lossy().as_ref()));
+
+        let prefix_b = env_b.get_env_var("CMAKE_PREFIX_PATH").unwrap();
+        assert!(prefix_b.contains(dep_b_prefix.to_string_lossy().as_ref()));
+        assert!(!prefix_b.contains(dep_a_prefix.to_string_lossy().as_ref()));
+        assert!(
+            env_b
+                .get_env_var("PATH")
+                .unwrap()
+                .contains(dep_b_prefix.join("bin").to_string_lossy().as_ref())
+        );
+        assert!(
+            !env_b
+                .get_env_var("PATH")
+                .unwrap()
+                .contains(dep_a_prefix.join("bin").to_string_lossy().as_ref())
         );
     }
 

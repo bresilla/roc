@@ -103,7 +103,7 @@ Definition of done:
 - no infinite polling after dependency failures
 - summaries accurately reflect blocked downstream packages
 
-### Slice 1.2: Hermetic Package Environment Per Build Job
+### Slice 1.2: Hermetic Package Environment Per Build Job [complete]
 
 Problem:
 
