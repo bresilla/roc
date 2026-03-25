@@ -43,6 +43,49 @@ fn record_summary(total: u64, interrupted: bool) -> String {
     }
 }
 
+fn validate_record_request(
+    output: &str,
+    all: bool,
+    topics: &[String],
+    type_override: Option<&str>,
+    separated: bool,
+) -> Result<()> {
+    if all {
+        return Err(anyhow!("--all recording not implemented yet"));
+    }
+    if topics.is_empty() {
+        return Err(anyhow!("Please provide at least one topic or use --all"));
+    }
+    if type_override.is_some() && topics.len() != 1 {
+        return Err(anyhow!("--type is only supported with a single topic"));
+    }
+
+    let mut seen = std::collections::BTreeSet::new();
+    for topic in topics {
+        if !seen.insert(topic) {
+            return Err(anyhow!(
+                "Duplicate topic requested for recording: '{}'",
+                topic
+            ));
+        }
+    }
+
+    let output_path = PathBuf::from(output);
+    let parent = if separated && topics.len() > 1 && output_path.extension().is_none() {
+        output_path.as_path()
+    } else {
+        output_path.parent().unwrap_or_else(|| Path::new("."))
+    };
+    if !parent.exists() {
+        return Err(anyhow!(
+            "Output directory does not exist: {}",
+            parent.display()
+        ));
+    }
+
+    Ok(())
+}
+
 fn resolve_topic_types(topics: &[String]) -> Result<BTreeMap<String, String>> {
     let ctx = RclGraphContext::new()?;
     let all = ctx.get_topic_names_and_types()?;
@@ -78,15 +121,11 @@ fn run_command(matches: ArgMatches) -> Result<()> {
         .unwrap_or_default();
     let type_override = matches.get_one::<String>("type").cloned();
 
+    validate_record_request(&output, all, &topics, type_override.as_deref(), separated)?;
+
     let (topic_types, topics_to_record) = if all {
-        return Err(anyhow!("--all recording not implemented yet"));
+        unreachable!("validated above")
     } else {
-        if topics.is_empty() {
-            return Err(anyhow!("Please provide at least one topic or use --all"));
-        }
-        if type_override.is_some() && topics.len() != 1 {
-            return Err(anyhow!("--type is only supported with a single topic"));
-        }
         if let Some(ty) = type_override {
             let mut m = BTreeMap::new();
             m.insert(topics[0].clone(), ty);
@@ -261,7 +300,8 @@ pub fn handle(matches: ArgMatches) {
 
 #[cfg(test)]
 mod tests {
-    use super::record_summary;
+    use super::{record_summary, validate_record_request};
+    use tempfile::tempdir;
 
     #[test]
     fn record_summary_reports_interrupted_shutdown() {
@@ -274,5 +314,41 @@ mod tests {
     #[test]
     fn record_summary_reports_clean_shutdown() {
         assert_eq!(record_summary(7, false), "Finished recording 7 messages");
+    }
+
+    #[test]
+    fn validate_record_request_rejects_duplicate_topics() {
+        let temp = tempdir().unwrap();
+        let output = temp.path().join("out.mcap");
+        let topics = vec!["/demo".to_string(), "/demo".to_string()];
+
+        let err = validate_record_request(
+            output.to_string_lossy().as_ref(),
+            false,
+            &topics,
+            None,
+            false,
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("Duplicate topic requested"));
+    }
+
+    #[test]
+    fn validate_record_request_rejects_missing_output_directory() {
+        let temp = tempdir().unwrap();
+        let output = temp.path().join("missing").join("out.mcap");
+        let topics = vec!["/demo".to_string()];
+
+        let err = validate_record_request(
+            output.to_string_lossy().as_ref(),
+            false,
+            &topics,
+            None,
+            false,
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("Output directory does not exist"));
     }
 }

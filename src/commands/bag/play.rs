@@ -40,6 +40,25 @@ fn playback_summary(total: u64, interrupted: bool) -> String {
     }
 }
 
+fn resolve_message_descriptor(
+    channels: &BTreeMap<u16, (String, u16)>,
+    schemas: &BTreeMap<u16, String>,
+    channel_id: u16,
+) -> Result<(String, String)> {
+    let (topic, schema_id) = channels
+        .get(&channel_id)
+        .cloned()
+        .ok_or_else(|| anyhow!("MCAP message referenced unknown channel id {}", channel_id))?;
+    let msg_type = schemas.get(&schema_id).cloned().ok_or_else(|| {
+        anyhow!(
+            "MCAP channel '{}' referenced unknown schema id {}",
+            topic,
+            schema_id
+        )
+    })?;
+    Ok((topic, msg_type))
+}
+
 fn map_file(path: &str) -> Result<Mmap> {
     let file = fs::File::open(path).map_err(|e| anyhow!("Failed to open {}: {}", path, e))?;
     unsafe { Mmap::map(&file).map_err(|e| anyhow!("Failed to mmap {}: {}", path, e)) }
@@ -63,13 +82,8 @@ fn read_messages(path: &str) -> Result<Vec<McapMessage>> {
                 channels.insert(c.id, (c.topic, c.schema_id));
             }
             mcap::records::Record::Message { header, data } => {
-                let Some((topic, schema_id)) = channels.get(&header.channel_id).cloned() else {
-                    continue;
-                };
-                let msg_type = schemas
-                    .get(&schema_id)
-                    .cloned()
-                    .unwrap_or_else(|| "<unknown>".to_string());
+                let (topic, msg_type) =
+                    resolve_message_descriptor(&channels, &schemas, header.channel_id)?;
                 out.push(McapMessage {
                     topic,
                     msg_type,
@@ -181,7 +195,8 @@ pub fn handle(matches: ArgMatches) {
 
 #[cfg(test)]
 mod tests {
-    use super::playback_summary;
+    use super::{playback_summary, resolve_message_descriptor};
+    use std::collections::BTreeMap;
 
     #[test]
     fn playback_summary_reports_interrupted_shutdown() {
@@ -197,5 +212,20 @@ mod tests {
             playback_summary(5, false),
             "Finished playback after publishing 5 messages"
         );
+    }
+
+    #[test]
+    fn resolve_message_descriptor_rejects_unknown_channel_ids() {
+        let err = resolve_message_descriptor(&BTreeMap::new(), &BTreeMap::new(), 7).unwrap_err();
+
+        assert!(err.to_string().contains("unknown channel id 7"));
+    }
+
+    #[test]
+    fn resolve_message_descriptor_rejects_unknown_schema_ids() {
+        let channels = BTreeMap::from([(3u16, ("/demo".to_string(), 9u16))]);
+        let err = resolve_message_descriptor(&channels, &BTreeMap::new(), 3).unwrap_err();
+
+        assert!(err.to_string().contains("unknown schema id 9"));
     }
 }

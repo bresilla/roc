@@ -291,7 +291,7 @@ Definition of done:
 
 - users can tell which commands are fully native, delegated, or unfinished
 
-### Slice 3.2: Harden Bag Record/Play Surface
+### Slice 3.2: Harden Bag Record/Play Surface [complete]
 
 Problem:
 
