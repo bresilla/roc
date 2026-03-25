@@ -1,6 +1,5 @@
 use clap::ArgMatches;
 
-pub fn handle(_matches: ArgMatches) {
-    println!("ROS2 daemon start functionality is currently work in progress.");
-    println!("This will implement: ros2 daemon start");
+pub fn handle(_matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    Err(crate::commands::daemon::unimplemented_message("start").into())
 }

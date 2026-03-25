@@ -105,7 +105,7 @@ pub fn cmd() -> Command {
         )
         .subcommand(
             Command::new("goal")
-                .about("Send a goal to an action server")
+                .about("Send a goal to an action server by delegating to `ros2 action send_goal`")
                 .aliases(["g", "send_goal"])
                 .arg_required_else_help(true)
                 .arg(
@@ -135,4 +135,22 @@ pub fn cmd() -> Command {
                         .action(ArgAction::SetTrue),
                 ),
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cmd;
+
+    #[test]
+    fn action_goal_help_marks_command_as_delegated() {
+        let mut command = cmd();
+        let goal = command
+            .find_subcommand_mut("goal")
+            .expect("action goal subcommand should exist");
+        let mut buffer = Vec::new();
+        goal.write_long_help(&mut buffer).unwrap();
+        let help = String::from_utf8(buffer).unwrap();
+
+        assert!(help.contains("delegating to `ros2 action send_goal`"));
+    }
 }

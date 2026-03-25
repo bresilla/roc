@@ -267,7 +267,7 @@ Objective:
 
 - stop exposing commands that look finished but are not
 
-### Slice 3.1: Audit Placeholder And Delegated Commands
+### Slice 3.1: Audit Placeholder And Delegated Commands [complete]
 
 Problem:
 

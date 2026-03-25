@@ -2,6 +2,7 @@ use crate::arguments::action::CommonActionArgs;
 use crate::commands::cli::{joined_values, required_string, run_async_command};
 use crate::shared::preflight::{ensure_command_available, ensure_ros_environment};
 use clap::ArgMatches;
+use colored::Colorize;
 use std::process::Stdio;
 use tokio::process::Command;
 
@@ -11,6 +12,7 @@ async fn run_command(
 ) -> Result<(), Box<dyn std::error::Error>> {
     ensure_command_available("ros2", "roc action goal")?;
     ensure_ros_environment("roc action goal")?;
+    println!("{}", "Delegating to ros2 action send_goal".bright_black());
     let action_name = required_string(&matches, "action_name")?;
     let action_type = required_string(&matches, "action_type")?;
 

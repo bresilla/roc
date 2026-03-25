@@ -2,7 +2,7 @@ use clap::{arg, Command};
 
 pub fn cmd() -> Command {
     Command::new("launch")
-        .about("Launch a launch file")
+        .about("Launch a launch file by delegating to `ros2 launch`")
         .aliases(&["l"])
         .arg_required_else_help(true)
         .arg(
@@ -25,6 +25,21 @@ pub fn cmd() -> Command {
         .arg(arg!(-a --show_all "Show all launched subprocesses' output"))
         .arg(arg!(--launch_prefix <LAUNCH_PREFIX> "Prefix command before executables (e.g. --launch-prefix 'xterm -e gdb -ex run --args')."))
         .arg(arg!(--launch_prefix_filter <LAUNCH_PREFIX_FILTER> "Regex pattern for executable filtering with --launch-prefix."))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cmd;
+
+    #[test]
+    fn launch_help_marks_command_as_delegated() {
+        let mut command = cmd();
+        let mut buffer = Vec::new();
+        command.write_long_help(&mut buffer).unwrap();
+        let help = String::from_utf8(buffer).unwrap();
+
+        assert!(help.contains("delegating to `ros2 launch`"));
+    }
 }
 
 fn package_value_parser(s: &str) -> Result<String, String> {

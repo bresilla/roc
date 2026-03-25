@@ -2,6 +2,7 @@ use crate::commands::cli::{required_string, run_async_command};
 use crate::shared::preflight::{ensure_command_available, ensure_ros_environment};
 use crate::utils::get_ros_workspace_paths;
 use clap::ArgMatches;
+use colored::Colorize;
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -82,6 +83,7 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
     // Find the actual launch file
     let launch_file_path = find_launch_file(package_name, launch_file_name).await?;
 
+    println!("{}", "Delegating to ros2 launch".bright_black());
     println!("Launching: {}", launch_file_path.display());
 
     // All launch files should be executed through ros2 launch command

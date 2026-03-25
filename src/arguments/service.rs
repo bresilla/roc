@@ -52,7 +52,7 @@ pub fn cmd() -> Command {
         )
         .subcommand(
             Command::new("call")
-            .about("Call a service")
+            .about("Call a service by delegating to `ros2 service call`")
             .aliases(["c", "invoke"])
             .arg_required_else_help(true)
             .arg(
@@ -155,4 +155,22 @@ pub fn cmd() -> Command {
                 .value_name("SERVICE_NAME")
             )
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cmd;
+
+    #[test]
+    fn service_call_help_marks_command_as_delegated() {
+        let mut command = cmd();
+        let call = command
+            .find_subcommand_mut("call")
+            .expect("service call subcommand should exist");
+        let mut buffer = Vec::new();
+        call.write_long_help(&mut buffer).unwrap();
+        let help = String::from_utf8(buffer).unwrap();
+
+        assert!(help.contains("delegating to `ros2 service call`"));
+    }
 }
