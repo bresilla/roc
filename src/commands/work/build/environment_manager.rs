@@ -71,26 +71,53 @@ impl EnvironmentManager {
             }
         }
 
-        // Update Python path
-        let python_lib_dirs = [
-            install_dir
-                .join("lib")
-                .join("python3")
-                .join("site-packages"),
-            install_dir
-                .join("local")
-                .join("lib")
-                .join("python3")
-                .join("site-packages"),
-        ];
-
-        for python_dir in &python_lib_dirs {
+        // Update Python path with discovered versioned or unversioned package dirs.
+        for python_dir in Self::find_python_package_dirs(&install_dir) {
             if python_dir.exists() {
-                self.update_path_env("PYTHONPATH", python_dir);
+                self.update_path_env("PYTHONPATH", &python_dir);
             }
         }
 
         Ok(())
+    }
+
+    fn find_python_package_dirs(install_dir: &Path) -> Vec<PathBuf> {
+        let roots = [
+            install_dir.join("lib"),
+            install_dir.join("local").join("lib"),
+        ];
+        let mut discovered = Vec::new();
+
+        for root in roots {
+            if !root.exists() {
+                continue;
+            }
+
+            for candidate in [root.join("site-packages"), root.join("dist-packages")] {
+                if candidate.exists() && !discovered.contains(&candidate) {
+                    discovered.push(candidate);
+                }
+            }
+
+            let Ok(entries) = fs::read_dir(&root) else {
+                continue;
+            };
+
+            for entry in entries.filter_map(Result::ok) {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+
+                for candidate in [path.join("site-packages"), path.join("dist-packages")] {
+                    if candidate.exists() && !discovered.contains(&candidate) {
+                        discovered.push(candidate);
+                    }
+                }
+            }
+        }
+
+        discovered
     }
 
     /// Update a PATH-like environment variable by prepending a new path
@@ -309,6 +336,7 @@ impl EnvironmentManager {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use tempfile::tempdir;
 
     #[test]
     fn test_environment_manager_creation() {
@@ -329,5 +357,44 @@ mod tests {
             env_mgr.get_env_var("TEST_PATH"),
             Some(&"/test/path".to_string())
         );
+    }
+
+    #[test]
+    fn setup_package_environment_detects_versioned_site_packages_in_isolated_layout() {
+        let temp = tempdir().unwrap();
+        let install_prefix = temp.path().join("install");
+        let package_dir = install_prefix.join("demo_pkg");
+        let python_dir = package_dir.join("lib/python3.12/site-packages");
+        let local_python_dir = package_dir.join("local/lib/python3.11/dist-packages");
+        fs::create_dir_all(&python_dir).unwrap();
+        fs::create_dir_all(&local_python_dir).unwrap();
+
+        let mut env_mgr = EnvironmentManager::new(install_prefix, true);
+        env_mgr
+            .setup_package_environment("demo_pkg", temp.path())
+            .unwrap();
+
+        let pythonpath = env_mgr.get_env_var("PYTHONPATH").unwrap();
+        assert!(pythonpath.contains(python_dir.to_string_lossy().as_ref()));
+        assert!(pythonpath.contains(local_python_dir.to_string_lossy().as_ref()));
+    }
+
+    #[test]
+    fn setup_package_environment_detects_python_dirs_in_merged_layout() {
+        let temp = tempdir().unwrap();
+        let install_prefix = temp.path().join("install");
+        let python_dir = install_prefix.join("lib/python3.10/dist-packages");
+        let fallback_dir = install_prefix.join("local/lib/site-packages");
+        fs::create_dir_all(&python_dir).unwrap();
+        fs::create_dir_all(&fallback_dir).unwrap();
+
+        let mut env_mgr = EnvironmentManager::new(install_prefix.clone(), false);
+        env_mgr
+            .setup_package_environment("demo_pkg", temp.path())
+            .unwrap();
+
+        let pythonpath = env_mgr.get_env_var("PYTHONPATH").unwrap();
+        assert!(pythonpath.contains(python_dir.to_string_lossy().as_ref()));
+        assert!(pythonpath.contains(fallback_dir.to_string_lossy().as_ref()));
     }
 }

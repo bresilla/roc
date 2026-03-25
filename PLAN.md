@@ -197,7 +197,7 @@ Objective:
 
 - reduce "works only in the right shell" failures
 
-### Slice 2.1: Python Install Layout Detection
+### Slice 2.1: Python Install Layout Detection [complete]
 
 Problem:
 
