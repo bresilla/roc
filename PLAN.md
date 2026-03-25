@@ -160,7 +160,7 @@ Definition of done:
 
 - `roc run` preserves user intent for normal quoted arguments and prefixes
 
-### Slice 1.4: Add Lifecycle Control To Long-Running ROS Helpers
+### Slice 1.4: Add Lifecycle Control To Long-Running ROS Helpers [complete]
 
 Problem:
 

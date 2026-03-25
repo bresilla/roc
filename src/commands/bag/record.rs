@@ -1,24 +1,46 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::{Duration, SystemTime};
 
 use mcap::records::MessageHeader;
 use mcap::{WriteOptions, Writer};
 
 use crate::graph::RclGraphContext;
-use crate::shared::serialized_transport::{SerializedReceiver, sleep_short};
+use crate::shared::serialized_transport::{sleep_short, SerializedReceiver};
 
 fn now_nanos() -> u64 {
     let dur = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or(Duration::from_secs(0));
     (dur.as_secs() * 1_000_000_000) + (dur.subsec_nanos() as u64)
+}
+
+fn install_stop_flag(command_name: &str) -> Result<Arc<AtomicBool>> {
+    let stop_requested = Arc::new(AtomicBool::new(false));
+    let handler_flag = Arc::clone(&stop_requested);
+    ctrlc::set_handler(move || {
+        handler_flag.store(true, Ordering::SeqCst);
+    })
+    .map_err(|e| anyhow!("Failed to install Ctrl-C handler for {command_name}: {e}"))?;
+    Ok(stop_requested)
+}
+
+fn record_summary(total: u64, interrupted: bool) -> String {
+    if interrupted {
+        format!("Stopped recording after {total} messages")
+    } else {
+        format!("Finished recording {total} messages")
+    }
 }
 
 fn resolve_topic_types(topics: &[String]) -> Result<BTreeMap<String, String>> {
@@ -42,6 +64,7 @@ fn resolve_topic_types(topics: &[String]) -> Result<BTreeMap<String, String>> {
 }
 
 fn run_command(matches: ArgMatches) -> Result<()> {
+    let stop_requested = install_stop_flag("roc bag record")?;
     let output = matches
         .get_one::<String>("output")
         .cloned()
@@ -160,11 +183,20 @@ fn run_command(matches: ArgMatches) -> Result<()> {
     }
 
     let mut total: u64 = 0;
+    let mut interrupted = false;
 
     loop {
+        if stop_requested.load(Ordering::SeqCst) {
+            interrupted = true;
+            break;
+        }
         sleep_short();
         let mut wrote_any = false;
         for (topic, _ty, rx) in receivers.iter_mut() {
+            if stop_requested.load(Ordering::SeqCst) {
+                interrupted = true;
+                break;
+            }
             if let Some(bytes) = rx.take()? {
                 let t = now_nanos();
 
@@ -206,6 +238,10 @@ fn run_command(matches: ArgMatches) -> Result<()> {
             }
         }
 
+        if interrupted {
+            break;
+        }
+
         if wrote_any && total % 50 == 0 {
             println!(
                 "{} {}",
@@ -214,8 +250,29 @@ fn run_command(matches: ArgMatches) -> Result<()> {
             );
         }
     }
+
+    println!("{}", record_summary(total, interrupted).bright_green());
+    Ok(())
 }
 
 pub fn handle(matches: ArgMatches) {
     handle_anyhow_result(run_command(matches));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::record_summary;
+
+    #[test]
+    fn record_summary_reports_interrupted_shutdown() {
+        assert_eq!(
+            record_summary(42, true),
+            "Stopped recording after 42 messages"
+        );
+    }
+
+    #[test]
+    fn record_summary_reports_clean_shutdown() {
+        assert_eq!(record_summary(7, false), "Finished recording 7 messages");
+    }
 }

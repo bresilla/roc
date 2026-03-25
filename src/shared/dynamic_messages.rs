@@ -1,11 +1,11 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use rclrs::{
-    Context, CreateBasicExecutor, DynamicMessage, IntoPrimitiveOptions, MessageTypeName, Node,
-    QoSProfile, SpinOptions,
+    Context, CreateBasicExecutor, DynamicMessage, ExecutorCommands, IntoPrimitiveOptions,
+    MessageTypeName, Node, QoSProfile, SpinOptions,
 };
 use std::{
     fmt,
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
     thread,
 };
 
@@ -25,15 +25,44 @@ pub struct ReceivedDynamicMessage {
 /// through an internal channel.
 pub struct DynamicSubscriber {
     receiver: Mutex<mpsc::Receiver<ReceivedDynamicMessage>>,
-    #[allow(dead_code)]
     _subscription: rclrs::DynamicSubscription,
-    #[allow(dead_code)]
-    _spin_thread: thread::JoinHandle<()>,
+    spin_thread: Option<ManagedSpinThread>,
 }
 
 impl fmt::Debug for DynamicSubscriber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DynamicSubscriber").finish_non_exhaustive()
+    }
+}
+
+struct ManagedSpinThread {
+    commands: Arc<ExecutorCommands>,
+    handle: Option<thread::JoinHandle<()>>,
+}
+
+impl ManagedSpinThread {
+    fn new(commands: Arc<ExecutorCommands>, handle: thread::JoinHandle<()>) -> Self {
+        Self {
+            commands,
+            handle: Some(handle),
+        }
+    }
+}
+
+impl Drop for ManagedSpinThread {
+    fn drop(&mut self) {
+        self.commands.halt_spinning();
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Drop for DynamicSubscriber {
+    fn drop(&mut self) {
+        if let Some(spin_thread) = self.spin_thread.take() {
+            drop(spin_thread);
+        }
     }
 }
 
@@ -108,9 +137,8 @@ impl DynamicSubscriber {
             },
         )?;
 
+        let commands = executor.commands().clone();
         let spin_thread = thread::spawn(move || {
-            // Spin forever. The thread will end when process exits.
-            // This tool is primarily for CLI usage.
             let mut executor = executor;
             let _ = executor.spin(SpinOptions::default());
         });
@@ -118,7 +146,7 @@ impl DynamicSubscriber {
         Ok(Self {
             receiver: Mutex::new(rx),
             _subscription: subscription,
-            _spin_thread: spin_thread,
+            spin_thread: Some(ManagedSpinThread::new(commands, spin_thread)),
         })
     }
 
@@ -142,5 +170,70 @@ impl DynamicSubscriber {
     /// This replaces the former `take_message()` method from the raw `rcl_take` implementation.
     pub fn take_message(&self) -> Result<Option<ReceivedDynamicMessage>> {
         self.try_recv()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+    use std::time::Duration;
+
+    #[test]
+    fn managed_spin_thread_stops_and_joins_on_drop() {
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let finished = Arc::new(AtomicBool::new(false));
+
+        let stop_requested_thread = Arc::clone(&stop_requested);
+        let finished_thread = Arc::clone(&finished);
+        let handle = std::thread::spawn(move || {
+            while !stop_requested_thread.load(Ordering::SeqCst) {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            finished_thread.store(true, Ordering::SeqCst);
+        });
+
+        let mock_commands = Arc::new(MockExecutorCommands {
+            stop_requested: Arc::clone(&stop_requested),
+        });
+        let managed = ManagedSpinThreadForTest::new(mock_commands, handle);
+        drop(managed);
+
+        assert!(finished.load(Ordering::SeqCst));
+    }
+
+    struct MockExecutorCommands {
+        stop_requested: Arc<AtomicBool>,
+    }
+
+    impl MockExecutorCommands {
+        fn halt_spinning(&self) {
+            self.stop_requested.store(true, Ordering::SeqCst);
+        }
+    }
+
+    struct ManagedSpinThreadForTest {
+        commands: Arc<MockExecutorCommands>,
+        handle: Option<std::thread::JoinHandle<()>>,
+    }
+
+    impl ManagedSpinThreadForTest {
+        fn new(commands: Arc<MockExecutorCommands>, handle: std::thread::JoinHandle<()>) -> Self {
+            Self {
+                commands,
+                handle: Some(handle),
+            }
+        }
+    }
+
+    impl Drop for ManagedSpinThreadForTest {
+        fn drop(&mut self) {
+            self.commands.halt_spinning();
+            if let Some(handle) = self.handle.take() {
+                let _ = handle.join();
+            }
+        }
     }
 }
