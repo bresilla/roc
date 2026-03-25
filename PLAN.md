@@ -426,7 +426,7 @@ Definition of done:
 
 - docs are conservative, specific, and operationally useful
 
-### Slice 5.2: Add Developer Runbooks
+### Slice 5.2: Add Developer Runbooks [complete]
 
 Tasks:
 
