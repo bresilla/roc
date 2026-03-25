@@ -295,25 +295,11 @@ mod tests {
     #[test]
     fn param_output_mode_is_available_for_describe_remove_and_import() {
         cmd()
-            .try_get_matches_from([
-                "param",
-                "describe",
-                "/demo",
-                "answer",
-                "--output",
-                "json",
-            ])
+            .try_get_matches_from(["param", "describe", "/demo", "answer", "--output", "json"])
             .expect("describe should accept --output");
 
         cmd()
-            .try_get_matches_from([
-                "param",
-                "remove",
-                "/demo",
-                "answer",
-                "--output",
-                "plain",
-            ])
+            .try_get_matches_from(["param", "remove", "/demo", "answer", "--output", "plain"])
             .expect("remove should accept --output");
 
         cmd()

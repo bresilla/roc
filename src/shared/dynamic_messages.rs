@@ -1,11 +1,11 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use rclrs::{
     Context, CreateBasicExecutor, DynamicMessage, IntoPrimitiveOptions, MessageTypeName, Node,
     QoSProfile, SpinOptions,
 };
 use std::{
     fmt,
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
     thread,
 };
 

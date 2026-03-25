@@ -195,17 +195,15 @@ impl TfFrameIndex {
         frames: Arc<Mutex<BTreeSet<String>>>,
         edges: Arc<Mutex<BTreeMap<(String, String), TfEdgeTransform>>>,
     ) {
-        std::thread::spawn(move || {
-            loop {
-                match sub.take_message() {
-                    Ok(Some(msg)) => {
-                        add_tfmessage_edges(&frames, &edges, &msg.message);
-                    }
-                    Ok(None) => {
-                        std::thread::sleep(std::time::Duration::from_millis(50));
-                    }
-                    Err(_) => break,
+        std::thread::spawn(move || loop {
+            match sub.take_message() {
+                Ok(Some(msg)) => {
+                    add_tfmessage_edges(&frames, &edges, &msg.message);
                 }
+                Ok(None) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                Err(_) => break,
             }
         });
     }
