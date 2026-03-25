@@ -348,7 +348,7 @@ Objective:
 
 - catch real regressions with normal development workflows
 
-### Slice 4.1: Rebalance Test Pyramid
+### Slice 4.1: Rebalance Test Pyramid [complete]
 
 Current state:
 
