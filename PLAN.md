@@ -412,7 +412,7 @@ Objective:
 
 - make the real maturity level legible
 
-### Slice 5.1: Align README And Docs With Reality
+### Slice 5.1: Align README And Docs With Reality [complete]
 
 Tasks:
 

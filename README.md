@@ -4,6 +4,8 @@
 
 ROC is a ROS 2 command-line tool implemented in Rust. It implements many ROS 2 workflows directly and uses command naming close to the `ros2` CLI.
 
+The project is usable today, but it is not a blanket replacement for the full `ros2` CLI or `colcon` on every machine. The strongest validation in this repository is currently scoped to Linux with ROS 2 Jazzy.
+
 For detailed command-by-command implementation status, see `COMPAT.md`.
 For workspace-build validation results against `colcon`, see `COMPAT_VALIDATION.md`.
 
@@ -14,6 +16,8 @@ For workspace-build validation results against `colcon`, see `COMPAT_VALIDATION.
 ```bash
 cargo install rocc
 ```
+
+This only installs the `roc` binary. ROS-dependent commands still require a working ROS 2 installation in the environment where you run them.
 
 ### From source
 
@@ -52,6 +56,22 @@ roc work --help
 roc topic pub --help
 ```
 
+## Environment prerequisites
+
+For ROS-aware commands, the practical baseline is:
+
+- a sourced ROS 2 environment, for example `source /opt/ros/jazzy/setup.bash`
+- `ros2` available on `PATH` for delegated commands
+- standard ROS runtime libraries available to the `roc` binary
+
+For source builds and validation:
+
+- Rust toolchain
+- clang/libclang for bindgen-based builds
+- Python 3 for `ament_python` package workflows
+
+If the ROS environment is not sourced, command discovery and delegated subcommands will fail early.
+
 ## Workspace commands
 
 `roc work` includes package and workspace utilities:
@@ -65,6 +85,8 @@ Current validation status for `roc work build`:
 
 - validated against a minimal `ament_cmake` workspace: build and `ros2 pkg prefix` worked
 - validated against a minimal `ament_python` workspace: build and Python import worked, but package registration is still incomplete
+
+The strongest direct parity checks live in ignored integration tests and local validation notes; they are not part of the default `cargo test` gate yet.
 
 Examples:
 
@@ -111,27 +133,36 @@ The project is organized into command modules under `src/commands` and argument 
   - `roc launch <pkg> <launch>`
 - Workspace package discovery logic is shared across `work` commands.
 
+Bag command caveats:
+
+- `roc bag record` and `roc bag play` use serialized transport through the forked `rclrs` submodule in this repository.
+- these commands are intended for MCAP-based workflows and are not presented as feature-complete replacements for all `ros2 bag` behavior
+- validation is currently strongest for compile-time coverage and focused unit tests; end-to-end ROS bag validation still depends on local ROS setup
+
 Refer to:
 
 - `COMPAT.md` for feature status
 - `COMPAT_VALIDATION.md` for direct `colcon` vs `roc` build results
 - `FEATURES.md` for high-level feature notes
 - `book/` for extended project documentation
+- `DEVELOPMENT.md` for the local developer workflow and troubleshooting notes
 
 ## Development
 
-Requirements:
-
-- Rust toolchain
-- ROS 2 environment available/sourced for ROS-dependent commands
-- clang/libclang for bindgen-based builds
-
-Build and test:
+Default build/test loop:
 
 ```bash
 cargo build --release
 cargo test
 ```
+
+Run the heavier workspace parity validators explicitly:
+
+```bash
+cargo test --test real_workspace_validation -- --ignored
+```
+
+Those ignored tests assume a sourced ROS 2 environment, `colcon`, and local upstream workspaces described in [COMPAT_VALIDATION.md](/home/bresilla/data/code/tools/roc/COMPAT_VALIDATION.md).
 
 ## License
 

@@ -4,10 +4,13 @@ Last validated: March 7, 2026
 
 This document records direct `colcon` vs `roc` comparisons for both workspace build and test flows.
 
+It is a scoped validation log, not a blanket compatibility claim across ROS distributions, operating systems, or middleware combinations.
+
 Validation environment:
 
 - host: local development machine
 - ROS distribution: Jazzy Jalisco
+- operating system: Linux
 - `colcon`: `/usr/bin/colcon`
 - `ros2`: `/opt/ros/jazzy/bin/ros2`
 - `roc`: local debug binary from this repository
@@ -16,6 +19,12 @@ Repeatable validators:
 
 - [tests/real_workspace_validation.rs](/doc/code/tools/roc/tests/real_workspace_validation.rs)
 - [tests/completion_integration.rs](/doc/code/tools/roc/tests/completion_integration.rs)
+
+Prerequisites for the ignored real-workspace validators:
+
+- a sourced ROS 2 environment
+- `colcon` on `PATH`
+- the local upstream workspaces referenced below checked out under `/tmp`
 
 ## Build Validation
 
@@ -61,6 +70,8 @@ Current test-flow behavior:
 - verbose output now includes testcase-level failure blocks similar to `colcon test-result --verbose`
 - delete semantics now use `--delete` and `--delete-yes`, matching `colcon`’s CLI surface
 
+These checks focus on workspace build/test flows. They do not currently establish the same level of parity confidence for every other command group, especially graph inspection, bag tooling, or delegated `ros2` command surfaces.
+
 Real upstream workspace validation now exists as ignored integration tests for:
 
 - `/tmp/roc_ros2_examples`
@@ -90,6 +101,7 @@ What remains weaker than the build parity story:
 
 - the newest `work test` and `work test-result` real-workspace validations are present as ignored tests, but they have not yet been promoted into the same routinely-run release gate as the build matrix
 - some output formatting still differs from `colcon`, even where the underlying results match
+- the validation matrix is still primarily Linux/Jazzy-centric
 
 ## Remaining Work Before A Stronger Claim
 
