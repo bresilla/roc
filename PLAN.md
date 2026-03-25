@@ -478,3 +478,281 @@ Recommended commit titles:
 - `Detect versioned Python site-packages in workspace env setup`
 - `Document and gate runtime prerequisites for test execution`
 - `Add regression tests for hardening fixes`
+
+## Phase 6: Deep Hardening Of `roc work build`
+
+Objective:
+
+- make the workspace build path robust enough to trust under failure, scale, and real user environments
+
+Current assessment:
+
+- the build path has improved materially, but several important parts still rely on optimistic assumptions
+- the highest remaining risks are in:
+  - generated setup script correctness
+  - subprocess execution model
+  - scheduler architecture
+  - discovery strictness
+  - Python packaging assumptions
+
+### Current Findings
+
+1. the generated Python workspace helper appears to emit literal placeholders instead of resolved package/script paths
+2. workspace setup ordering still relies too much on direct iteration order instead of runtime dependency metadata
+3. build subprocesses are fully buffered via `Command::output()` with no timeout, cancellation, or streaming logs
+4. parallel worker scheduling is polling-based and lock-heavy
+5. `roc work build` currently requires a sourced ROS environment earlier and more broadly than `colcon` would
+6. Python builds still depend on `setup.py build/install`
+7. discovery is tolerant in ways that can hide bad workspace state
+8. build-type inference can silently misclassify unknown packages as `ament_cmake`
+9. previous-build selection relies on mutable log state as the source of truth
+10. setup-script generation is large, hand-rolled, and only partially validated relative to its complexity
+
+### Slice 6.1: Fix Generated Workspace Helper Script [complete]
+
+Problem:
+
+- the generated `_local_setup_util_*.py` helper is likely emitting literal placeholders for package/script paths
+- this undermines ordered setup execution and install usability
+
+Relevant code:
+
+- [src/commands/work/build/build_executor.rs](/home/bresilla/data/code/tools/roc/src/commands/work/build/build_executor.rs)
+
+Tasks:
+
+- verify the generated helper script output against a real fixture install tree
+- fix placeholder rendering so emitted commands contain actual resolved paths
+- add a test that executes the generated helper and asserts:
+  - package ordering is real
+  - sourced script paths are real
+  - no literal `{package_prefix}` or `{script}` placeholders remain
+
+Definition of done:
+
+- generated helper scripts emit executable path lines, not template artifacts
+
+### Slice 6.2: Make Setup Ordering Metadata-Driven Everywhere
+
+Problem:
+
+- workspace local setup generation iterates package discovery/build order directly
+- setup sourcing should be driven by runtime dependency metadata, not incidental vector order
+
+Relevant code:
+
+- [src/commands/work/build/build_executor.rs](/home/bresilla/data/code/tools/roc/src/commands/work/build/build_executor.rs)
+
+Tasks:
+
+- define one source of truth for package setup order
+  - generated `share/colcon-core/packages/*` metadata
+  - topologically sorted runtime dependency graph
+- make `local_setup.sh` and `local_setup.ps1` follow that order
+- add tests that prove a package with runtime deps is sourced after its prerequisites
+- validate both merged and isolated install layouts
+
+Definition of done:
+
+- workspace setup ordering is deterministic and metadata-driven
+
+### Slice 6.3: Replace Buffered Subprocess Execution With Streaming Phase Execution
+
+Problem:
+
+- `Command::output()` buffers stdout/stderr in memory and only returns on process exit
+- long or hung builds are opaque and operationally weak
+
+Relevant code:
+
+- [src/commands/work/build/build_executor.rs](/home/bresilla/data/code/tools/roc/src/commands/work/build/build_executor.rs)
+
+Tasks:
+
+- replace phase execution with streamed subprocess handling
+- tee stdout/stderr into:
+  - terminal output
+  - per-phase log files
+- keep failure summaries concise while preserving full logs
+- add tests for:
+  - phase log creation
+  - non-zero exit handling
+  - visible partial output capture
+
+Definition of done:
+
+- users can see build progress while logs remain complete and usable
+
+### Slice 6.4: Add Timeouts And Interrupt Handling To Build Phases
+
+Problem:
+
+- a wedged `cmake` or `python3 setup.py` process can stall the build forever
+- there is no standard interrupt propagation for build subprocesses
+
+Tasks:
+
+- add configurable per-phase timeout support
+- propagate ctrl-c into active build subprocesses
+- mark interrupted packages distinctly from normal failures when possible
+- ensure partial logs and status files still persist on interruption
+- add tests around:
+  - timeout classification
+  - interrupted builds
+  - summary/status output
+
+Definition of done:
+
+- hung or interrupted build phases terminate predictably and leave debuggable state behind
+
+### Slice 6.5: Replace Polling Scheduler With Ready-Queue Coordination
+
+Problem:
+
+- the current parallel scheduler repeatedly polls shared state and sleeps
+- this is simple but scales poorly and is harder to reason about than an event-driven queue
+
+Tasks:
+
+- redesign parallel scheduling around:
+  - explicit ready queue
+  - dependency counters
+  - worker wakeup signaling
+- minimize lock scope and lock frequency
+- keep blocked/failure propagation semantics from the hardened version
+- add regression tests for:
+  - early failure
+  - multi-worker fairness
+  - no busy-loop waiting when idle
+
+Definition of done:
+
+- worker coordination is event-driven and easier to reason about than shared polling
+
+### Slice 6.6: Tighten Discovery Diagnostics And Add Strict Mode
+
+Problem:
+
+- missing paths, parse failures, duplicate package names, and other discovery anomalies mostly degrade into warnings
+- this hides real workspace problems
+
+Relevant code:
+
+- [src/shared/package_discovery.rs](/home/bresilla/data/code/tools/roc/src/shared/package_discovery.rs)
+- [src/commands/work/build/mod.rs](/home/bresilla/data/code/tools/roc/src/commands/work/build/mod.rs)
+
+Tasks:
+
+- add a strict discovery mode for `roc work build`
+- surface structured diagnostics for:
+  - duplicate package names
+  - unreadable/invalid manifests
+  - missing requested packages
+  - ignored packages due to hide/exclude rules
+- keep a permissive mode when desired, but make strictness available for CI and debugging
+- add tests for duplicate-package and malformed-manifest scenarios
+
+Definition of done:
+
+- users can choose between permissive discovery and fail-fast discovery with explicit diagnostics
+
+### Slice 6.7: Harden Build-Type Inference And Unsupported-Type Reporting
+
+Problem:
+
+- unknown or underspecified packages can be silently inferred as `ament_cmake`
+- that delays the real error and makes diagnosis worse
+
+Tasks:
+
+- make build-type inference more conservative
+- distinguish:
+  - explicitly declared build types
+  - inferred build types
+  - unsupported/unknown build types
+- improve errors for `BuildType::Other`
+- add tests for:
+  - missing `build_type` plus clear source indicators
+  - ambiguous packages
+  - unsupported declared build types
+
+Definition of done:
+
+- unsupported or ambiguous packages fail early with a precise reason
+
+### Slice 6.8: Revisit ROS Preflight Scope For `work build`
+
+Problem:
+
+- `roc work build` currently requires ROS env preflight before any real build work
+- that is stricter than necessary for some local/package-only workflows
+
+Tasks:
+
+- separate:
+  - absolute prerequisites for builder execution
+  - prerequisites only needed for specific package types or underlays
+- decide whether `work build` should:
+  - always require sourced ROS
+  - warn but continue in some cases
+  - gate only when a package actually needs the missing environment
+- document and test the chosen policy
+
+Definition of done:
+
+- `roc work build` has a deliberate preflight policy instead of a blanket assumption
+
+### Slice 6.9: Reduce Reliance On `setup.py install` Assumptions
+
+Problem:
+
+- `ament_python` builds still rely on `setup.py build/install`
+- newer Python packaging layouts and tooling are gradually making this path weaker
+
+Tasks:
+
+- document the currently supported Python package shapes explicitly
+- identify the minimal compatibility target for `ament_python`
+- harden install-layout detection around the outputs we actually rely on
+- add fixtures covering:
+  - versioned site-packages
+  - egg-info metadata
+  - resource/package.xml installation
+- evaluate a forward path away from legacy assumptions without breaking current parity
+
+Definition of done:
+
+- Python package behavior is explicit, better tested, and less dependent on luck
+
+### Slice 6.10: Strengthen Build-State Persistence And Resume Semantics
+
+Problem:
+
+- resume/select-skip behavior relies on `log/latest/*/status.txt`
+- that is simple, but fragile if the log tree is stale, partially deleted, or copied
+
+Tasks:
+
+- define a more explicit machine-readable build state contract
+- decide whether `latest/` is enough or whether a dedicated state file is needed
+- validate resume behavior for:
+  - partially deleted logs
+  - mixed completed/failed/blocked state
+  - stale state from a different workspace root
+- add tests for build-state loading and filtering under those conditions
+
+Definition of done:
+
+- resume/select-skip behavior uses explicit, trustworthy state rather than opportunistic log parsing
+
+## Recommended Next Order For `roc work` Hardening
+
+1. fix the generated workspace helper script
+2. make setup ordering metadata-driven
+3. replace buffered subprocess execution with streaming logs
+4. add timeouts and interrupt handling
+5. replace polling scheduler with a ready queue
+6. tighten discovery diagnostics and build-type inference
+7. revisit ROS preflight scope
+8. harden Python packaging behavior
+9. strengthen resume/build-state persistence semantics

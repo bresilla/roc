@@ -1562,10 +1562,10 @@ def main():
         script = package_prefix / "share" / package / f"package.{{ext}}"
         if script.is_file():
             if ext == "ps1":
-                print(f'$env:COLCON_CURRENT_PREFIX="{{{{package_prefix}}}}"')
-                print(f'{invoke} "{{{{script}}}}"')
+                print(f'$env:COLCON_CURRENT_PREFIX="{{package_prefix}}"')
+                print(f'{invoke} "{{script}}"')
             else:
-                print(f'COLCON_CURRENT_PREFIX="{{{{package_prefix}}}}" {invoke} "{{{{script}}}}"')
+                print(f'COLCON_CURRENT_PREFIX="{{package_prefix}}" {invoke} "{{script}}"')
 
 
 if __name__ == "__main__":
@@ -2808,6 +2808,90 @@ mod tests {
                 ],
             }
         );
+    }
+
+    #[test]
+    fn generated_workspace_helper_emits_real_package_paths_in_dependency_order() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let executor = BuildExecutor::new(&config);
+        fs::create_dir_all(config.install_base.join("share/colcon-core/packages")).unwrap();
+        fs::create_dir_all(config.install_base.join("base_pkg/share/base_pkg")).unwrap();
+        fs::create_dir_all(
+            config
+                .install_base
+                .join("consumer_pkg/share/colcon-core/packages"),
+        )
+        .unwrap();
+        fs::create_dir_all(config.install_base.join("consumer_pkg/share/consumer_pkg")).unwrap();
+
+        fs::write(
+            config
+                .install_base
+                .join("share/colcon-core/packages/base_pkg"),
+            "",
+        )
+        .unwrap();
+        fs::write(
+            config
+                .install_base
+                .join("consumer_pkg/share/colcon-core/packages/consumer_pkg"),
+            "base_pkg\n",
+        )
+        .unwrap();
+        fs::write(
+            config
+                .install_base
+                .join("base_pkg/share/base_pkg/package.sh"),
+            "#!/bin/sh\n",
+        )
+        .unwrap();
+        fs::write(
+            config
+                .install_base
+                .join("consumer_pkg/share/consumer_pkg/package.sh"),
+            "#!/bin/sh\n",
+        )
+        .unwrap();
+
+        executor
+            .generate_workspace_helper_scripts(&config.install_base)
+            .unwrap();
+
+        let helper_path = config.install_base.join("_local_setup_util_sh.py");
+        let output = Command::new("python3").arg(&helper_path).output().unwrap();
+        assert!(output.status.success(), "helper execution failed");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let lines = stdout.lines().collect::<Vec<_>>();
+        let base_prefix = config.install_base.join("base_pkg").display().to_string();
+        let consumer_prefix = config
+            .install_base
+            .join("consumer_pkg")
+            .display()
+            .to_string();
+        let base_script = config
+            .install_base
+            .join("base_pkg/share/base_pkg/package.sh")
+            .display()
+            .to_string();
+        let consumer_script = config
+            .install_base
+            .join("consumer_pkg/share/consumer_pkg/package.sh")
+            .display()
+            .to_string();
+
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains(&base_prefix));
+        assert!(lines[0].contains(&base_script));
+        assert!(lines[1].contains(&consumer_prefix));
+        assert!(lines[1].contains(&consumer_script));
+        assert!(!stdout.contains("{package_prefix}"));
+        assert!(!stdout.contains("{script}"));
     }
 
     #[test]
