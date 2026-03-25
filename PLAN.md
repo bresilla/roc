@@ -392,7 +392,7 @@ Definition of done:
 
 - obvious command breakage is caught before deeper validation
 
-### Slice 4.3: Add Hardening Regression Tests
+### Slice 4.3: Add Hardening Regression Tests [complete]
 
 Target regressions to lock down:
 

@@ -2358,7 +2358,9 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::process::Command;
+    use std::sync::mpsc;
     use std::sync::{Arc, Mutex};
+    use std::time::Duration;
     use tempfile::tempdir;
 
     fn fixture_package(name: &str, deps: &[&str]) -> PackageMeta {
@@ -3245,10 +3247,10 @@ mod tests {
         let package_a = fixture_package("pkg_a", &["dep_a"]);
         let package_b = fixture_package("pkg_b", &["dep_b"]);
 
-        let env_a = BuildExecutor::prepare_package_environment(&package_a, &build_state, &config)
-            .unwrap();
-        let env_b = BuildExecutor::prepare_package_environment(&package_b, &build_state, &config)
-            .unwrap();
+        let env_a =
+            BuildExecutor::prepare_package_environment(&package_a, &build_state, &config).unwrap();
+        let env_b =
+            BuildExecutor::prepare_package_environment(&package_b, &build_state, &config).unwrap();
 
         let prefix_a = env_a.get_env_var("CMAKE_PREFIX_PATH").unwrap();
         assert!(prefix_a.contains(dep_a_prefix.to_string_lossy().as_ref()));
@@ -3257,18 +3259,14 @@ mod tests {
         let prefix_b = env_b.get_env_var("CMAKE_PREFIX_PATH").unwrap();
         assert!(prefix_b.contains(dep_b_prefix.to_string_lossy().as_ref()));
         assert!(!prefix_b.contains(dep_a_prefix.to_string_lossy().as_ref()));
-        assert!(
-            env_b
-                .get_env_var("PATH")
-                .unwrap()
-                .contains(dep_b_prefix.join("bin").to_string_lossy().as_ref())
-        );
-        assert!(
-            !env_b
-                .get_env_var("PATH")
-                .unwrap()
-                .contains(dep_a_prefix.join("bin").to_string_lossy().as_ref())
-        );
+        assert!(env_b
+            .get_env_var("PATH")
+            .unwrap()
+            .contains(dep_b_prefix.join("bin").to_string_lossy().as_ref()));
+        assert!(!env_b
+            .get_env_var("PATH")
+            .unwrap()
+            .contains(dep_a_prefix.join("bin").to_string_lossy().as_ref()));
     }
 
     #[test]
@@ -3295,5 +3293,55 @@ mod tests {
         assert!(status.contains("status=failed"));
         assert!(status.contains("duration_ms=12"));
         assert!(status.contains("error=compile failed"));
+    }
+
+    #[test]
+    fn parallel_build_returns_after_dependency_failure_without_hanging() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.build_base = workspace_root.join("build");
+        config.install_base = workspace_root.join("install");
+        config.log_base = workspace_root.join("log");
+        config.parallel_workers = 2;
+        config.continue_on_error = false;
+
+        let mut failing = fixture_package("failing_pkg", &[]);
+        failing.path = workspace_root.join("src/failing_pkg");
+        failing.build_type = BuildType::Other("unsupported_fixture".to_string());
+
+        let mut dependent = fixture_package("dependent_pkg", &["failing_pkg"]);
+        dependent.path = workspace_root.join("src/dependent_pkg");
+
+        let packages = vec![failing, dependent];
+        let build_order = vec![0, 1];
+        let thread_config = config.clone();
+        let (tx, rx) = mpsc::channel();
+
+        std::thread::spawn(move || {
+            let mut executor = BuildExecutor::new(&thread_config);
+            let result = executor.build_all(&packages, &build_order);
+            tx.send(result.map_err(|error| error.to_string())).unwrap();
+        });
+
+        let result = rx
+            .recv_timeout(Duration::from_secs(3))
+            .expect("parallel build should return instead of hanging");
+
+        let error = result.expect_err("fixture build should fail");
+        assert!(
+            error.contains("Some packages failed to build")
+                || error.contains("Build failed for package")
+        );
+
+        let status =
+            fs::read_to_string(config.log_base.join("latest/dependent_pkg/status.txt")).unwrap();
+        assert!(status.contains("status=blocked"));
+        assert!(
+            status.contains("Blocked by dependency failure: failing_pkg")
+                || status.contains("Build stopped after dependency failure")
+        );
     }
 }
