@@ -1,12 +1,17 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::run_async_command;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use rclrs::{
-    Context, CreateBasicExecutor, DynamicMessage, MessageTypeName, SimpleValueMut, ValueMut,
+    BoundedSequenceValueMut, Context, CreateBasicExecutor, DynamicMessage, DynamicMessageViewMut,
+    MessageTypeName, SequenceValueMut, SimpleValueMut, ValueMut,
 };
 use std::thread;
 use std::time::{Duration, Instant};
+
+fn publish_capability_matrix() -> &'static str {
+    "Supported: scalar fields, bounded strings, nested messages, and unbounded/bounded sequences of supported scalar or message values. Unsupported: fixed-size arrays and long double values."
+}
 
 fn set_field_from_yaml(
     msg: &mut DynamicMessage,
@@ -21,11 +26,281 @@ fn set_field_from_yaml(
         ));
     };
 
+    set_value_from_yaml(field, field_value, value)
+}
+
+fn set_value_from_yaml(
+    field: &str,
+    field_value: ValueMut<'_>,
+    value: &serde_yaml::Value,
+) -> Result<()> {
     match field_value {
         ValueMut::Simple(simple) => set_simple_value_from_yaml(field, simple, value),
+        ValueMut::Sequence(sequence) => set_sequence_value_from_yaml(field, sequence, value),
+        ValueMut::BoundedSequence(sequence) => {
+            set_bounded_sequence_value_from_yaml(field, sequence, value)
+        }
+        ValueMut::Array(_) => Err(anyhow!(
+            "Field '{}' is a fixed-size array, which is not supported yet. {}",
+            field,
+            publish_capability_matrix()
+        )),
+    }
+}
+
+fn expect_yaml_sequence<'a>(
+    field: &str,
+    value: &'a serde_yaml::Value,
+) -> Result<&'a Vec<serde_yaml::Value>> {
+    value
+        .as_sequence()
+        .ok_or_else(|| anyhow!("Field '{}' expects a YAML sequence", field))
+}
+
+fn apply_mapping_to_message_view(
+    field: &str,
+    nested: &mut DynamicMessageViewMut<'_>,
+    value: &serde_yaml::Value,
+) -> Result<()> {
+    let map = value
+        .as_mapping()
+        .ok_or_else(|| anyhow!("Field '{}' expects mapping for nested message", field))?;
+
+    for (k, v) in map {
+        let key = k
+            .as_str()
+            .ok_or_else(|| anyhow!("Nested field name must be a string"))?;
+        let nested_path = format!("{}.{}", field, key);
+        let Some(nested_field) = nested.get_mut(key) else {
+            return Err(anyhow!("Unknown nested field '{}'", nested_path));
+        };
+        set_value_from_yaml(&nested_path, nested_field, v)?;
+    }
+
+    Ok(())
+}
+
+fn set_sequence_value_from_yaml(
+    field: &str,
+    sequence: SequenceValueMut<'_>,
+    value: &serde_yaml::Value,
+) -> Result<()> {
+    let elements = expect_yaml_sequence(field, value)?;
+
+    match sequence {
+        SequenceValueMut::BooleanSequence(mut seq) => {
+            *seq = elements
+                .iter()
+                .map(|item| {
+                    item.as_bool()
+                        .ok_or_else(|| anyhow!("Field '{}' expects bool sequence entries", field))
+                })
+                .collect::<Result<_>>()?;
+            Ok(())
+        }
+        SequenceValueMut::Int32Sequence(mut seq) => {
+            *seq = elements
+                .iter()
+                .map(|item| {
+                    let n = item
+                        .as_i64()
+                        .ok_or_else(|| anyhow!("Field '{}' expects i32 sequence entries", field))?;
+                    i32::try_from(n)
+                        .map_err(|_| anyhow!("Field '{}' i32 sequence entry out of range", field))
+                })
+                .collect::<Result<_>>()?;
+            Ok(())
+        }
+        SequenceValueMut::Uint32Sequence(mut seq) => {
+            *seq = elements
+                .iter()
+                .map(|item| {
+                    let n = item
+                        .as_u64()
+                        .ok_or_else(|| anyhow!("Field '{}' expects u32 sequence entries", field))?;
+                    u32::try_from(n)
+                        .map_err(|_| anyhow!("Field '{}' u32 sequence entry out of range", field))
+                })
+                .collect::<Result<_>>()?;
+            Ok(())
+        }
+        SequenceValueMut::Int64Sequence(mut seq) => {
+            *seq = elements
+                .iter()
+                .map(|item| {
+                    item.as_i64()
+                        .ok_or_else(|| anyhow!("Field '{}' expects i64 sequence entries", field))
+                })
+                .collect::<Result<_>>()?;
+            Ok(())
+        }
+        SequenceValueMut::Uint64Sequence(mut seq) => {
+            *seq = elements
+                .iter()
+                .map(|item| {
+                    item.as_u64()
+                        .ok_or_else(|| anyhow!("Field '{}' expects u64 sequence entries", field))
+                })
+                .collect::<Result<_>>()?;
+            Ok(())
+        }
+        SequenceValueMut::FloatSequence(mut seq) => {
+            *seq = elements
+                .iter()
+                .map(|item| {
+                    item.as_f64()
+                        .map(|n| n as f32)
+                        .ok_or_else(|| anyhow!("Field '{}' expects f32 sequence entries", field))
+                })
+                .collect::<Result<_>>()?;
+            Ok(())
+        }
+        SequenceValueMut::DoubleSequence(mut seq) => {
+            *seq = elements
+                .iter()
+                .map(|item| {
+                    item.as_f64()
+                        .ok_or_else(|| anyhow!("Field '{}' expects f64 sequence entries", field))
+                })
+                .collect::<Result<_>>()?;
+            Ok(())
+        }
+        SequenceValueMut::StringSequence(mut seq) => {
+            *seq = elements
+                .iter()
+                .map(|item| {
+                    item.as_str()
+                        .map(Into::into)
+                        .ok_or_else(|| anyhow!("Field '{}' expects string sequence entries", field))
+                })
+                .collect::<Result<_>>()?;
+            Ok(())
+        }
+        SequenceValueMut::BoundedStringSequence(mut seq) => {
+            seq.reset(elements.len());
+            for (slot, item) in seq.iter_mut().zip(elements) {
+                let text = item
+                    .as_str()
+                    .ok_or_else(|| anyhow!("Field '{}' expects string sequence entries", field))?;
+                slot.try_assign(text).map_err(|_| {
+                    anyhow!(
+                        "Field '{}' bounded string sequence entry exceeds bounds",
+                        field
+                    )
+                })?;
+            }
+            Ok(())
+        }
+        SequenceValueMut::MessageSequence(mut seq) => {
+            seq.reset(elements.len());
+            for (index, item) in elements.iter().enumerate() {
+                apply_mapping_to_message_view(
+                    &format!("{}[{}]", field, index),
+                    &mut seq[index],
+                    item,
+                )?;
+            }
+            Ok(())
+        }
         _ => Err(anyhow!(
-            "Field '{}' is not a simple value; complex structures are not supported yet",
-            field
+            "Field '{}' sequence shape is not supported yet. {}",
+            field,
+            publish_capability_matrix()
+        )),
+    }
+}
+
+fn set_bounded_sequence_value_from_yaml(
+    field: &str,
+    sequence: BoundedSequenceValueMut<'_>,
+    value: &serde_yaml::Value,
+) -> Result<()> {
+    let elements = expect_yaml_sequence(field, value)?;
+
+    match sequence {
+        BoundedSequenceValueMut::BooleanBoundedSequence(mut seq) => {
+            seq.try_reset(elements.len()).map_err(|_| {
+                anyhow!("Field '{}' sequence length exceeds its upper bound", field)
+            })?;
+            for (slot, item) in seq.iter_mut().zip(elements) {
+                *slot = item
+                    .as_bool()
+                    .ok_or_else(|| anyhow!("Field '{}' expects bool sequence entries", field))?;
+            }
+            Ok(())
+        }
+        BoundedSequenceValueMut::Int32BoundedSequence(mut seq) => {
+            seq.try_reset(elements.len()).map_err(|_| {
+                anyhow!("Field '{}' sequence length exceeds its upper bound", field)
+            })?;
+            for (slot, item) in seq.iter_mut().zip(elements) {
+                let n = item
+                    .as_i64()
+                    .ok_or_else(|| anyhow!("Field '{}' expects i32 sequence entries", field))?;
+                *slot = i32::try_from(n)
+                    .map_err(|_| anyhow!("Field '{}' i32 sequence entry out of range", field))?;
+            }
+            Ok(())
+        }
+        BoundedSequenceValueMut::Uint32BoundedSequence(mut seq) => {
+            seq.try_reset(elements.len()).map_err(|_| {
+                anyhow!("Field '{}' sequence length exceeds its upper bound", field)
+            })?;
+            for (slot, item) in seq.iter_mut().zip(elements) {
+                let n = item
+                    .as_u64()
+                    .ok_or_else(|| anyhow!("Field '{}' expects u32 sequence entries", field))?;
+                *slot = u32::try_from(n)
+                    .map_err(|_| anyhow!("Field '{}' u32 sequence entry out of range", field))?;
+            }
+            Ok(())
+        }
+        BoundedSequenceValueMut::StringBoundedSequence(mut seq) => {
+            seq.try_reset(elements.len()).map_err(|_| {
+                anyhow!("Field '{}' sequence length exceeds its upper bound", field)
+            })?;
+            for (slot, item) in seq.iter_mut().zip(elements) {
+                let text = item
+                    .as_str()
+                    .ok_or_else(|| anyhow!("Field '{}' expects string sequence entries", field))?;
+                *slot = text.into();
+            }
+            Ok(())
+        }
+        BoundedSequenceValueMut::BoundedStringBoundedSequence(mut seq) => {
+            seq.try_reset(elements.len()).map_err(|_| {
+                anyhow!("Field '{}' sequence length exceeds its upper bound", field)
+            })?;
+            for (slot, item) in seq.iter_mut().zip(elements) {
+                let text = item
+                    .as_str()
+                    .ok_or_else(|| anyhow!("Field '{}' expects string sequence entries", field))?;
+                slot.try_assign(text).map_err(|_| {
+                    anyhow!(
+                        "Field '{}' bounded string sequence entry exceeds bounds",
+                        field
+                    )
+                })?;
+            }
+            Ok(())
+        }
+        BoundedSequenceValueMut::MessageBoundedSequence(mut seq) => {
+            seq.try_reset(elements.len()).map_err(|_| {
+                anyhow!("Field '{}' sequence length exceeds its upper bound", field)
+            })?;
+            for (index, item) in elements.iter().enumerate() {
+                apply_mapping_to_message_view(
+                    &format!("{}[{}]", field, index),
+                    &mut seq[index],
+                    item,
+                )?;
+            }
+            Ok(())
+        }
+        _ => Err(anyhow!(
+            "Field '{}' bounded sequence shape is not supported yet. {}",
+            field,
+            publish_capability_matrix()
         )),
     }
 }
@@ -115,35 +390,22 @@ fn set_simple_value_from_yaml(
             *s = text.into();
             Ok(())
         }
-        SimpleValueMut::Message(mut nested) => {
-            let map = value
-                .as_mapping()
-                .ok_or_else(|| anyhow!("Field '{}' expects mapping for nested message", field))?;
-
-            for (k, v) in map {
-                let key = k
-                    .as_str()
-                    .ok_or_else(|| anyhow!("Nested field name must be a string"))?;
-                let Some(nested_field) = nested.get_mut(key) else {
-                    return Err(anyhow!("Unknown nested field '{}.{}'", field, key));
-                };
-                match nested_field {
-                    ValueMut::Simple(simple) => set_simple_value_from_yaml(key, simple, v)?,
-                    _ => {
-                        return Err(anyhow!(
-                            "Nested field '{}.{}' is not a simple value; complex structures are not supported yet",
-                            field,
-                            key
-                        ));
-                    }
-                }
-            }
+        SimpleValueMut::BoundedString(mut s) => {
+            let text = value
+                .as_str()
+                .ok_or_else(|| anyhow!("Field '{}' expects string", field))?;
+            s.try_assign(text)
+                .map_err(|_| anyhow!("Field '{}' bounded string exceeds its upper bound", field))?;
             Ok(())
         }
+        SimpleValueMut::Message(mut nested) => {
+            apply_mapping_to_message_view(field, &mut nested, value)
+        }
         other => Err(anyhow!(
-            "Field '{}' type {:?} is not supported yet",
+            "Field '{}' type {:?} is not supported yet. {}",
             field,
-            other
+            other,
+            publish_capability_matrix()
         )),
     }
 }
@@ -278,4 +540,37 @@ async fn run_command(matches: ArgMatches, _common_args: CommonTopicArgs) -> Resu
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
     run_async_command(run_command(matches, common_args));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_message, publish_capability_matrix};
+
+    #[test]
+    fn publish_capability_matrix_mentions_sequences() {
+        assert!(publish_capability_matrix().contains("sequences"));
+    }
+
+    #[test]
+    fn build_message_supports_sequence_fields() {
+        let message = build_message(
+            "test_msgs/msg/UnboundedSequences",
+            "{int32_values: [1, 2, 3], string_values: ['a', 'b']}",
+        )
+        .unwrap();
+
+        assert!(message.get("int32_values").is_some());
+        assert!(message.get("string_values").is_some());
+    }
+
+    #[test]
+    fn build_message_supports_nested_messages() {
+        let message = build_message(
+            "test_msgs/msg/Nested",
+            "{basic_types_value: {bool_value: true, int32_value: 7}}",
+        )
+        .unwrap();
+
+        assert!(message.get("basic_types_value").is_some());
+    }
 }

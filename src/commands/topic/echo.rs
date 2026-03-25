@@ -1,10 +1,10 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -64,6 +64,10 @@ impl EchoOptions {
             csv,
         })
     }
+}
+
+fn echo_capability_note() -> &'static str {
+    "Native echo supports formatted dynamic-message output. Raw serialized output is not available on this path."
 }
 
 fn truncate_string_if_needed(s: &str, opts: &EchoOptions) -> String {
@@ -554,7 +558,7 @@ async fn echo_topic_messages(
         eprintln!("Note: --flow-style is not fully supported yet; using default YAML formatting");
     }
     if options.raw {
-        eprintln!("Note: --raw is not supported for native echo; using formatted output");
+        eprintln!("Note: {}", echo_capability_note());
     }
 
     // Wait for publishers to be available
@@ -739,4 +743,14 @@ async fn run_command(matches: ArgMatches, common_args: CommonTopicArgs) -> Resul
 
 pub fn handle(matches: ArgMatches, common_args: CommonTopicArgs) {
     run_async_command(run_command(matches, common_args));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::echo_capability_note;
+
+    #[test]
+    fn echo_capability_note_mentions_raw_output_limit() {
+        assert!(echo_capability_note().contains("Raw serialized output"));
+    }
 }

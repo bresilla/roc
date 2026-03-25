@@ -317,7 +317,7 @@ Definition of done:
 
 - bag commands fail clearly and stop cleanly
 
-### Slice 3.3: Dynamic Message Publish/Echo Capability Matrix
+### Slice 3.3: Dynamic Message Publish/Echo Capability Matrix [complete]
 
 Problem:
 
