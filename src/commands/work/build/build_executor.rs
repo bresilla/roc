@@ -1149,6 +1149,88 @@ impl<'a> BuildExecutor<'a> {
         Ok(())
     }
 
+    fn ordered_package_setup_entries(&self, packages: &[PackageMeta]) -> Vec<(String, PathBuf)> {
+        let installed_names = self
+            .install_paths
+            .keys()
+            .cloned()
+            .collect::<HashSet<String>>();
+        let mut metadata_graph = HashMap::new();
+
+        for package in packages {
+            if !installed_names.contains(&package.name) {
+                continue;
+            }
+
+            let metadata_path = self
+                .package_metadata_root(&package.name)
+                .join(&package.name);
+            let deps = fs::read_to_string(&metadata_path)
+                .map(|contents| Self::parse_package_metadata_dependencies(&contents))
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|dep| installed_names.contains(dep))
+                .collect::<Vec<_>>();
+            metadata_graph.insert(package.name.clone(), deps);
+        }
+
+        let mut ordered_names = metadata_graph.keys().cloned().collect::<Vec<_>>();
+        ordered_names.sort();
+
+        let mut visited = HashSet::new();
+        let mut ordered = Vec::new();
+        for package_name in ordered_names {
+            Self::visit_runtime_dependency_order(
+                &package_name,
+                &metadata_graph,
+                &self.install_paths,
+                &mut visited,
+                &mut ordered,
+            );
+        }
+
+        ordered
+    }
+
+    fn parse_package_metadata_dependencies(contents: &str) -> Vec<String> {
+        let path_separator = if cfg!(windows) { ';' } else { ':' };
+        contents
+            .replace(path_separator, "\n")
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(ToOwned::to_owned)
+            .collect()
+    }
+
+    fn visit_runtime_dependency_order(
+        package_name: &str,
+        metadata_graph: &HashMap<String, Vec<String>>,
+        install_paths: &HashMap<String, PathBuf>,
+        visited: &mut HashSet<String>,
+        ordered: &mut Vec<(String, PathBuf)>,
+    ) {
+        if !visited.insert(package_name.to_string()) {
+            return;
+        }
+
+        if let Some(deps) = metadata_graph.get(package_name) {
+            for dep in deps {
+                Self::visit_runtime_dependency_order(
+                    dep,
+                    metadata_graph,
+                    install_paths,
+                    visited,
+                    ordered,
+                );
+            }
+        }
+
+        if let Some(prefix) = install_paths.get(package_name) {
+            ordered.push((package_name.to_string(), prefix.clone()));
+        }
+    }
+
     fn generate_workspace_helper_scripts(
         &self,
         install_dir: &Path,
@@ -1589,13 +1671,10 @@ export COLCON_CURRENT_PREFIX="{install_prefix}"
             install_prefix = install_dir.display()
         );
 
-        for package in packages {
-            let Some(package_prefix) = self.install_paths.get(&package.name) else {
-                continue;
-            };
+        for (package_name, package_prefix) in self.ordered_package_setup_entries(packages) {
             let package_script = package_prefix
                 .join("share")
-                .join(&package.name)
+                .join(&package_name)
                 .join("package.sh");
             content.push_str(&format!(
                 r#"if [ -f "{package_script}" ]; then
@@ -1655,13 +1734,10 @@ function _colcon_prefix_powershell_source_script {{
                 helper = helper_path.display()
             ));
         } else {
-            for package in packages {
-                let Some(package_prefix) = self.install_paths.get(&package.name) else {
-                    continue;
-                };
+            for (package_name, package_prefix) in self.ordered_package_setup_entries(packages) {
                 let package_script = package_prefix
                     .join("share")
-                    .join(&package.name)
+                    .join(&package_name)
                     .join("package.ps1");
                 content.push_str(&format!(
                     "if (Test-Path \"{package_script}\") {{\n    $env:COLCON_CURRENT_PREFIX=\"{package_prefix}\"\n    . \"{package_script}\"\n}}\n",
@@ -2710,6 +2786,79 @@ mod tests {
         assert!(setup_ps1.contains("local_setup.ps1"));
         assert!(setup_ps1.contains("colcon_normalize_path_list"));
         assert!(setup_ps1.contains("COLCON_PREFIX_PATH"));
+    }
+
+    #[test]
+    fn workspace_local_setup_uses_runtime_dependency_order_instead_of_input_order() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let mut executor = BuildExecutor::new(&config);
+        let base_prefix = config.install_base.join("base_pkg");
+        let consumer_prefix = config.install_base.join("consumer_pkg");
+        executor
+            .install_paths
+            .insert("base_pkg".to_string(), base_prefix.clone());
+        executor
+            .install_paths
+            .insert("consumer_pkg".to_string(), consumer_prefix.clone());
+
+        let packages = vec![
+            PackageMeta {
+                name: "consumer_pkg".to_string(),
+                path: PathBuf::from("/tmp/consumer_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "consumer".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: vec!["base_pkg".to_string()],
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
+                exec_deps: vec!["base_pkg".to_string()],
+                test_deps: Vec::new(),
+            },
+            PackageMeta {
+                name: "base_pkg".to_string(),
+                path: PathBuf::from("/tmp/base_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "base".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: Vec::new(),
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
+                exec_deps: Vec::new(),
+                test_deps: Vec::new(),
+            },
+        ];
+
+        executor.generate_package_metadata_files(&packages).unwrap();
+        fs::create_dir_all(base_prefix.join("share/base_pkg")).unwrap();
+        fs::create_dir_all(consumer_prefix.join("share/consumer_pkg")).unwrap();
+        fs::write(base_prefix.join("share/base_pkg/package.sh"), "#!/bin/sh\n").unwrap();
+        fs::write(
+            consumer_prefix.join("share/consumer_pkg/package.sh"),
+            "#!/bin/sh\n",
+        )
+        .unwrap();
+
+        let local_setup = executor.render_workspace_local_setup_sh(&config.install_base, &packages);
+        let base_index = local_setup
+            .find("base_pkg/share/base_pkg/package.sh")
+            .unwrap();
+        let consumer_index = local_setup
+            .find("consumer_pkg/share/consumer_pkg/package.sh")
+            .unwrap();
+
+        assert!(
+            base_index < consumer_index,
+            "runtime dependency order should source base_pkg before consumer_pkg"
+        );
     }
 
     #[test]

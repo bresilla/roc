@@ -532,7 +532,7 @@ Definition of done:
 
 - generated helper scripts emit executable path lines, not template artifacts
 
-### Slice 6.2: Make Setup Ordering Metadata-Driven Everywhere
+### Slice 6.2: Make Setup Ordering Metadata-Driven Everywhere [complete]
 
 Problem:
 
