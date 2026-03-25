@@ -1,5 +1,6 @@
 use crate::arguments::service::CommonServiceArgs;
 use crate::commands::cli::{joined_values, required_string, run_async_command};
+use crate::shared::preflight::{ensure_command_available, ensure_ros_environment};
 use clap::ArgMatches;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -8,6 +9,8 @@ async fn run_command(
     matches: ArgMatches,
     _common_args: CommonServiceArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    ensure_command_available("ros2", "roc service call")?;
+    ensure_ros_environment("roc service call")?;
     let service_name = required_string(&matches, "service_name")?;
     let service_type = required_string(&matches, "service_type")?;
 

@@ -1,4 +1,5 @@
 use crate::commands::cli::{required_string, run_async_command};
+use crate::shared::preflight::{ensure_command_available, ensure_ros_environment};
 use crate::utils::get_ros_workspace_paths;
 use clap::ArgMatches;
 use std::path::PathBuf;
@@ -73,6 +74,8 @@ async fn find_launch_file(
 }
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
+    ensure_command_available("ros2", "roc launch")?;
+    ensure_ros_environment("roc launch")?;
     let package_name = required_string(&matches, "package_name")?;
     let launch_file_name = required_string(&matches, "launch_file_name")?;
 

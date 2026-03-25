@@ -6,6 +6,7 @@ pub mod interface_operations;
 pub mod node_operations;
 pub mod package_discovery;
 pub mod param_operations;
+pub mod preflight;
 pub mod ros_interface_parser;
 pub mod ros_tf_introspection;
 pub mod ros_tf_msgs_sys;

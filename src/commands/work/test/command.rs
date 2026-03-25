@@ -3,6 +3,7 @@ use crate::commands::work::build::dependency_graph;
 use crate::commands::work::build::environment_manager::EnvironmentManager;
 use crate::commands::work::build::{BuildType, PackageMeta};
 use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
+use crate::shared::preflight::{ensure_command_available, ensure_ros_environment};
 use clap::ArgMatches;
 use colored::Colorize;
 use std::collections::{HashMap, HashSet};
@@ -145,6 +146,7 @@ impl WorkspaceTester {
     }
 
     fn run_tests(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        ensure_ros_environment("roc work test")?;
         fs::create_dir_all(self.config.log_base.join("latest_test"))?;
         fs::create_dir_all(&self.run_log_dir)?;
 
@@ -307,6 +309,7 @@ impl WorkspaceTester {
         package: &PackageMeta,
         env_manager: &EnvironmentManager,
     ) -> Result<TestRecord, Box<dyn std::error::Error>> {
+        ensure_command_available("ctest", "roc work test")?;
         let build_dir = self.config.build_base.join(&package.name);
         if !build_dir.exists() {
             return Ok(TestRecord {
@@ -343,6 +346,7 @@ impl WorkspaceTester {
         package: &PackageMeta,
         env_manager: &EnvironmentManager,
     ) -> Result<TestRecord, Box<dyn std::error::Error>> {
+        ensure_command_available("python3", "roc work test")?;
         if !Self::has_python_tests(&package.path) {
             return Ok(TestRecord {
                 status: TestState::Skipped,

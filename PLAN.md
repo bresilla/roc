@@ -240,7 +240,7 @@ Definition of done:
 
 - test execution expectations are explicit and reproducible
 
-### Slice 2.3: Tighten Build/Run Preflight Checks
+### Slice 2.3: Tighten Build/Run Preflight Checks [complete]
 
 Problem:
 
