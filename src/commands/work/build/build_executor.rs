@@ -25,13 +25,14 @@ pub enum PackageState {
     Building,
     Completed,
     Failed,
+    Blocked,
 }
 
 /// Thread-safe build state manager
 pub struct BuildState {
     package_states: Arc<Mutex<HashMap<String, PackageState>>>,
     install_paths: Arc<Mutex<HashMap<String, PathBuf>>>,
-    build_count: Arc<Mutex<(usize, usize)>>, // (successful, failed)
+    build_count: Arc<Mutex<(usize, usize, usize)>>, // (successful, failed, blocked)
     build_records: Arc<Mutex<HashMap<String, BuildRecord>>>,
 }
 
@@ -256,7 +257,7 @@ impl<'a> BuildExecutor<'a> {
         let build_state = BuildState {
             package_states: Arc::new(Mutex::new(HashMap::new())),
             install_paths: Arc::new(Mutex::new(HashMap::new())),
-            build_count: Arc::new(Mutex::new((0, 0))),
+            build_count: Arc::new(Mutex::new((0, 0, 0))),
             build_records: Arc::new(Mutex::new(HashMap::new())),
         };
 
@@ -328,7 +329,7 @@ impl<'a> BuildExecutor<'a> {
         }
 
         // Print summary
-        let (successful_builds, failed_builds) = {
+        let (successful_builds, failed_builds, blocked_builds) = {
             let counts = build_state.build_count.lock().unwrap();
             *counts
         };
@@ -345,10 +346,17 @@ impl<'a> BuildExecutor<'a> {
                 failed_builds.to_string().bright_red().bold(),
                 "packages failed".bright_red()
             );
+        }
+        if blocked_builds > 0 {
+            println!(
+                "  {} {}",
+                blocked_builds.to_string().bright_yellow().bold(),
+                "packages blocked".bright_yellow()
+            );
+        }
 
-            if !self.config.continue_on_error {
-                return Err("Some packages failed to build".into());
-            }
+        if failed_builds > 0 && !self.config.continue_on_error {
+            return Err("Some packages failed to build".into());
         }
 
         // Generate environment setup scripts
@@ -375,6 +383,15 @@ impl<'a> BuildExecutor<'a> {
             // Find a package that's ready to build
             let package_to_build = {
                 let mut states = build_state.package_states.lock().unwrap();
+                let mut records = build_state.build_records.lock().unwrap();
+                let mut counts = build_state.build_count.lock().unwrap();
+                Self::mark_blocked_pending_packages(
+                    &mut states,
+                    &mut records,
+                    &mut counts,
+                    &dependencies,
+                    &config,
+                )?;
                 let mut ready_package = None;
 
                 // Collect candidates first to avoid borrow conflicts
@@ -401,6 +418,7 @@ impl<'a> BuildExecutor<'a> {
 
                         if all_deps_ready {
                             states.insert(pkg_name.clone(), PackageState::Building);
+                            records.remove(&pkg_name);
                             ready_package = Some(pkg_name);
                             break;
                         }
@@ -526,6 +544,31 @@ impl<'a> BuildExecutor<'a> {
                                         })?;
                                 }
 
+                                {
+                                    let mut states = build_state.package_states.lock().unwrap();
+                                    let mut records = build_state.build_records.lock().unwrap();
+                                    let mut counts = build_state.build_count.lock().unwrap();
+                                    Self::mark_blocked_pending_packages(
+                                        &mut states,
+                                        &mut records,
+                                        &mut counts,
+                                        &dependencies,
+                                        &config,
+                                    )?;
+                                    if !config.continue_on_error {
+                                        Self::mark_all_pending_as_blocked(
+                                            &mut states,
+                                            &mut records,
+                                            &mut counts,
+                                            &config,
+                                            &format!(
+                                                "Build stopped after dependency failure in {}",
+                                                package.name
+                                            ),
+                                        )?;
+                                    }
+                                }
+
                                 if !config.continue_on_error {
                                     return Err(format!(
                                         "Build failed for package {}: {}",
@@ -541,7 +584,9 @@ impl<'a> BuildExecutor<'a> {
                     let all_done = {
                         let states = build_state.package_states.lock().unwrap();
                         states.values().all(|state| {
-                            *state == PackageState::Completed || *state == PackageState::Failed
+                            *state == PackageState::Completed
+                                || *state == PackageState::Failed
+                                || *state == PackageState::Blocked
                         })
                     };
 
@@ -585,6 +630,97 @@ impl<'a> BuildExecutor<'a> {
         }
 
         Ok(())
+    }
+
+    fn mark_blocked_pending_packages(
+        states: &mut HashMap<String, PackageState>,
+        records: &mut HashMap<String, BuildRecord>,
+        counts: &mut (usize, usize, usize),
+        dependencies: &HashMap<String, HashSet<String>>,
+        config: &BuildConfig,
+    ) -> Result<(), String> {
+        loop {
+            let blocked: Vec<(String, String)> = states
+                .iter()
+                .filter_map(|(pkg_name, state)| {
+                    if *state != PackageState::Pending {
+                        return None;
+                    }
+
+                    let blocking_dep = dependencies.get(pkg_name)?.iter().find(|dep| {
+                        matches!(
+                            states.get(*dep),
+                            Some(PackageState::Failed | PackageState::Blocked)
+                        )
+                    })?;
+                    Some((
+                        pkg_name.clone(),
+                        format!("Blocked by dependency failure: {blocking_dep}"),
+                    ))
+                })
+                .collect();
+
+            if blocked.is_empty() {
+                return Ok(());
+            }
+
+            for (pkg_name, reason) in blocked {
+                Self::mark_package_blocked(states, records, counts, config, &pkg_name, reason)?;
+            }
+        }
+    }
+
+    fn mark_all_pending_as_blocked(
+        states: &mut HashMap<String, PackageState>,
+        records: &mut HashMap<String, BuildRecord>,
+        counts: &mut (usize, usize, usize),
+        config: &BuildConfig,
+        reason: &str,
+    ) -> Result<(), String> {
+        let pending_packages: Vec<String> = states
+            .iter()
+            .filter_map(|(pkg_name, state)| {
+                if *state == PackageState::Pending {
+                    Some(pkg_name.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for pkg_name in pending_packages {
+            Self::mark_package_blocked(states, records, counts, config, &pkg_name, reason.into())?;
+        }
+
+        Ok(())
+    }
+
+    fn mark_package_blocked(
+        states: &mut HashMap<String, PackageState>,
+        records: &mut HashMap<String, BuildRecord>,
+        counts: &mut (usize, usize, usize),
+        config: &BuildConfig,
+        package_name: &str,
+        reason: String,
+    ) -> Result<(), String> {
+        if !matches!(states.get(package_name), Some(PackageState::Pending)) {
+            return Ok(());
+        }
+
+        states.insert(package_name.to_string(), PackageState::Blocked);
+        counts.2 += 1;
+        let record = BuildRecord {
+            status: PackageState::Blocked,
+            duration_ms: 0,
+            error: Some(reason),
+        };
+        records.insert(package_name.to_string(), record.clone());
+        Self::write_package_state(config, package_name, &record).map_err(|e| {
+            format!(
+                "Failed to persist build state for blocked package {}: {}",
+                package_name, e
+            )
+        })
     }
 
     /// Build a package with the given environment
@@ -1071,6 +1207,16 @@ impl<'a> BuildExecutor<'a> {
         Self::package_log_dir(config, package_name).join("status.txt")
     }
 
+    fn package_state_label(state: &PackageState) -> &'static str {
+        match state {
+            PackageState::Pending => "pending",
+            PackageState::Building => "building",
+            PackageState::Completed => "completed",
+            PackageState::Failed => "failed",
+            PackageState::Blocked => "blocked",
+        }
+    }
+
     fn write_build_summary(
         &self,
         packages: &[PackageMeta],
@@ -1082,12 +1228,7 @@ impl<'a> BuildExecutor<'a> {
                 continue;
             };
 
-            let status = match record.status {
-                PackageState::Pending => "pending",
-                PackageState::Building => "building",
-                PackageState::Completed => "completed",
-                PackageState::Failed => "failed",
-            };
+            let status = Self::package_state_label(&record.status);
             summary.push_str(&format!(
                 "{package}: status={status} duration_ms={duration}\n",
                 package = package.name,
@@ -1118,12 +1259,7 @@ impl<'a> BuildExecutor<'a> {
         package_name: &str,
         record: &BuildRecord,
     ) -> Result<(), io::Error> {
-        let status = match record.status {
-            PackageState::Pending => "pending",
-            PackageState::Building => "building",
-            PackageState::Completed => "completed",
-            PackageState::Failed => "failed",
-        };
+        let status = Self::package_state_label(&record.status);
         let mut content = format!(
             "status={status}\nduration_ms={duration}\n",
             duration = record.duration_ms
@@ -2214,11 +2350,28 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
 mod tests {
     use super::{BuildExecutor, BuildRecord, DsvOperation, InstalledArtifacts, PackageState};
     use crate::commands::work::build::{BuildConfig, BuildType, PackageMeta};
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::fs;
     use std::path::PathBuf;
     use std::process::Command;
     use tempfile::tempdir;
+
+    fn fixture_package(name: &str, deps: &[&str]) -> PackageMeta {
+        PackageMeta {
+            name: name.to_string(),
+            path: PathBuf::from(format!("/tmp/{name}")),
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: "fixture".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: deps.iter().map(|dep| dep.to_string()).collect(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }
+    }
 
     #[test]
     fn create_workspace_directories_respects_custom_bases_and_ignore_markers() {
@@ -2946,6 +3099,118 @@ mod tests {
         assert!(summary.contains("demo_pkg: status=completed duration_ms=42"));
         assert!(summary.contains("logs="));
         assert!(summary.contains("log/latest/demo_pkg"));
+    }
+
+    #[test]
+    fn write_build_summary_persists_blocked_statuses() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.log_base = workspace_root.join("log");
+        fs::create_dir_all(config.log_base.join("latest")).unwrap();
+
+        let executor = BuildExecutor::new(&config);
+        let packages = vec![fixture_package("blocked_pkg", &["failed_pkg"])];
+        let records = HashMap::from([(
+            "blocked_pkg".to_string(),
+            BuildRecord {
+                status: PackageState::Blocked,
+                duration_ms: 0,
+                error: Some("Blocked by dependency failure: failed_pkg".to_string()),
+            },
+        )]);
+
+        executor.write_build_summary(&packages, &records).unwrap();
+
+        let summary = fs::read_to_string(config.log_base.join("latest/build_summary.log")).unwrap();
+        assert!(summary.contains("blocked_pkg: status=blocked duration_ms=0"));
+        assert!(summary.contains("error=Blocked by dependency failure: failed_pkg"));
+    }
+
+    #[test]
+    fn mark_blocked_pending_packages_marks_transitive_dependents() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.log_base = workspace_root.join("log");
+
+        let mut states = HashMap::from([
+            ("base".to_string(), PackageState::Failed),
+            ("mid".to_string(), PackageState::Pending),
+            ("leaf".to_string(), PackageState::Pending),
+            ("independent".to_string(), PackageState::Pending),
+        ]);
+        let mut records = HashMap::new();
+        let mut counts = (0, 1, 0);
+        let dependencies = HashMap::from([
+            ("base".to_string(), HashSet::new()),
+            ("mid".to_string(), HashSet::from(["base".to_string()])),
+            ("leaf".to_string(), HashSet::from(["mid".to_string()])),
+            ("independent".to_string(), HashSet::new()),
+        ]);
+
+        BuildExecutor::mark_blocked_pending_packages(
+            &mut states,
+            &mut records,
+            &mut counts,
+            &dependencies,
+            &config,
+        )
+        .unwrap();
+
+        assert_eq!(states.get("mid"), Some(&PackageState::Blocked));
+        assert_eq!(states.get("leaf"), Some(&PackageState::Blocked));
+        assert_eq!(states.get("independent"), Some(&PackageState::Pending));
+        assert_eq!(counts, (0, 1, 2));
+        assert_eq!(
+            records.get("mid").unwrap().error.as_deref(),
+            Some("Blocked by dependency failure: base")
+        );
+        assert_eq!(
+            records.get("leaf").unwrap().error.as_deref(),
+            Some("Blocked by dependency failure: mid")
+        );
+        assert!(
+            config.log_base.join("latest/mid/status.txt").exists(),
+            "blocked packages should persist machine-readable status"
+        );
+    }
+
+    #[test]
+    fn mark_all_pending_as_blocked_marks_every_remaining_package() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.log_base = workspace_root.join("log");
+
+        let mut states = HashMap::from([
+            ("done".to_string(), PackageState::Completed),
+            ("failed".to_string(), PackageState::Failed),
+            ("pending_a".to_string(), PackageState::Pending),
+            ("pending_b".to_string(), PackageState::Pending),
+        ]);
+        let mut records = HashMap::new();
+        let mut counts = (1, 1, 0);
+
+        BuildExecutor::mark_all_pending_as_blocked(
+            &mut states,
+            &mut records,
+            &mut counts,
+            &config,
+            "Build stopped after dependency failure in failed",
+        )
+        .unwrap();
+
+        assert_eq!(states.get("pending_a"), Some(&PackageState::Blocked));
+        assert_eq!(states.get("pending_b"), Some(&PackageState::Blocked));
+        assert_eq!(counts, (1, 1, 2));
+        assert_eq!(
+            records.get("pending_a").unwrap().error.as_deref(),
+            Some("Build stopped after dependency failure in failed")
+        );
     }
 
     #[test]

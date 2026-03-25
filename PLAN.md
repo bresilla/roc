@@ -68,7 +68,7 @@ Definition of done:
 
 These are the first items to implement because they can produce hangs, invalid builds, or broken user execution even when the CLI appears to work.
 
-### Slice 1.1: Parallel Build Deadlock And Failure Propagation
+### Slice 1.1: Parallel Build Deadlock And Failure Propagation [complete]
 
 Problem:
 
