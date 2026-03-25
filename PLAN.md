@@ -373,7 +373,7 @@ Definition of done:
 
 - meaningful correctness coverage exists without requiring a full ROS machine
 
-### Slice 4.2: Add Command-Focused Smoke Matrix
+### Slice 4.2: Add Command-Focused Smoke Matrix [complete]
 
 Tasks:
 
