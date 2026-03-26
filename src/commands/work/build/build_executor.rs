@@ -4,9 +4,10 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::environment_manager::EnvironmentManager;
 use crate::commands::work::build::{BuildConfig, BuildType, PackageMeta};
@@ -34,6 +35,7 @@ pub struct BuildState {
     install_paths: Arc<Mutex<HashMap<String, PathBuf>>>,
     build_count: Arc<Mutex<(usize, usize, usize)>>, // (successful, failed, blocked)
     build_records: Arc<Mutex<HashMap<String, BuildRecord>>>,
+    cancel_requested: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -60,6 +62,19 @@ struct BuildRecord {
 }
 
 impl<'a> BuildExecutor<'a> {
+    fn build_interrupt_flag() -> Arc<AtomicBool> {
+        static BUILD_INTERRUPT_FLAG: OnceLock<Arc<AtomicBool>> = OnceLock::new();
+
+        Arc::clone(BUILD_INTERRUPT_FLAG.get_or_init(|| {
+            let flag = Arc::new(AtomicBool::new(false));
+            let handler_flag = Arc::clone(&flag);
+            let _ = ctrlc::set_handler(move || {
+                handler_flag.store(true, Ordering::SeqCst);
+            });
+            flag
+        }))
+    }
+
     pub fn new(config: &'a BuildConfig) -> Self {
         let env_manager = EnvironmentManager::new(config.install_base.clone(), config.isolated);
 
@@ -75,6 +90,8 @@ impl<'a> BuildExecutor<'a> {
         packages: &[PackageMeta],
         build_order: &[usize],
     ) -> Result<(), Box<dyn std::error::Error>> {
+        Self::build_interrupt_flag().store(false, Ordering::SeqCst);
+
         // Create necessary directories
         self.create_workspace_directories()?;
 
@@ -98,6 +115,7 @@ impl<'a> BuildExecutor<'a> {
         packages: &[PackageMeta],
         build_order: &[usize],
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let cancel_requested = Self::build_interrupt_flag();
         let mut successful_builds = 0;
         let mut failed_builds = 0;
         let mut build_records = HashMap::new();
@@ -112,6 +130,11 @@ impl<'a> BuildExecutor<'a> {
                 format!("({:?})", package.build_type).bright_black()
             );
             let start_time = Instant::now();
+
+            if cancel_requested.load(Ordering::SeqCst) {
+                self.write_build_summary(packages, &build_records)?;
+                return Err("Build interrupted before starting the next package".into());
+            }
 
             // Create a fresh environment manager for this package (like parallel build does)
             let mut package_env_manager =
@@ -135,12 +158,22 @@ impl<'a> BuildExecutor<'a> {
             // Build using the clean environment (like parallel build does)
             let build_result: Result<(), Box<dyn std::error::Error>> = match package.build_type {
                 BuildType::AmentCmake | BuildType::Cmake => {
-                    Self::build_cmake_package_with_env(package, &package_env_manager, self.config)
-                        .map_err(|e| e.into())
+                    Self::build_cmake_package_with_env(
+                        package,
+                        &package_env_manager,
+                        self.config,
+                        cancel_requested.as_ref(),
+                    )
+                    .map_err(|e| e.into())
                 }
                 BuildType::AmentPython => {
-                    Self::build_python_package_with_env(package, &package_env_manager, self.config)
-                        .map_err(|e| e.into())
+                    Self::build_python_package_with_env(
+                        package,
+                        &package_env_manager,
+                        self.config,
+                        cancel_requested.as_ref(),
+                    )
+                    .map_err(|e| e.into())
                 }
                 BuildType::Other(ref build_type) => {
                     Err(format!(
@@ -263,6 +296,7 @@ impl<'a> BuildExecutor<'a> {
             install_paths: Arc::new(Mutex::new(HashMap::new())),
             build_count: Arc::new(Mutex::new((0, 0, 0))),
             build_records: Arc::new(Mutex::new(HashMap::new())),
+            cancel_requested: Self::build_interrupt_flag(),
         };
 
         // Initialize package states
@@ -298,6 +332,7 @@ impl<'a> BuildExecutor<'a> {
                 install_paths: Arc::clone(&build_state.install_paths),
                 build_count: Arc::clone(&build_state.build_count),
                 build_records: Arc::clone(&build_state.build_records),
+                cancel_requested: Arc::clone(&build_state.cancel_requested),
             };
             let packages_clone = Arc::clone(&packages_arc);
             let dependencies_clone = Arc::clone(&dependencies_arc);
@@ -359,6 +394,10 @@ impl<'a> BuildExecutor<'a> {
             );
         }
 
+        if build_state.cancel_requested.load(Ordering::SeqCst) {
+            return Err("Build interrupted".into());
+        }
+
         if failed_builds > 0 && !self.config.continue_on_error {
             return Err("Some packages failed to build".into());
         }
@@ -382,6 +421,20 @@ impl<'a> BuildExecutor<'a> {
         config: Arc<BuildConfig>,
     ) -> Result<(), String> {
         loop {
+            if build_state.cancel_requested.load(Ordering::SeqCst) {
+                let mut states = build_state.package_states.lock().unwrap();
+                let mut records = build_state.build_records.lock().unwrap();
+                let mut counts = build_state.build_count.lock().unwrap();
+                Self::mark_all_pending_as_blocked(
+                    &mut states,
+                    &mut records,
+                    &mut counts,
+                    &config,
+                    "Build interrupted by user",
+                )?;
+                break;
+            }
+
             // Find a package that's ready to build
             let package_to_build = {
                 let mut states = build_state.package_states.lock().unwrap();
@@ -448,9 +501,13 @@ impl<'a> BuildExecutor<'a> {
                             Self::prepare_package_environment(package, &build_state, &config)?;
 
                         // Build the package
-                        let build_result =
-                            Self::build_package_with_env(package, &env_manager, &config)
-                                .map_err(|e| format!("Build failed: {}", e));
+                        let build_result = Self::build_package_with_env(
+                            package,
+                            &env_manager,
+                            &config,
+                            build_state.cancel_requested.as_ref(),
+                        )
+                        .map_err(|e| format!("Build failed: {}", e));
 
                         let duration = start_time.elapsed();
 
@@ -736,13 +793,14 @@ impl<'a> BuildExecutor<'a> {
         package: &PackageMeta,
         env_manager: &EnvironmentManager,
         config: &BuildConfig,
+        cancel_requested: &AtomicBool,
     ) -> Result<(), String> {
         match package.build_type {
             BuildType::AmentCmake | BuildType::Cmake => {
-                Self::build_cmake_package_with_env(package, env_manager, config)
+                Self::build_cmake_package_with_env(package, env_manager, config, cancel_requested)
             }
             BuildType::AmentPython => {
-                Self::build_python_package_with_env(package, env_manager, config)
+                Self::build_python_package_with_env(package, env_manager, config, cancel_requested)
             }
             BuildType::Other(ref build_type) => {
                 Err(format!(
@@ -758,6 +816,7 @@ impl<'a> BuildExecutor<'a> {
         package: &PackageMeta,
         env_manager: &EnvironmentManager,
         config: &BuildConfig,
+        cancel_requested: &AtomicBool,
     ) -> Result<(), String> {
         let build_dir = config.build_base.join(&package.name);
         let install_prefix = if config.merge_install {
@@ -785,6 +844,8 @@ impl<'a> BuildExecutor<'a> {
             configure_cmd,
             "CMake configure",
             &Self::phase_log_path(config, &package.name, "configure"),
+            config.phase_timeout,
+            cancel_requested,
         )?;
         println!("  {}", "CMake configure succeeded".bright_green());
 
@@ -801,6 +862,8 @@ impl<'a> BuildExecutor<'a> {
             build_cmd,
             "CMake build",
             &Self::phase_log_path(config, &package.name, "build"),
+            config.phase_timeout,
+            cancel_requested,
         )?;
         println!("  {}", "CMake build succeeded".bright_green());
 
@@ -813,6 +876,8 @@ impl<'a> BuildExecutor<'a> {
             install_cmd,
             "CMake install",
             &Self::phase_log_path(config, &package.name, "install"),
+            config.phase_timeout,
+            cancel_requested,
         )?;
         println!("  {}", "CMake install succeeded".bright_green());
 
@@ -824,6 +889,7 @@ impl<'a> BuildExecutor<'a> {
         package: &PackageMeta,
         env_manager: &EnvironmentManager,
         config: &BuildConfig,
+        cancel_requested: &AtomicBool,
     ) -> Result<(), String> {
         Self::validate_python_package_layout(package)?;
 
@@ -846,6 +912,8 @@ impl<'a> BuildExecutor<'a> {
             build_cmd,
             "Python build",
             &Self::phase_log_path(config, &package.name, "build"),
+            config.phase_timeout,
+            cancel_requested,
         )?;
 
         let mut install_cmd = Command::new("python3");
@@ -857,6 +925,8 @@ impl<'a> BuildExecutor<'a> {
             install_cmd,
             "Python install",
             &Self::phase_log_path(config, &package.name, "install"),
+            config.phase_timeout,
+            cancel_requested,
         )?;
 
         Self::normalize_python_install_layout(&install_prefix)
@@ -2405,6 +2475,8 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
         mut command: Command,
         label: &str,
         log_path: &Path,
+        timeout: Option<Duration>,
+        cancel_requested: &AtomicBool,
     ) -> Result<(), String> {
         let program = command.get_program().to_string_lossy().to_string();
         let args = command
@@ -2426,9 +2498,35 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
             .ok_or_else(|| format!("{label} failed to capture stderr"))?;
         let stdout_handle = thread::spawn(move || Self::stream_output(stdout_reader, false));
         let stderr_handle = thread::spawn(move || Self::stream_output(stderr_reader, true));
-        let status = child
-            .wait()
-            .map_err(|e| format!("{label} failed while waiting for completion: {e}"))?;
+        let start = Instant::now();
+        let mut timed_out = false;
+        let mut interrupted = false;
+        let status = loop {
+            if cancel_requested.load(Ordering::SeqCst) {
+                interrupted = true;
+                let _ = child.kill();
+                break child.wait().map_err(|e| {
+                    format!("{label} failed while stopping interrupted process: {e}")
+                })?;
+            }
+
+            if timeout.is_some_and(|limit| start.elapsed() >= limit) {
+                timed_out = true;
+                let _ = child.kill();
+                break child.wait().map_err(|e| {
+                    format!("{label} failed while stopping timed out process: {e}")
+                })?;
+            }
+
+            if let Some(status) = child
+                .try_wait()
+                .map_err(|e| format!("{label} failed while waiting for completion: {e}"))?
+            {
+                break status;
+            }
+
+            thread::sleep(Duration::from_millis(50));
+        };
         let stdout = String::from_utf8_lossy(
             &stdout_handle
                 .join()
@@ -2460,7 +2558,16 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
             return Ok(());
         }
 
-        let mut message = format!("{label} failed.\nCommand: {command_line}");
+        let mut message = if interrupted {
+            format!("{label} interrupted.\nCommand: {command_line}")
+        } else if timed_out {
+            let timeout_secs = timeout
+                .map(|value| format!("{:.2}", value.as_secs_f64()))
+                .unwrap_or_else(|| "unknown".to_string());
+            format!("{label} timed out after {timeout_secs}s.\nCommand: {command_line}")
+        } else {
+            format!("{label} failed.\nCommand: {command_line}")
+        };
         if !stdout.is_empty() {
             message.push_str(&format!("\nstdout:\n{stdout}"));
         }
@@ -2556,6 +2663,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::process::Command;
+    use std::sync::atomic::AtomicBool;
     use std::sync::mpsc;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -3526,11 +3634,19 @@ mod tests {
     fn run_command_checked_writes_phase_log() {
         let temp = tempdir().unwrap();
         let log_path = temp.path().join("latest/demo_pkg/build.log");
+        let cancel_requested = AtomicBool::new(false);
 
         let mut command = Command::new("sh");
         command.args(["-c", "printf 'hello stdout'; printf 'oops stderr' >&2"]);
 
-        BuildExecutor::run_command_checked(command, "Fixture command", &log_path).unwrap();
+        BuildExecutor::run_command_checked(
+            command,
+            "Fixture command",
+            &log_path,
+            None,
+            &cancel_requested,
+        )
+        .unwrap();
 
         let log = fs::read_to_string(log_path).unwrap();
         assert!(log.contains("[Fixture command]"));
@@ -3545,6 +3661,7 @@ mod tests {
     fn run_command_checked_preserves_partial_stream_output_in_logs() {
         let temp = tempdir().unwrap();
         let log_path = temp.path().join("latest/demo_pkg/stream.log");
+        let cancel_requested = AtomicBool::new(false);
 
         let mut command = Command::new("sh");
         command.args([
@@ -3552,12 +3669,65 @@ mod tests {
             "printf 'stdout-part-1'; sleep 0.1; printf ' stdout-part-2'; printf 'stderr-part-1' >&2; sleep 0.1; printf ' stderr-part-2' >&2",
         ]);
 
-        BuildExecutor::run_command_checked(command, "Streaming command", &log_path).unwrap();
+        BuildExecutor::run_command_checked(
+            command,
+            "Streaming command",
+            &log_path,
+            None,
+            &cancel_requested,
+        )
+        .unwrap();
 
         let log = fs::read_to_string(log_path).unwrap();
         assert!(log.contains("[Streaming command]"));
         assert!(log.contains("stdout-part-1 stdout-part-2"));
         assert!(log.contains("stderr-part-1 stderr-part-2"));
+    }
+
+    #[test]
+    fn run_command_checked_times_out_long_running_phase() {
+        let temp = tempdir().unwrap();
+        let log_path = temp.path().join("latest/demo_pkg/timeout.log");
+        let cancel_requested = AtomicBool::new(false);
+
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf 'phase start'; sleep 1"]);
+
+        let error = BuildExecutor::run_command_checked(
+            command,
+            "Timed command",
+            &log_path,
+            Some(Duration::from_millis(50)),
+            &cancel_requested,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("Timed command timed out"));
+        let log = fs::read_to_string(log_path).unwrap();
+        assert!(log.contains("phase start"));
+    }
+
+    #[test]
+    fn run_command_checked_aborts_when_cancel_requested() {
+        let temp = tempdir().unwrap();
+        let log_path = temp.path().join("latest/demo_pkg/interrupted.log");
+        let cancel_requested = AtomicBool::new(true);
+
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf 'phase start'; sleep 1"]);
+
+        let error = BuildExecutor::run_command_checked(
+            command,
+            "Interruptible command",
+            &log_path,
+            Some(Duration::from_secs(1)),
+            &cancel_requested,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("Interruptible command interrupted"));
+        let log = fs::read_to_string(log_path).unwrap();
+        assert!(log.contains("phase start"));
     }
 
     #[test]
@@ -3735,6 +3905,7 @@ mod tests {
             ]))),
             build_count: Arc::new(Mutex::new((0, 0, 0))),
             build_records: Arc::new(Mutex::new(HashMap::new())),
+            cancel_requested: Arc::new(AtomicBool::new(false)),
         };
 
         let package_a = fixture_package("pkg_a", &["dep_a"]);

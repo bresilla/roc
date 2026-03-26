@@ -1,6 +1,7 @@
 use clap::ArgMatches;
 use colored::Colorize;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::commands::work::build::{BuildConfig, ColconBuilder};
 
@@ -51,6 +52,9 @@ fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std:
     config.symlink_install = matches.get_flag("symlink_install");
     config.continue_on_error = matches.get_flag("continue_on_error");
     config.strict_discovery = matches.get_flag("strict_discovery");
+    if let Some(timeout_seconds) = matches.get_one::<u64>("phase_timeout_seconds") {
+        config.phase_timeout = Some(Duration::from_secs(*timeout_seconds));
+    }
 
     if let Some(cmake_args) = matches.get_many::<String>("cmake_args") {
         config.cmake_args = cmake_args.map(|s| s.to_string()).collect();
@@ -146,6 +150,7 @@ pub fn handle(matches: ArgMatches) {
 #[cfg(test)]
 mod tests {
     use super::config_from_matches;
+    use std::time::Duration;
 
     #[test]
     fn config_from_matches_uses_custom_base_directories() {
@@ -210,5 +215,17 @@ mod tests {
         let config = config_from_matches(submatches).unwrap();
 
         assert!(config.strict_discovery);
+    }
+
+    #[test]
+    fn config_from_matches_parses_phase_timeout_seconds() {
+        let matches = crate::arguments::work::cmd()
+            .try_get_matches_from(["work", "build", "--phase-timeout-seconds", "15"])
+            .unwrap();
+        let (_, submatches) = matches.subcommand().unwrap();
+
+        let config = config_from_matches(submatches).unwrap();
+
+        assert_eq!(config.phase_timeout, Some(Duration::from_secs(15)));
     }
 }

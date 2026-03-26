@@ -583,7 +583,7 @@ Definition of done:
 
 - users can see build progress while logs remain complete and usable
 
-### Slice 6.4: Add Timeouts And Interrupt Handling To Build Phases
+### Slice 6.4: Add Timeouts And Interrupt Handling To Build Phases [complete]
 
 Problem:
 

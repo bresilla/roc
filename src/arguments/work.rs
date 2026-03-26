@@ -174,6 +174,14 @@ pub fn cmd() -> Command {
                     .help("Continue building other packages when a package fails")
             )
             .arg(
+                Arg::new("phase_timeout_seconds")
+                    .long("phase-timeout-seconds")
+                    .visible_alias("phase_timeout_seconds")
+                    .value_name("SECONDS")
+                    .value_parser(clap::value_parser!(u64))
+                    .help("Abort an individual configure/build/install phase if it exceeds the timeout")
+            )
+            .arg(
                 Arg::new("strict_discovery")
                     .long("strict-discovery")
                     .visible_alias("strict_discovery")

@@ -16,6 +16,7 @@ use colored::Colorize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::shared::package_discovery::{
     discover_packages_with_diagnostics, DiscoveryConfig, DiscoveryResult,
@@ -40,6 +41,7 @@ pub struct BuildConfig {
     pub cmake_target: Option<String>,
     pub continue_on_error: bool,
     pub strict_discovery: bool,
+    pub phase_timeout: Option<Duration>,
     pub workspace_root: PathBuf,
     pub install_base: PathBuf,
     pub build_base: PathBuf,
@@ -66,6 +68,7 @@ impl Default for BuildConfig {
             cmake_target: None,
             continue_on_error: false,
             strict_discovery: false,
+            phase_timeout: None,
             workspace_root: workspace_root.clone(),
             install_base: workspace_root.join("install"),
             build_base: workspace_root.join("build"),
