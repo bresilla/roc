@@ -1,0 +1,3 @@
+[console_scripts]
+metrics_cli = demo_python_tools.metrics_cli:main
+report_node = demo_python_tools.report_node:main

@@ -1,0 +1,5 @@
+topic_name: demo/telemetry
+input_topic: demo/stats
+window_size: 8
+publish_period_ms: 1000
+scenario_name: descending

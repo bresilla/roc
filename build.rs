@@ -1,43 +1,57 @@
 use std::env;
 use std::path::PathBuf;
 
+fn ros_prefixes() -> Vec<PathBuf> {
+    let mut prefixes = Vec::new();
+
+    for var in ["AMENT_PREFIX_PATH", "CMAKE_PREFIX_PATH"] {
+        if let Ok(value) = env::var(var) {
+            for prefix in value.split(':') {
+                if prefix.is_empty() {
+                    continue;
+                }
+                let path = PathBuf::from(prefix);
+                if !prefixes.contains(&path) {
+                    prefixes.push(path);
+                }
+            }
+        }
+    }
+
+    if prefixes.is_empty() {
+        prefixes.push(PathBuf::from("/opt/ros/jazzy"));
+    }
+
+    prefixes
+}
+
+fn find_header(prefixes: &[PathBuf], relative_path: &str) -> PathBuf {
+    for prefix in prefixes {
+        let candidate = prefix.join("include").join(relative_path);
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+
+    let fallback_prefix = prefixes
+        .first()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from("/opt/ros/jazzy"));
+    fallback_prefix.join("include").join(relative_path)
+}
+
 fn main() {
     // Generate Rust FFI bindings for the ROS2-generated C message structs.
     //
     // This does not generate full message support; we use it as the low-level
     // rmw struct definitions which we can then pair with typesupport symbols.
 
-    let ament_prefix =
-        env::var("AMENT_PREFIX_PATH").unwrap_or_else(|_| "/opt/ros/jazzy".to_string());
-    let include_root = PathBuf::from(ament_prefix).join("include");
+    let prefixes = ros_prefixes();
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let bindings_path = out_dir.join("ros_tf_msgs_bindings.rs");
 
     let mut builder = bindgen::Builder::default()
-        .clang_arg(format!("-I{}", include_root.display()))
-        // Some packages include headers as <pkg/msg/...> which live under include/<pkg>.
-        .clang_arg(format!(
-            "-I{}",
-            include_root.join("builtin_interfaces").display()
-        ))
-        .clang_arg(format!("-I{}", include_root.join("std_msgs").display()))
-        .clang_arg(format!(
-            "-I{}",
-            include_root.join("geometry_msgs").display()
-        ))
-        .clang_arg(format!("-I{}", include_root.join("tf2_msgs").display()))
-        // ROS2 installs some headers under include/<pkg>/<pkg>/... but also expects
-        // includes like <rosidl_runtime_c/...>, which live under include/rosidl_runtime_c/rosidl_runtime_c.
-        .clang_arg(format!(
-            "-I{}",
-            include_root.join("rosidl_runtime_c").display()
-        ))
-        .clang_arg(format!("-I{}", include_root.join("rcutils").display()))
-        .clang_arg(format!(
-            "-I{}",
-            include_root.join("rosidl_typesupport_interface").display()
-        ))
         .clang_arg("-std=c11")
         // Keep bindgen output stable and minimal.
         .allowlist_type("builtin_interfaces__msg__Time")
@@ -67,6 +81,35 @@ fn main() {
         .derive_default(true)
         .generate_comments(false);
 
+    for prefix in &prefixes {
+        let include_root = prefix.join("include");
+        if !include_root.is_dir() {
+            continue;
+        }
+
+        builder = builder
+            .clang_arg(format!("-I{}", include_root.display()))
+            .clang_arg(format!(
+                "-I{}",
+                include_root.join("builtin_interfaces").display()
+            ))
+            .clang_arg(format!("-I{}", include_root.join("std_msgs").display()))
+            .clang_arg(format!(
+                "-I{}",
+                include_root.join("geometry_msgs").display()
+            ))
+            .clang_arg(format!("-I{}", include_root.join("tf2_msgs").display()))
+            .clang_arg(format!(
+                "-I{}",
+                include_root.join("rosidl_runtime_c").display()
+            ))
+            .clang_arg(format!("-I{}", include_root.join("rcutils").display()))
+            .clang_arg(format!(
+                "-I{}",
+                include_root.join("rosidl_typesupport_interface").display()
+            ));
+    }
+
     // The headers we need.
     let headers = [
         "builtin_interfaces/builtin_interfaces/msg/detail/time__struct.h",
@@ -87,7 +130,7 @@ fn main() {
     ];
 
     for h in headers {
-        builder = builder.header(include_root.join(h).to_string_lossy());
+        builder = builder.header(find_header(&prefixes, h).to_string_lossy());
     }
 
     let bindings = builder
@@ -98,7 +141,11 @@ fn main() {
         .expect("Couldn't write bindings");
 
     println!("cargo:rerun-if-env-changed=AMENT_PREFIX_PATH");
+    println!("cargo:rerun-if-env-changed=CMAKE_PREFIX_PATH");
     for h in headers {
-        println!("cargo:rerun-if-changed={}", include_root.join(h).display());
+        println!(
+            "cargo:rerun-if-changed={}",
+            find_header(&prefixes, h).display()
+        );
     }
 }

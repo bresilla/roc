@@ -88,7 +88,7 @@ fn set_sequence_value_from_yaml(
     let elements = expect_yaml_sequence(field, value)?;
 
     match sequence {
-        SequenceValueMut::BooleanSequence(mut seq) => {
+        SequenceValueMut::BooleanSequence(seq) => {
             *seq = elements
                 .iter()
                 .map(|item| {
@@ -98,7 +98,7 @@ fn set_sequence_value_from_yaml(
                 .collect::<Result<_>>()?;
             Ok(())
         }
-        SequenceValueMut::Int32Sequence(mut seq) => {
+        SequenceValueMut::Int32Sequence(seq) => {
             *seq = elements
                 .iter()
                 .map(|item| {
@@ -111,7 +111,7 @@ fn set_sequence_value_from_yaml(
                 .collect::<Result<_>>()?;
             Ok(())
         }
-        SequenceValueMut::Uint32Sequence(mut seq) => {
+        SequenceValueMut::Uint32Sequence(seq) => {
             *seq = elements
                 .iter()
                 .map(|item| {
@@ -124,7 +124,7 @@ fn set_sequence_value_from_yaml(
                 .collect::<Result<_>>()?;
             Ok(())
         }
-        SequenceValueMut::Int64Sequence(mut seq) => {
+        SequenceValueMut::Int64Sequence(seq) => {
             *seq = elements
                 .iter()
                 .map(|item| {
@@ -134,7 +134,7 @@ fn set_sequence_value_from_yaml(
                 .collect::<Result<_>>()?;
             Ok(())
         }
-        SequenceValueMut::Uint64Sequence(mut seq) => {
+        SequenceValueMut::Uint64Sequence(seq) => {
             *seq = elements
                 .iter()
                 .map(|item| {
@@ -144,7 +144,7 @@ fn set_sequence_value_from_yaml(
                 .collect::<Result<_>>()?;
             Ok(())
         }
-        SequenceValueMut::FloatSequence(mut seq) => {
+        SequenceValueMut::FloatSequence(seq) => {
             *seq = elements
                 .iter()
                 .map(|item| {
@@ -155,7 +155,7 @@ fn set_sequence_value_from_yaml(
                 .collect::<Result<_>>()?;
             Ok(())
         }
-        SequenceValueMut::DoubleSequence(mut seq) => {
+        SequenceValueMut::DoubleSequence(seq) => {
             *seq = elements
                 .iter()
                 .map(|item| {
@@ -165,7 +165,7 @@ fn set_sequence_value_from_yaml(
                 .collect::<Result<_>>()?;
             Ok(())
         }
-        SequenceValueMut::StringSequence(mut seq) => {
+        SequenceValueMut::StringSequence(seq) => {
             *seq = elements
                 .iter()
                 .map(|item| {

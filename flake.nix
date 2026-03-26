@@ -22,7 +22,7 @@
 
         rosDistro = pkgs.rosPackages.jazzy;
 
-        rosPrefixes = "${rosDistro.ament-cmake}:${rosDistro.ament-cmake-core}:${rosDistro.python-cmake-module}:${rosDistro.rmw}:${rosDistro.rosidl-default-generators}:${rosDistro.rosidl-runtime-c}:${rosDistro.rosidl-typesupport-c}:${rosDistro.rosidl-typesupport-interface}:${rosDistro.std-msgs}";
+        rosPrefixes = "${rosDistro.ament-cmake}:${rosDistro.ament-cmake-core}:${rosDistro.python-cmake-module}:${rosDistro.rmw}:${rosDistro.rosidl-default-generators}:${rosDistro.rosidl-runtime-c}:${rosDistro.rosidl-typesupport-c}:${rosDistro.rosidl-typesupport-interface}:${rosDistro.std-msgs}:${rosDistro.test-msgs}";
       in
       {
         devShells.default = pkgs.mkShell {
@@ -44,6 +44,7 @@
                   cyclonedds
                   rmw-cyclonedds-cpp
                   ackermann-msgs
+                  test-msgs
                   moveit
                 ];
               })
@@ -52,6 +53,12 @@
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
 
           shellHook = ''
+            export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
+            export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export CC=clang
+            export CXX=clang++
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+
             dedup_flags() {
                 local var_name="$1"
                 local current_value
@@ -142,7 +149,7 @@
                 local filtered=""
 
                 synthetic_prefix="$PWD/.nix-ament-prefix"
-                mkdir -p "$synthetic_prefix/share/ament_index/resource_index"
+                mkdir -p "$synthetic_prefix/share/ament_index/resource_index/packages"
 
                 cat > "$synthetic_prefix/local_setup.sh" <<'SETUPEOF'
             #!/usr/bin/env sh

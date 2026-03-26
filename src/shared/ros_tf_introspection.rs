@@ -21,10 +21,39 @@ pub struct LoadedTypeSupport {
     pub handle: *const RosidlMessageTypeSupport,
 }
 
-fn ros_lib_dir() -> PathBuf {
-    let prefix =
-        std::env::var("AMENT_PREFIX_PATH").unwrap_or_else(|_| "/opt/ros/jazzy".to_string());
-    PathBuf::from(prefix).join("lib")
+fn ros_prefixes() -> Vec<PathBuf> {
+    let mut prefixes = Vec::new();
+
+    for var in ["AMENT_PREFIX_PATH", "CMAKE_PREFIX_PATH"] {
+        if let Ok(value) = std::env::var(var) {
+            for prefix in value.split(':') {
+                if prefix.is_empty() {
+                    continue;
+                }
+                let path = PathBuf::from(prefix);
+                if !prefixes.contains(&path) {
+                    prefixes.push(path);
+                }
+            }
+        }
+    }
+
+    if prefixes.is_empty() {
+        prefixes.push(PathBuf::from("/opt/ros/jazzy"));
+    }
+
+    prefixes
+}
+
+fn ros_lib_path(libname: &str) -> PathBuf {
+    for prefix in ros_prefixes() {
+        let candidate = prefix.join("lib").join(libname);
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+
+    PathBuf::from("/opt/ros/jazzy").join("lib").join(libname)
 }
 
 fn load_symbol(lib: &Library, symbol: &str) -> Result<*const RosidlMessageTypeSupport> {
@@ -38,13 +67,13 @@ fn load_symbol(lib: &Library, symbol: &str) -> Result<*const RosidlMessageTypeSu
 
 fn load_introspection_c_lib(pkg: &str) -> Result<Library> {
     let libname = format!("lib{}__rosidl_typesupport_introspection_c.so", pkg);
-    let path = ros_lib_dir().join(libname);
+    let path = ros_lib_path(&libname);
     unsafe { Library::new(&path).map_err(|e| anyhow!("Failed to load {}: {}", path.display(), e)) }
 }
 
 fn load_typesupport_c_lib(pkg: &str) -> Result<Library> {
     let libname = format!("lib{}__rosidl_typesupport_c.so", pkg);
-    let path = ros_lib_dir().join(libname);
+    let path = ros_lib_path(&libname);
     unsafe { Library::new(&path).map_err(|e| anyhow!("Failed to load {}: {}", path.display(), e)) }
 }
 

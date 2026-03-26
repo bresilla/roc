@@ -6,3 +6,6 @@
 proto2ros
 test
 .nix-ament-prefix/
+examples/log
+examples/build
+examples/install

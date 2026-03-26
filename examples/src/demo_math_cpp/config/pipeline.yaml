@@ -1,0 +1,4 @@
+window_size: 5
+topic_name: demo/stats
+publish_period_ms: 750
+stream_name: burst

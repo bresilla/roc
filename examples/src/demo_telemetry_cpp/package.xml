@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>demo_telemetry_cpp</name>
+  <version>0.1.0</version>
+  <description>Dependent C++ example package consuming the demo_math_cpp library.</description>
+  <maintainer email="examples@example.com">ROC Examples</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>demo_math_cpp</depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: demo_python_tools
+Version: 0.1.0
+Summary: Python example package with a ROS node and testable CLI helpers.
+Maintainer: ROC Examples
+Maintainer-email: examples@example.com
+License: Apache-2.0
+Requires-Dist: setuptools
+Dynamic: license
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: requires-dist
+Dynamic: summary
