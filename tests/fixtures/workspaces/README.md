@@ -12,6 +12,18 @@ These fixture workspaces provide stable compatibility cases for `roc work build`
   - one minimal `ament_python` package
   - used for discovery and Python package layout checks
 
+- `ament_python_setup_cfg_only`
+  - one `ament_python` package that declares `setup.cfg` but omits `setup.py`
+  - used for unsupported Python layout coverage
+
+- `unsupported_build_type`
+  - one package with an explicit non-supported build type
+  - used for unsupported build-type discovery coverage
+
+- `ignored_packages`
+  - one normal package and one package hidden by `COLCON_IGNORE`
+  - used for ignore-marker discovery coverage
+
 - `dependency_chain`
   - two packages with a simple dependency edge
   - used for topological ordering checks

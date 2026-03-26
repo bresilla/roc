@@ -916,6 +916,8 @@ impl<'a> BuildExecutor<'a> {
         config: &BuildConfig,
         cancel_requested: &AtomicBool,
     ) -> Result<(), String> {
+        Self::validate_cmake_package_layout(package)?;
+
         let build_dir = config.build_base.join(&package.name);
         let install_prefix = if config.merge_install {
             config.install_base.clone()
@@ -978,6 +980,18 @@ impl<'a> BuildExecutor<'a> {
             cancel_requested,
         )?;
         println!("  {}", "CMake install succeeded".bright_green());
+
+        Ok(())
+    }
+
+    fn validate_cmake_package_layout(package: &PackageMeta) -> Result<(), String> {
+        let cmake_lists = package.path.join("CMakeLists.txt");
+        if !cmake_lists.is_file() {
+            return Err(format!(
+                "Unsupported CMake package layout for {}: missing CMakeLists.txt.",
+                package.name
+            ));
+        }
 
         Ok(())
     }
@@ -2784,6 +2798,14 @@ mod tests {
         }
     }
 
+    fn fixture_workspace_path(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("workspaces")
+            .join(name)
+    }
+
     #[test]
     fn create_workspace_directories_respects_custom_bases_and_ignore_markers() {
         let temp = tempdir().unwrap();
@@ -3621,6 +3643,83 @@ mod tests {
 
         let error = BuildExecutor::validate_python_package_layout(&package).unwrap_err();
         assert!(error.contains("missing Python package directory"));
+    }
+
+    #[test]
+    fn validate_python_package_layout_rejects_setup_cfg_only_fixture() {
+        let package = PackageMeta {
+            name: "demo_cfg_pkg".to_string(),
+            path: fixture_workspace_path("ament_python_setup_cfg_only")
+                .join("src")
+                .join("demo_cfg_pkg"),
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: "fixture".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: vec!["ament_python".to_string()],
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        let error = BuildExecutor::validate_python_package_layout(&package).unwrap_err();
+        assert!(error.contains("missing setup.py"));
+    }
+
+    #[test]
+    fn validate_cmake_package_layout_accepts_minimal_supported_shape() {
+        let temp = tempdir().unwrap();
+        let package_root = temp.path().join("src/demo_cmake_pkg");
+        fs::create_dir_all(&package_root).unwrap();
+        fs::write(
+            package_root.join("CMakeLists.txt"),
+            "cmake_minimum_required(VERSION 3.8)\nproject(demo_cmake_pkg)\n",
+        )
+        .unwrap();
+
+        let package = PackageMeta {
+            name: "demo_cmake_pkg".to_string(),
+            path: package_root,
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: vec!["ament_cmake".to_string()],
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        BuildExecutor::validate_cmake_package_layout(&package).unwrap();
+    }
+
+    #[test]
+    fn validate_cmake_package_layout_rejects_missing_cmakelists() {
+        let temp = tempdir().unwrap();
+        let package_root = temp.path().join("src/demo_cmake_pkg");
+        fs::create_dir_all(&package_root).unwrap();
+
+        let package = PackageMeta {
+            name: "demo_cmake_pkg".to_string(),
+            path: package_root,
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: vec!["ament_cmake".to_string()],
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        let error = BuildExecutor::validate_cmake_package_layout(&package).unwrap_err();
+        assert!(error.contains("missing CMakeLists.txt"));
     }
 
     #[test]

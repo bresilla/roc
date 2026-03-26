@@ -801,3 +801,24 @@ Tasks:
 Definition of done:
 
 - `roc work test` discovery and preflight behavior matches the hardened build path in clarity and failure quality
+
+### Slice 7.3: Add Pathological Package Fixtures For Build-System Coverage [complete]
+
+Problem:
+
+- the build path had good unit coverage, but fewer real fixture workspaces for pathological package shapes
+- weird Python and CMake package layouts can regress if they are only covered by synthetic tempdir tests
+
+Tasks:
+
+- add fixture workspaces for:
+  - `setup.cfg`-only `ament_python`
+  - explicit unsupported build types
+  - ignored packages hidden by `COLCON_IGNORE`
+- add compatibility tests that prove those fixtures are discovered with the expected semantics
+- add early CMake layout validation mirroring the Python layout checks
+- add regression tests for unsupported CMake layout and fixture-backed Python rejection
+
+Definition of done:
+
+- pathological Python/CMake package shapes have stable fixture coverage and fail early with explicit reasons

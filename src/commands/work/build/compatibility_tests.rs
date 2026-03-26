@@ -78,6 +78,38 @@ fn ament_python_fixture_is_discoverable() {
 }
 
 #[test]
+fn setup_cfg_only_python_fixture_is_discoverable_as_ament_python() {
+    let packages = discover_fixture_packages("ament_python_setup_cfg_only");
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].name, "demo_cfg_pkg");
+    assert_eq!(
+        packages[0].build_type,
+        crate::commands::work::build::BuildType::AmentPython
+    );
+}
+
+#[test]
+fn unsupported_build_type_fixture_is_preserved_as_other() {
+    let packages = discover_fixture_packages("unsupported_build_type");
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].name, "demo_custom_pkg");
+    assert_eq!(
+        packages[0].build_type,
+        crate::commands::work::build::BuildType::Other("bazel".to_string())
+    );
+}
+
+#[test]
+fn ignore_markers_exclude_hidden_packages_from_discovery() {
+    let packages = discover_fixture_packages("ignored_packages");
+    let names = packages
+        .iter()
+        .map(|pkg| pkg.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(names, vec!["visible_pkg"]);
+}
+
+#[test]
 fn dependency_chain_fixture_orders_packages_topologically() {
     let packages = discover_fixture_packages("dependency_chain");
     let order = dependency_graph::topological_sort(&packages).unwrap();

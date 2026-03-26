@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>demo_custom_pkg</name>
+  <version>0.1.0</version>
+  <description>Unsupported build type fixture package</description>
+  <maintainer email="fixtures@example.com">Fixture Maintainer</maintainer>
+  <license>Apache-2.0</license>
+  <export>
+    <build_type>bazel</build_type>
+  </export>
+</package>
