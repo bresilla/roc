@@ -825,6 +825,8 @@ impl<'a> BuildExecutor<'a> {
         env_manager: &EnvironmentManager,
         config: &BuildConfig,
     ) -> Result<(), String> {
+        Self::validate_python_package_layout(package)?;
+
         let build_dir = config.build_base.join(&package.name);
         let install_prefix = if config.merge_install {
             config.install_base.clone()
@@ -863,6 +865,35 @@ impl<'a> BuildExecutor<'a> {
         if config.symlink_install {
             Self::apply_python_symlink_install(package, &build_dir, &install_prefix)
                 .map_err(|e| format!("Failed to apply symlink install: {}", e))?;
+        }
+
+        Ok(())
+    }
+
+    fn validate_python_package_layout(package: &PackageMeta) -> Result<(), String> {
+        let setup_py = package.path.join("setup.py");
+        if !setup_py.is_file() {
+            return Err(format!(
+                "Unsupported ament_python package layout for {}: missing setup.py. roc currently supports setuptools-based packages and does not support setup.cfg-only or pyproject-only builds yet.",
+                package.name
+            ));
+        }
+
+        let resource_marker = package.path.join("resource").join(&package.name);
+        if !resource_marker.is_file() {
+            return Err(format!(
+                "Unsupported ament_python package layout for {}: missing resource/{} marker.",
+                package.name, package.name
+            ));
+        }
+
+        let module_dir = package.path.join(&package.name);
+        if !module_dir.is_dir() {
+            return Err(format!(
+                "Unsupported ament_python package layout for {}: missing Python package directory {}.",
+                package.name,
+                module_dir.display()
+            ));
         }
 
         Ok(())
@@ -3265,6 +3296,125 @@ mod tests {
         assert!(module_meta.file_type().is_symlink());
         assert!(marker_meta.file_type().is_symlink());
         assert!(xml_meta.file_type().is_symlink());
+    }
+
+    #[test]
+    fn validate_python_package_layout_accepts_minimal_supported_shape() {
+        let temp = tempdir().unwrap();
+        let package_root = temp.path().join("src/demo_python_pkg");
+        fs::create_dir_all(package_root.join("demo_python_pkg")).unwrap();
+        fs::create_dir_all(package_root.join("resource")).unwrap();
+        fs::write(
+            package_root.join("setup.py"),
+            "from setuptools import setup\n",
+        )
+        .unwrap();
+        fs::write(package_root.join("resource/demo_python_pkg"), "").unwrap();
+
+        let package = PackageMeta {
+            name: "demo_python_pkg".to_string(),
+            path: package_root,
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        BuildExecutor::validate_python_package_layout(&package).unwrap();
+    }
+
+    #[test]
+    fn validate_python_package_layout_rejects_missing_setup_py() {
+        let temp = tempdir().unwrap();
+        let package_root = temp.path().join("src/demo_python_pkg");
+        fs::create_dir_all(package_root.join("demo_python_pkg")).unwrap();
+        fs::create_dir_all(package_root.join("resource")).unwrap();
+        fs::write(package_root.join("resource/demo_python_pkg"), "").unwrap();
+
+        let package = PackageMeta {
+            name: "demo_python_pkg".to_string(),
+            path: package_root,
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        let error = BuildExecutor::validate_python_package_layout(&package).unwrap_err();
+        assert!(error.contains("missing setup.py"));
+    }
+
+    #[test]
+    fn validate_python_package_layout_rejects_missing_resource_marker() {
+        let temp = tempdir().unwrap();
+        let package_root = temp.path().join("src/demo_python_pkg");
+        fs::create_dir_all(package_root.join("demo_python_pkg")).unwrap();
+        fs::write(
+            package_root.join("setup.py"),
+            "from setuptools import setup\n",
+        )
+        .unwrap();
+
+        let package = PackageMeta {
+            name: "demo_python_pkg".to_string(),
+            path: package_root,
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        let error = BuildExecutor::validate_python_package_layout(&package).unwrap_err();
+        assert!(error.contains("missing resource/demo_python_pkg marker"));
+    }
+
+    #[test]
+    fn validate_python_package_layout_rejects_missing_module_dir() {
+        let temp = tempdir().unwrap();
+        let package_root = temp.path().join("src/demo_python_pkg");
+        fs::create_dir_all(package_root.join("resource")).unwrap();
+        fs::write(
+            package_root.join("setup.py"),
+            "from setuptools import setup\n",
+        )
+        .unwrap();
+        fs::write(package_root.join("resource/demo_python_pkg"), "").unwrap();
+
+        let package = PackageMeta {
+            name: "demo_python_pkg".to_string(),
+            path: package_root,
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        let error = BuildExecutor::validate_python_package_layout(&package).unwrap_err();
+        assert!(error.contains("missing Python package directory"));
     }
 
     #[test]

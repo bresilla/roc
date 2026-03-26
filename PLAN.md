@@ -702,7 +702,7 @@ Definition of done:
 
 - `roc work build` has a deliberate preflight policy instead of a blanket assumption
 
-### Slice 6.9: Reduce Reliance On `setup.py install` Assumptions
+### Slice 6.9: Reduce Reliance On `setup.py install` Assumptions [complete]
 
 Problem:
 
