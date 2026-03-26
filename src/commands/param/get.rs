@@ -1,9 +1,9 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 
 use crate::arguments::param::CommonParamArgs;
-use crate::shared::param_operations::{ParamClientContext, format_parameter_value_for_display};
+use crate::shared::param_operations::{format_parameter_value_for_display, ParamClientContext};
 
 fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {
     let node_name = matches

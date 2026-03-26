@@ -1,5 +1,5 @@
 use crate::shared::package_discovery::{
-    DiscoveryConfig, Package, discover_packages, find_idl_files_in_packages,
+    discover_packages, find_idl_files_in_packages, DiscoveryConfig, Package,
 };
 use anyhow::Result;
 use std::path::PathBuf;

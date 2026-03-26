@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use rclrs::{Client, Context, CreateBasicExecutor, Executor, Node, RclrsErrorFilter, SpinOptions};
 use regex::Regex;
 use std::sync::{Arc, Mutex};

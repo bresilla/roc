@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;

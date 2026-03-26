@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use libloading::Library;
 use std::ffi::c_void;
 use std::path::PathBuf;

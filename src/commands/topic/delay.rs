@@ -1,7 +1,7 @@
 use crate::arguments::topic::CommonTopicArgs;
 use crate::commands::cli::run_async_command;
 use crate::graph::RclGraphContext;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use rclrs::{Context, CreateBasicExecutor, DynamicMessage, MessageTypeName};
 use std::sync::atomic::{AtomicBool, Ordering};

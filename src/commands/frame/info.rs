@@ -1,13 +1,13 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use crate::shared::tf_dump;
 use crate::shared::tf2_subscriber::TfFrameIndex;
+use crate::shared::tf_dump;
 
 fn run_command(matches: ArgMatches) -> Result<()> {
     let frame_name = matches

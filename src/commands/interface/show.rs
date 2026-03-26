@@ -1,6 +1,6 @@
 use crate::commands::cli::{handle_anyhow_result, required_string};
-use anyhow::Result;
 use anyhow::anyhow;
+use anyhow::Result;
 use clap::ArgMatches;
 
 use crate::graph::interface_operations;

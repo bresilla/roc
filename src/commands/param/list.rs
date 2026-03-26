@@ -1,11 +1,11 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use colored::*;
 
 use crate::arguments::param::CommonParamArgs;
 use crate::shared::param_operations::{
-    ParamClientContext, filter_parameter_names, parameter_type_to_string,
+    filter_parameter_names, parameter_type_to_string, ParamClientContext,
 };
 
 fn run_command(matches: ArgMatches, common_args: CommonParamArgs) -> Result<()> {

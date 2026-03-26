@@ -1,5 +1,5 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 use rclrs::IntoPrimitiveOptions;
 use rclrs::{Context, CreateBasicExecutor, DynamicMessage, MessageTypeName, QoSProfile};

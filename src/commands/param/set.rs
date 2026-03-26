@@ -1,9 +1,9 @@
 use crate::commands::cli::handle_anyhow_result;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ArgMatches;
 
 use crate::arguments::param::CommonParamArgs;
-use crate::shared::param_operations::{ParamClientContext, parse_value_tokens_to_parameter_value};
+use crate::shared::param_operations::{parse_value_tokens_to_parameter_value, ParamClientContext};
 
 use rclrs::vendor::rcl_interfaces::msg::Parameter;
 
