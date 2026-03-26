@@ -724,7 +724,7 @@ Definition of done:
 
 - Python package behavior is explicit, better tested, and less dependent on luck
 
-### Slice 6.10: Strengthen Build-State Persistence And Resume Semantics
+### Slice 6.10: Strengthen Build-State Persistence And Resume Semantics [complete]
 
 Problem:
 

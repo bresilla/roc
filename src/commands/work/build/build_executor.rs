@@ -1300,6 +1300,10 @@ impl<'a> BuildExecutor<'a> {
         Self::package_log_dir(config, package_name).join("status.txt")
     }
 
+    fn workspace_state_path(config: &BuildConfig) -> PathBuf {
+        config.log_base.join("latest").join("workspace_state.txt")
+    }
+
     fn package_state_label(state: &PackageState) -> &'static str {
         match state {
             PackageState::Pending => "pending",
@@ -1344,6 +1348,7 @@ impl<'a> BuildExecutor<'a> {
                 .join("build_summary.log"),
             summary,
         )?;
+        Self::write_workspace_state(self.config, records)?;
         Ok(())
     }
 
@@ -1362,6 +1367,31 @@ impl<'a> BuildExecutor<'a> {
         }
 
         let state_path = Self::package_state_path(config, package_name);
+        if let Some(parent) = state_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(state_path, content)
+    }
+
+    fn write_workspace_state(
+        config: &BuildConfig,
+        records: &HashMap<String, BuildRecord>,
+    ) -> Result<(), io::Error> {
+        let mut package_names = records.keys().cloned().collect::<Vec<_>>();
+        package_names.sort();
+
+        let mut content = format!("workspace_root={}\n", config.workspace_root.display());
+        for package_name in package_names {
+            let Some(record) = records.get(&package_name) else {
+                continue;
+            };
+            content.push_str(&format!(
+                "package={package_name}\tstatus={status}\n",
+                status = Self::package_state_label(&record.status)
+            ));
+        }
+
+        let state_path = Self::workspace_state_path(config);
         if let Some(parent) = state_path.parent() {
             fs::create_dir_all(parent)?;
         }

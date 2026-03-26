@@ -329,6 +329,10 @@ impl ColconBuilder {
     }
 
     fn load_previous_build_state(&self) -> HashMap<String, String> {
+        if let Some(state) = self.load_previous_build_state_file() {
+            return state;
+        }
+
         let state_root = self.config.log_base.join("latest");
         let entries = match fs::read_dir(state_root) {
             Ok(entries) => entries,
@@ -361,6 +365,36 @@ impl ColconBuilder {
         }
 
         state
+    }
+
+    fn load_previous_build_state_file(&self) -> Option<HashMap<String, String>> {
+        let state_path = self
+            .config
+            .log_base
+            .join("latest")
+            .join("workspace_state.txt");
+        let contents = fs::read_to_string(state_path).ok()?;
+        let mut lines = contents.lines();
+        let workspace_root = lines.next()?.strip_prefix("workspace_root=")?;
+        if workspace_root != self.config.workspace_root.to_string_lossy() {
+            return Some(HashMap::new());
+        }
+
+        let mut state = HashMap::new();
+        for line in lines {
+            let Some((package_part, status_part)) = line.split_once('\t') else {
+                continue;
+            };
+            let Some(package_name) = package_part.strip_prefix("package=") else {
+                continue;
+            };
+            let Some(status) = status_part.strip_prefix("status=") else {
+                continue;
+            };
+            state.insert(package_name.to_string(), status.to_string());
+        }
+
+        Some(state)
     }
 }
 
@@ -547,5 +581,75 @@ mod tests {
         builder.packages = vec![pkg("demo_pkg", &[])];
 
         builder.validate_requested_packages().unwrap();
+    }
+
+    #[test]
+    fn load_previous_build_state_prefers_workspace_state_file_for_matching_root() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().join("ws");
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.log_base = temp.path().join("log");
+        fs::create_dir_all(config.log_base.join("latest")).unwrap();
+        fs::write(
+            config.log_base.join("latest/workspace_state.txt"),
+            format!(
+                "workspace_root={}\npackage=base\tstatus=completed\npackage=consumer\tstatus=failed\n",
+                workspace_root.display()
+            ),
+        )
+        .unwrap();
+
+        let builder = ColconBuilder::new(config);
+        let state = builder.load_previous_build_state();
+
+        assert_eq!(state.get("base").map(String::as_str), Some("completed"));
+        assert_eq!(state.get("consumer").map(String::as_str), Some("failed"));
+    }
+
+    #[test]
+    fn load_previous_build_state_ignores_workspace_state_from_different_root() {
+        let temp = tempdir().unwrap();
+        let mut config = BuildConfig::default();
+        config.workspace_root = temp.path().join("current_ws");
+        config.log_base = temp.path().join("log");
+        fs::create_dir_all(config.log_base.join("latest/base")).unwrap();
+        fs::write(
+            config.log_base.join("latest/base/status.txt"),
+            "status=completed\n",
+        )
+        .unwrap();
+        fs::write(
+            config.log_base.join("latest/workspace_state.txt"),
+            format!(
+                "workspace_root={}\npackage=base\tstatus=failed\n",
+                temp.path().join("other_ws").display()
+            ),
+        )
+        .unwrap();
+
+        let builder = ColconBuilder::new(config);
+        let state = builder.load_previous_build_state();
+
+        assert!(state.is_empty());
+    }
+
+    #[test]
+    fn load_previous_build_state_falls_back_to_status_files_when_state_file_missing() {
+        let temp = tempdir().unwrap();
+        let mut config = BuildConfig::default();
+        config.workspace_root = temp.path().join("ws");
+        config.log_base = temp.path().join("log");
+        fs::create_dir_all(config.log_base.join("latest/base")).unwrap();
+        fs::write(
+            config.log_base.join("latest/base/status.txt"),
+            "status=completed\n",
+        )
+        .unwrap();
+
+        let builder = ColconBuilder::new(config);
+        let state = builder.load_previous_build_state();
+
+        assert_eq!(state.get("base").map(String::as_str), Some("completed"));
     }
 }
