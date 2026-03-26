@@ -2,7 +2,9 @@ use crate::commands::cli::handle_boxed_command_result;
 use crate::commands::work::build::dependency_graph;
 use crate::commands::work::build::environment_manager::EnvironmentManager;
 use crate::commands::work::build::{BuildType, PackageMeta};
-use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
+use crate::shared::package_discovery::{
+    discover_packages_with_diagnostics, DiscoveryConfig, DiscoveryResult,
+};
 use crate::shared::preflight::{ensure_command_available, ensure_ros_environment};
 use clap::ArgMatches;
 use colored::Colorize;
@@ -20,6 +22,7 @@ struct TestConfig {
     packages_up_to: Option<Vec<String>>,
     continue_on_error: bool,
     merge_install: bool,
+    strict_discovery: bool,
     ctest_args: Vec<String>,
     pytest_args: Vec<String>,
     workspace_root: PathBuf,
@@ -39,6 +42,7 @@ impl Default for TestConfig {
             packages_up_to: None,
             continue_on_error: true,
             merge_install: false,
+            strict_discovery: false,
             ctest_args: Vec::new(),
             pytest_args: Vec::new(),
             workspace_root: workspace_root.clone(),
@@ -113,15 +117,21 @@ impl WorkspaceTester {
             ],
         };
 
-        self.packages =
-            discover_packages(&discovery_config).map_err(|e| -> Box<dyn std::error::Error> {
-                Box::new(std::io::Error::other(e.to_string()))
-            })?;
+        let DiscoveryResult {
+            packages,
+            diagnostics,
+        } = discover_packages_with_diagnostics(&discovery_config).map_err(
+            |e| -> Box<dyn std::error::Error> { Box::new(std::io::Error::other(e.to_string())) },
+        )?;
+        self.packages = packages;
+
+        self.report_discovery_diagnostics(&diagnostics)?;
 
         if self.packages.is_empty() {
             return Err("No ROS packages found in the selected base paths".into());
         }
 
+        self.validate_requested_packages()?;
         self.apply_package_filters();
 
         println!(
@@ -132,6 +142,117 @@ impl WorkspaceTester {
         );
 
         Ok(())
+    }
+
+    fn report_discovery_diagnostics(
+        &self,
+        diagnostics: &[String],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if diagnostics.is_empty() {
+            return Ok(());
+        }
+
+        if self.config.strict_discovery {
+            let details = diagnostics
+                .iter()
+                .map(|line| format!("- {line}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Err(format!("Strict discovery failed:\n{details}").into());
+        }
+
+        for diagnostic in diagnostics {
+            eprintln!(
+                "{} {}",
+                "Discovery warning:".bright_yellow().bold(),
+                diagnostic
+            );
+        }
+        Ok(())
+    }
+
+    fn validate_requested_packages(&self) -> Result<(), Box<dyn std::error::Error>> {
+        if !self.config.strict_discovery {
+            return Ok(());
+        }
+
+        let discovered_names = self
+            .packages
+            .iter()
+            .map(|pkg| pkg.name.as_str())
+            .collect::<HashSet<_>>();
+        let mut missing = Vec::new();
+
+        if let Some(selected) = &self.config.packages_select {
+            for package in selected {
+                if !discovered_names.contains(package.as_str()) {
+                    missing.push(package.clone());
+                }
+            }
+        }
+
+        if let Some(up_to) = &self.config.packages_up_to {
+            for package in up_to {
+                if !discovered_names.contains(package.as_str()) {
+                    missing.push(package.clone());
+                }
+            }
+        }
+
+        missing.sort();
+        missing.dedup();
+        if missing.is_empty() {
+            return Ok(());
+        }
+
+        Err(format!(
+            "Strict discovery failed: requested packages not found: {}",
+            missing.join(", ")
+        )
+        .into())
+    }
+
+    fn validate_test_preconditions(&self) -> Result<(), Box<dyn std::error::Error>> {
+        for tool in self.required_test_tools() {
+            ensure_command_available(tool, "roc work test")?;
+        }
+
+        if self.requires_ros_environment() {
+            ensure_ros_environment("roc work test for discovered ament packages")?;
+        }
+
+        Ok(())
+    }
+
+    fn required_test_tools(&self) -> Vec<&'static str> {
+        let mut tools = Vec::new();
+
+        if self
+            .packages
+            .iter()
+            .any(|pkg| matches!(pkg.build_type, BuildType::AmentCmake | BuildType::Cmake))
+        {
+            tools.push("ctest");
+        }
+
+        if self
+            .packages
+            .iter()
+            .any(|pkg| matches!(pkg.build_type, BuildType::AmentPython))
+        {
+            tools.push("python3");
+        }
+
+        tools
+    }
+
+    fn requires_ros_environment(&self) -> bool {
+        self.packages.iter().any(|pkg| {
+            matches!(
+                pkg.build_type,
+                BuildType::AmentCmake | BuildType::AmentPython
+            )
+        })
     }
 
     fn resolve_dependencies(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -146,7 +267,6 @@ impl WorkspaceTester {
     }
 
     fn run_tests(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        ensure_ros_environment("roc work test")?;
         fs::create_dir_all(self.config.log_base.join("latest_test"))?;
         fs::create_dir_all(&self.run_log_dir)?;
 
@@ -730,6 +850,7 @@ fn config_from_matches(matches: &ArgMatches) -> Result<TestConfig, Box<dyn std::
 
     config.continue_on_error = config.continue_on_error || matches.get_flag("continue_on_error");
     config.merge_install = matches.get_flag("merge_install");
+    config.strict_discovery = matches.get_flag("strict_discovery");
     config.isolated = !config.merge_install;
     config.workspace_root = std::env::current_dir()?;
 
@@ -766,6 +887,7 @@ fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut tester = WorkspaceTester::new(config);
     tester.discover_packages()?;
+    tester.validate_test_preconditions()?;
     tester.resolve_dependencies()?;
     tester.run_tests()?;
 
@@ -865,5 +987,75 @@ mod tests {
     fn test_config_defaults_to_continue_on_error() {
         let config = TestConfig::default();
         assert!(config.continue_on_error);
+    }
+
+    #[test]
+    fn config_from_matches_enables_strict_discovery() {
+        let matches = crate::arguments::work::cmd()
+            .try_get_matches_from(["work", "test", "--strict-discovery"])
+            .unwrap();
+        let (_, submatches) = matches.subcommand().unwrap();
+
+        let config = config_from_matches(submatches).unwrap();
+        assert!(config.strict_discovery);
+    }
+
+    #[test]
+    fn strict_discovery_rejects_missing_requested_packages() {
+        let mut tester = WorkspaceTester::new(TestConfig {
+            strict_discovery: true,
+            packages_select: Some(vec!["missing_pkg".to_string()]),
+            ..TestConfig::default()
+        });
+        tester.packages = vec![pkg("demo_pkg", &[])];
+
+        let error = tester.validate_requested_packages().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("requested packages not found: missing_pkg"));
+    }
+
+    #[test]
+    fn test_preflight_allows_plain_cmake_packages_without_ros_env_requirement() {
+        let mut tester = WorkspaceTester::new(TestConfig::default());
+        tester.packages = vec![PackageMeta {
+            name: "plain_cmake".to_string(),
+            path: PathBuf::from("src/plain_cmake"),
+            build_type: BuildType::Cmake,
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            maintainers: Vec::new(),
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+
+        assert!(!tester.requires_ros_environment());
+        assert_eq!(tester.required_test_tools(), vec!["ctest"]);
+    }
+
+    #[test]
+    fn test_preflight_requests_python_for_ament_python_packages() {
+        let mut tester = WorkspaceTester::new(TestConfig::default());
+        tester.packages = vec![PackageMeta {
+            name: "demo_python_pkg".to_string(),
+            path: PathBuf::from("src/demo_python_pkg"),
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            maintainers: Vec::new(),
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: vec!["ament_python".to_string()],
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+
+        assert!(tester.requires_ros_environment());
+        assert_eq!(tester.required_test_tools(), vec!["python3"]);
     }
 }

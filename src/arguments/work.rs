@@ -276,6 +276,13 @@ pub fn cmd() -> Command {
                     .help("Continue testing other packages when a package test fails")
             )
             .arg(
+                Arg::new("strict_discovery")
+                    .long("strict-discovery")
+                    .visible_alias("strict_discovery")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Fail fast on discovery warnings such as invalid manifests, duplicates, or missing requested packages")
+            )
+            .arg(
                 Arg::new("ctest_args")
                     .long("ctest-args")
                     .visible_alias("ctest_args")

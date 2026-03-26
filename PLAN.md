@@ -784,7 +784,7 @@ Definition of done:
 
 - `roc work list` reflects the explicit latest build status before falling back to filesystem guesses
 
-### Slice 7.2: Bring `roc work test` Up To The Hardened Discovery And Preflight Model
+### Slice 7.2: Bring `roc work test` Up To The Hardened Discovery And Preflight Model [complete]
 
 Problem:
 
