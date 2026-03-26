@@ -1,5 +1,5 @@
 use colored::Colorize;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -35,6 +35,7 @@ pub struct BuildState {
     install_paths: Arc<Mutex<HashMap<String, PathBuf>>>,
     build_count: Arc<Mutex<(usize, usize, usize)>>, // (successful, failed, blocked)
     build_records: Arc<Mutex<HashMap<String, BuildRecord>>>,
+    ready_queue: Arc<(Mutex<VecDeque<String>>, std::sync::Condvar)>,
     cancel_requested: Arc<AtomicBool>,
 }
 
@@ -296,6 +297,7 @@ impl<'a> BuildExecutor<'a> {
             install_paths: Arc::new(Mutex::new(HashMap::new())),
             build_count: Arc::new(Mutex::new((0, 0, 0))),
             build_records: Arc::new(Mutex::new(HashMap::new())),
+            ready_queue: Arc::new((Mutex::new(VecDeque::new()), std::sync::Condvar::new())),
             cancel_requested: Self::build_interrupt_flag(),
         };
 
@@ -320,6 +322,16 @@ impl<'a> BuildExecutor<'a> {
             pkg_dependencies.insert(package.name.clone(), deps);
         }
 
+        {
+            let (queue_lock, _) = &*build_state.ready_queue;
+            let mut ready_queue = queue_lock.lock().unwrap();
+            ready_queue.extend(Self::initial_ready_packages(
+                packages,
+                build_order,
+                &pkg_dependencies,
+            ));
+        }
+
         // Worker threads
         let mut handles = Vec::new();
         let packages_arc = Arc::new(packages.to_vec());
@@ -332,6 +344,7 @@ impl<'a> BuildExecutor<'a> {
                 install_paths: Arc::clone(&build_state.install_paths),
                 build_count: Arc::clone(&build_state.build_count),
                 build_records: Arc::clone(&build_state.build_records),
+                ready_queue: Arc::clone(&build_state.ready_queue),
                 cancel_requested: Arc::clone(&build_state.cancel_requested),
             };
             let packages_clone = Arc::clone(&packages_arc);
@@ -412,6 +425,144 @@ impl<'a> BuildExecutor<'a> {
         Ok(())
     }
 
+    fn initial_ready_packages(
+        packages: &[PackageMeta],
+        build_order: &[usize],
+        dependencies: &HashMap<String, HashSet<String>>,
+    ) -> VecDeque<String> {
+        build_order
+            .iter()
+            .filter_map(|&pkg_idx| {
+                let package = &packages[pkg_idx];
+                let deps = dependencies.get(&package.name)?;
+                if deps.is_empty() {
+                    Some(package.name.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn wait_for_ready_package(
+        build_state: &BuildState,
+        dependencies: &HashMap<String, HashSet<String>>,
+        config: &BuildConfig,
+    ) -> Result<Option<String>, String> {
+        loop {
+            if build_state.cancel_requested.load(Ordering::SeqCst) {
+                return Ok(None);
+            }
+
+            if let Some(pkg_name) = {
+                let (queue_lock, _) = &*build_state.ready_queue;
+                let mut ready_queue = queue_lock.lock().unwrap();
+                ready_queue.pop_front()
+            } {
+                let mut states = build_state.package_states.lock().unwrap();
+                let mut records = build_state.build_records.lock().unwrap();
+                let mut counts = build_state.build_count.lock().unwrap();
+                Self::mark_blocked_pending_packages(
+                    &mut states,
+                    &mut records,
+                    &mut counts,
+                    dependencies,
+                    config,
+                )?;
+
+                let deps_ready = dependencies
+                    .get(&pkg_name)
+                    .map(|deps| {
+                        deps.iter().all(|dep| {
+                            states
+                                .get(dep)
+                                .map(|state| *state == PackageState::Completed)
+                                .unwrap_or(true)
+                        })
+                    })
+                    .unwrap_or(true);
+
+                if matches!(states.get(&pkg_name), Some(PackageState::Pending)) && deps_ready {
+                    states.insert(pkg_name.clone(), PackageState::Building);
+                    records.remove(&pkg_name);
+                    return Ok(Some(pkg_name));
+                }
+
+                continue;
+            }
+
+            {
+                let mut states = build_state.package_states.lock().unwrap();
+                let mut records = build_state.build_records.lock().unwrap();
+                let mut counts = build_state.build_count.lock().unwrap();
+                Self::mark_blocked_pending_packages(
+                    &mut states,
+                    &mut records,
+                    &mut counts,
+                    dependencies,
+                    config,
+                )?;
+                if states.values().all(|state| {
+                    matches!(
+                        state,
+                        PackageState::Completed | PackageState::Failed | PackageState::Blocked
+                    )
+                }) {
+                    return Ok(None);
+                }
+            }
+
+            let (queue_lock, cv) = &*build_state.ready_queue;
+            let ready_queue = queue_lock.lock().unwrap();
+            let _guard = cv.wait(ready_queue).unwrap();
+        }
+    }
+
+    fn enqueue_ready_dependents(
+        completed_pkg: &str,
+        build_state: &BuildState,
+        dependencies: &HashMap<String, HashSet<String>>,
+    ) {
+        let ready_dependents = {
+            let states = build_state.package_states.lock().unwrap();
+            dependencies
+                .iter()
+                .filter_map(|(pkg_name, deps)| {
+                    if !deps.contains(completed_pkg) {
+                        return None;
+                    }
+                    if !matches!(states.get(pkg_name), Some(PackageState::Pending)) {
+                        return None;
+                    }
+                    if deps.iter().all(|dep| {
+                        states
+                            .get(dep)
+                            .map(|state| *state == PackageState::Completed)
+                            .unwrap_or(true)
+                    }) {
+                        Some(pkg_name.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        };
+
+        if ready_dependents.is_empty() {
+            return;
+        }
+
+        let (queue_lock, cv) = &*build_state.ready_queue;
+        let mut ready_queue = queue_lock.lock().unwrap();
+        ready_queue.extend(ready_dependents);
+        cv.notify_all();
+    }
+
+    fn notify_workers(build_state: &BuildState) {
+        let (_, cv) = &*build_state.ready_queue;
+        cv.notify_all();
+    }
+
     /// Worker thread that builds packages when their dependencies are satisfied
     fn worker_thread(
         worker_id: usize,
@@ -432,55 +583,12 @@ impl<'a> BuildExecutor<'a> {
                     &config,
                     "Build interrupted by user",
                 )?;
+                Self::notify_workers(&build_state);
                 break;
             }
 
-            // Find a package that's ready to build
-            let package_to_build = {
-                let mut states = build_state.package_states.lock().unwrap();
-                let mut records = build_state.build_records.lock().unwrap();
-                let mut counts = build_state.build_count.lock().unwrap();
-                Self::mark_blocked_pending_packages(
-                    &mut states,
-                    &mut records,
-                    &mut counts,
-                    &dependencies,
-                    &config,
-                )?;
-                let mut ready_package = None;
-
-                // Collect candidates first to avoid borrow conflicts
-                let pending_packages: Vec<String> = states
-                    .iter()
-                    .filter_map(|(name, state)| {
-                        if *state == PackageState::Pending {
-                            Some(name.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                for pkg_name in pending_packages {
-                    // Check if all dependencies are completed
-                    if let Some(deps) = dependencies.get(&pkg_name) {
-                        let all_deps_ready = deps.iter().all(|dep| {
-                            states
-                                .get(dep)
-                                .map(|s| *s == PackageState::Completed)
-                                .unwrap_or(true)
-                        });
-
-                        if all_deps_ready {
-                            states.insert(pkg_name.clone(), PackageState::Building);
-                            records.remove(&pkg_name);
-                            ready_package = Some(pkg_name);
-                            break;
-                        }
-                    }
-                }
-                ready_package
-            };
+            let package_to_build =
+                Self::wait_for_ready_package(&build_state, &dependencies, &config)?;
 
             match package_to_build {
                 Some(pkg_name) => {
@@ -538,6 +646,12 @@ impl<'a> BuildExecutor<'a> {
                                     let mut states = build_state.package_states.lock().unwrap();
                                     states.insert(package.name.clone(), PackageState::Completed);
                                 }
+                                Self::enqueue_ready_dependents(
+                                    &package.name,
+                                    &build_state,
+                                    &dependencies,
+                                );
+                                Self::notify_workers(&build_state);
 
                                 // Update build count
                                 {
@@ -622,6 +736,7 @@ impl<'a> BuildExecutor<'a> {
                                         )?;
                                     }
                                 }
+                                Self::notify_workers(&build_state);
 
                                 if !config.continue_on_error {
                                     return Err(format!(
@@ -633,24 +748,7 @@ impl<'a> BuildExecutor<'a> {
                         }
                     }
                 }
-                None => {
-                    // Check if all packages are done
-                    let all_done = {
-                        let states = build_state.package_states.lock().unwrap();
-                        states.values().all(|state| {
-                            *state == PackageState::Completed
-                                || *state == PackageState::Failed
-                                || *state == PackageState::Blocked
-                        })
-                    };
-
-                    if all_done {
-                        break;
-                    }
-
-                    // Brief sleep to avoid busy waiting
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                }
+                None => break,
             }
         }
 
@@ -2659,7 +2757,7 @@ Remove-Variable _colcon_prefix -ErrorAction SilentlyContinue
 mod tests {
     use super::{BuildExecutor, BuildRecord, DsvOperation, InstalledArtifacts, PackageState};
     use crate::commands::work::build::{BuildConfig, BuildType, PackageMeta};
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{HashMap, HashSet, VecDeque};
     use std::fs;
     use std::path::PathBuf;
     use std::process::Command;
@@ -3884,6 +3982,60 @@ mod tests {
     }
 
     #[test]
+    fn initial_ready_packages_include_only_dependency_free_packages() {
+        let packages = vec![
+            fixture_package("base", &[]),
+            fixture_package("mid", &["base"]),
+            fixture_package("leaf", &["mid"]),
+        ];
+        let build_order = vec![0, 1, 2];
+        let dependencies = HashMap::from([
+            ("base".to_string(), HashSet::new()),
+            ("mid".to_string(), HashSet::from(["base".to_string()])),
+            ("leaf".to_string(), HashSet::from(["mid".to_string()])),
+        ]);
+
+        let ready = BuildExecutor::initial_ready_packages(&packages, &build_order, &dependencies);
+
+        assert_eq!(ready.into_iter().collect::<Vec<_>>(), vec!["base"]);
+    }
+
+    #[test]
+    fn enqueue_ready_dependents_wakes_packages_whose_dependencies_are_now_complete() {
+        let dependencies = HashMap::from([
+            ("base".to_string(), HashSet::new()),
+            ("mid".to_string(), HashSet::from(["base".to_string()])),
+            (
+                "leaf".to_string(),
+                HashSet::from(["base".to_string(), "mid".to_string()]),
+            ),
+        ]);
+        let build_state = super::BuildState {
+            package_states: Arc::new(Mutex::new(HashMap::from([
+                ("base".to_string(), PackageState::Completed),
+                ("mid".to_string(), PackageState::Pending),
+                ("leaf".to_string(), PackageState::Pending),
+            ]))),
+            install_paths: Arc::new(Mutex::new(HashMap::new())),
+            build_count: Arc::new(Mutex::new((0, 0, 0))),
+            build_records: Arc::new(Mutex::new(HashMap::new())),
+            ready_queue: Arc::new((Mutex::new(VecDeque::new()), std::sync::Condvar::new())),
+            cancel_requested: Arc::new(AtomicBool::new(false)),
+        };
+
+        BuildExecutor::enqueue_ready_dependents("base", &build_state, &dependencies);
+
+        let (queue_lock, _) = &*build_state.ready_queue;
+        let ready = queue_lock
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(ready, vec!["mid"]);
+    }
+
+    #[test]
     fn prepare_package_environment_is_fresh_for_each_package() {
         let temp = tempdir().unwrap();
         let workspace_root = temp.path().to_path_buf();
@@ -3905,6 +4057,7 @@ mod tests {
             ]))),
             build_count: Arc::new(Mutex::new((0, 0, 0))),
             build_records: Arc::new(Mutex::new(HashMap::new())),
+            ready_queue: Arc::new((Mutex::new(VecDeque::new()), std::sync::Condvar::new())),
             cancel_requested: Arc::new(AtomicBool::new(false)),
         };
 

@@ -605,7 +605,7 @@ Definition of done:
 
 - hung or interrupted build phases terminate predictably and leave debuggable state behind
 
-### Slice 6.5: Replace Polling Scheduler With Ready-Queue Coordination
+### Slice 6.5: Replace Polling Scheduler With Ready-Queue Coordination [complete]
 
 Problem:
 
