@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use crate::commands::work::build::dependency_graph;
 use crate::commands::work::build::PackageMeta;
-use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
+use crate::shared::package_discovery::{
+    discover_packages, discover_packages_with_diagnostics, DiscoveryConfig,
+};
 
 fn fixture_workspace(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -155,6 +157,35 @@ fn missing_cmakelists_fixture_still_discovers_declared_ament_cmake_type() {
     assert_eq!(
         packages[0].build_type,
         crate::commands::work::build::BuildType::AmentCmake
+    );
+}
+
+#[test]
+fn duplicate_name_collision_prefers_source_package_over_installed_copy() {
+    let workspace_root = fixture_workspace("duplicate_name_collision");
+    let result = discover_packages_with_diagnostics(&DiscoveryConfig {
+        base_paths: vec![workspace_root],
+        include_hidden: false,
+        max_depth: Some(10),
+        exclude_patterns: vec![
+            "build".to_string(),
+            "log".to_string(),
+            ".git".to_string(),
+            ".vscode".to_string(),
+            "target".to_string(),
+            "node_modules".to_string(),
+            "__pycache__".to_string(),
+        ],
+    })
+    .unwrap();
+
+    assert_eq!(result.packages.len(), 1);
+    assert_eq!(result.packages[0].name, "shared_name");
+    assert!(
+        result.packages[0]
+            .path
+            .ends_with(PathBuf::from("src/shared_name")),
+        "source package should win over installed copy"
     );
 }
 

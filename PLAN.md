@@ -844,3 +844,23 @@ Tasks:
 Definition of done:
 
 - ambiguous, unknown, ignored, and malformed package shapes are exercised through stable workspace fixtures instead of only synthetic unit setups
+
+### Slice 7.5: Harden Duplicate-Name And Metadata-Ordering Edge Cases [complete]
+
+Problem:
+
+- discovery and setup-order generation still had fragile corners around duplicate package names and copied/malformed runtime metadata
+- those cases matter in real overlays and copied install trees
+
+Tasks:
+
+- add a fixture with a source package and installed package copy sharing the same name
+- verify discovery prefers the source package over the installed copy
+- add setup-order regression tests for:
+  - missing metadata files
+  - cyclic metadata
+  - cross-platform metadata separators
+
+Definition of done:
+
+- duplicate-name collisions and malformed runtime metadata no longer rely on untested assumptions

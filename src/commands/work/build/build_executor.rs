@@ -1413,9 +1413,8 @@ impl<'a> BuildExecutor<'a> {
     }
 
     fn parse_package_metadata_dependencies(contents: &str) -> Vec<String> {
-        let path_separator = if cfg!(windows) { ';' } else { ':' };
         contents
-            .replace(path_separator, "\n")
+            .replace([':', ';'], "\n")
             .lines()
             .map(str::trim)
             .filter(|line| !line.is_empty())
@@ -3208,6 +3207,148 @@ mod tests {
         assert!(
             base_index < consumer_index,
             "runtime dependency order should source base_pkg before consumer_pkg"
+        );
+    }
+
+    #[test]
+    fn ordered_package_setup_entries_keeps_packages_without_metadata() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let mut executor = BuildExecutor::new(&config);
+        let alpha_prefix = config.install_base.join("alpha_pkg");
+        let beta_prefix = config.install_base.join("beta_pkg");
+        executor
+            .install_paths
+            .insert("beta_pkg".to_string(), beta_prefix.clone());
+        executor
+            .install_paths
+            .insert("alpha_pkg".to_string(), alpha_prefix.clone());
+
+        let packages = vec![
+            PackageMeta {
+                name: "beta_pkg".to_string(),
+                path: PathBuf::from("/tmp/beta_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "beta".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: Vec::new(),
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
+                exec_deps: Vec::new(),
+                test_deps: Vec::new(),
+            },
+            PackageMeta {
+                name: "alpha_pkg".to_string(),
+                path: PathBuf::from("/tmp/alpha_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "alpha".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: Vec::new(),
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
+                exec_deps: Vec::new(),
+                test_deps: Vec::new(),
+            },
+        ];
+
+        let ordered = executor.ordered_package_setup_entries(&packages);
+        let ordered_names = ordered
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>();
+
+        assert_eq!(ordered_names, vec!["alpha_pkg", "beta_pkg"]);
+    }
+
+    #[test]
+    fn ordered_package_setup_entries_handles_cyclic_metadata_without_duplicates() {
+        let temp = tempdir().unwrap();
+        let workspace_root = temp.path().to_path_buf();
+        let mut config = BuildConfig::default();
+        config.workspace_root = workspace_root.clone();
+        config.install_base = workspace_root.join("install");
+
+        let mut executor = BuildExecutor::new(&config);
+        let alpha_prefix = config.install_base.join("alpha_pkg");
+        let beta_prefix = config.install_base.join("beta_pkg");
+        executor
+            .install_paths
+            .insert("alpha_pkg".to_string(), alpha_prefix.clone());
+        executor
+            .install_paths
+            .insert("beta_pkg".to_string(), beta_prefix.clone());
+        fs::create_dir_all(alpha_prefix.join("share/colcon-core/packages")).unwrap();
+        fs::create_dir_all(beta_prefix.join("share/colcon-core/packages")).unwrap();
+        fs::write(
+            alpha_prefix.join("share/colcon-core/packages/alpha_pkg"),
+            "beta_pkg\n",
+        )
+        .unwrap();
+        fs::write(
+            beta_prefix.join("share/colcon-core/packages/beta_pkg"),
+            "alpha_pkg\n",
+        )
+        .unwrap();
+
+        let packages = vec![
+            PackageMeta {
+                name: "alpha_pkg".to_string(),
+                path: PathBuf::from("/tmp/alpha_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "alpha".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: Vec::new(),
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
+                exec_deps: Vec::new(),
+                test_deps: Vec::new(),
+            },
+            PackageMeta {
+                name: "beta_pkg".to_string(),
+                path: PathBuf::from("/tmp/beta_pkg"),
+                build_type: BuildType::AmentCmake,
+                version: "0.1.0".to_string(),
+                description: "beta".to_string(),
+                maintainers: vec!["Fixture".to_string()],
+                depend_deps: Vec::new(),
+                build_deps: Vec::new(),
+                buildtool_deps: Vec::new(),
+                build_export_deps: Vec::new(),
+                exec_deps: Vec::new(),
+                test_deps: Vec::new(),
+            },
+        ];
+
+        let ordered = executor.ordered_package_setup_entries(&packages);
+        let ordered_names = ordered
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>();
+
+        assert_eq!(ordered_names.len(), 2);
+        assert!(ordered_names.contains(&"alpha_pkg".to_string()));
+        assert!(ordered_names.contains(&"beta_pkg".to_string()));
+    }
+
+    #[test]
+    fn parse_package_metadata_dependencies_accepts_colon_and_semicolon_separators() {
+        assert_eq!(
+            BuildExecutor::parse_package_metadata_dependencies("base_pkg:consumer_pkg"),
+            vec!["base_pkg".to_string(), "consumer_pkg".to_string()]
+        );
+        assert_eq!(
+            BuildExecutor::parse_package_metadata_dependencies("base_pkg;consumer_pkg"),
+            vec!["base_pkg".to_string(), "consumer_pkg".to_string()]
         );
     }
 

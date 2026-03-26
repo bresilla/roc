@@ -40,6 +40,10 @@ These fixture workspaces provide stable compatibility cases for `roc work build`
   - one normal package and packages hidden by `COLCON_IGNORE` and `AMENT_IGNORE`
   - used for ignore-marker discovery coverage
 
+- `duplicate_name_collision`
+  - one source package and one installed package copy with the same package name
+  - used for source-vs-install duplicate resolution coverage
+
 - `dependency_chain`
   - two packages with a simple dependency edge
   - used for topological ordering checks
