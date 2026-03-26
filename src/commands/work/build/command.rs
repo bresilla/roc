@@ -3,7 +3,6 @@ use colored::Colorize;
 use std::path::PathBuf;
 
 use crate::commands::work::build::{BuildConfig, ColconBuilder};
-use crate::shared::preflight::ensure_ros_environment;
 
 fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std::error::Error>> {
     let mut config = BuildConfig::default();
@@ -94,7 +93,6 @@ fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std:
 
 async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let config = config_from_matches(&matches)?;
-    ensure_ros_environment("roc work build")?;
 
     println!(
         "{}",
@@ -113,6 +111,7 @@ async fn run_command(matches: ArgMatches) -> Result<(), Box<dyn std::error::Erro
 
     // Discover packages
     builder.discover_packages()?;
+    builder.validate_build_preconditions()?;
 
     // Resolve dependencies and create build order
     builder.resolve_dependencies()?;

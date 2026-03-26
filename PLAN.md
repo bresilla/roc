@@ -680,7 +680,7 @@ Definition of done:
 
 - unsupported or ambiguous packages fail early with a precise reason
 
-### Slice 6.8: Revisit ROS Preflight Scope For `work build`
+### Slice 6.8: Revisit ROS Preflight Scope For `work build` [complete]
 
 Problem:
 

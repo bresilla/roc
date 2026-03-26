@@ -21,6 +21,7 @@ use crate::shared::package_discovery::{
     discover_packages_with_diagnostics, DiscoveryConfig, DiscoveryResult,
 };
 pub use crate::shared::package_discovery::{BuildType, Package as PackageMeta};
+use crate::shared::preflight::{ensure_command_available, ensure_ros_environment};
 
 #[derive(Debug, Clone)]
 pub struct BuildConfig {
@@ -220,6 +221,49 @@ impl ColconBuilder {
         }
 
         Ok(())
+    }
+
+    pub fn validate_build_preconditions(&self) -> Result<(), Box<dyn std::error::Error>> {
+        for tool in self.required_build_tools() {
+            ensure_command_available(tool, "roc work build")?;
+        }
+
+        if self.requires_ros_environment() {
+            ensure_ros_environment("roc work build for discovered ament packages")?;
+        }
+
+        Ok(())
+    }
+
+    fn required_build_tools(&self) -> Vec<&'static str> {
+        let mut tools = Vec::new();
+
+        if self
+            .packages
+            .iter()
+            .any(|pkg| matches!(pkg.build_type, BuildType::AmentCmake | BuildType::Cmake))
+        {
+            tools.push("cmake");
+        }
+
+        if self
+            .packages
+            .iter()
+            .any(|pkg| matches!(pkg.build_type, BuildType::AmentPython))
+        {
+            tools.push("python3");
+        }
+
+        tools
+    }
+
+    fn requires_ros_environment(&self) -> bool {
+        self.packages.iter().any(|pkg| {
+            matches!(
+                pkg.build_type,
+                BuildType::AmentCmake | BuildType::AmentPython
+            )
+        })
     }
 
     pub fn build_packages(&self) -> Result<(), Box<dyn std::error::Error>> {
@@ -581,6 +625,72 @@ mod tests {
         builder.packages = vec![pkg("demo_pkg", &[])];
 
         builder.validate_requested_packages().unwrap();
+    }
+
+    #[test]
+    fn build_preflight_requires_ros_environment_for_ament_packages() {
+        let mut builder = ColconBuilder::new(BuildConfig::default());
+        builder.packages = vec![PackageMeta {
+            name: "demo_nodes_cpp".to_string(),
+            path: PathBuf::from("src/demo_nodes_cpp"),
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            maintainers: Vec::new(),
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: vec!["ament_cmake".to_string()],
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+
+        assert!(builder.requires_ros_environment());
+        assert_eq!(builder.required_build_tools(), vec!["cmake"]);
+    }
+
+    #[test]
+    fn build_preflight_allows_plain_cmake_packages_without_ros_env_requirement() {
+        let mut builder = ColconBuilder::new(BuildConfig::default());
+        builder.packages = vec![PackageMeta {
+            name: "plain_cmake".to_string(),
+            path: PathBuf::from("src/plain_cmake"),
+            build_type: BuildType::Cmake,
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            maintainers: Vec::new(),
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: Vec::new(),
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+
+        assert!(!builder.requires_ros_environment());
+        assert_eq!(builder.required_build_tools(), vec!["cmake"]);
+    }
+
+    #[test]
+    fn build_preflight_requests_python_for_ament_python_packages() {
+        let mut builder = ColconBuilder::new(BuildConfig::default());
+        builder.packages = vec![PackageMeta {
+            name: "demo_python_pkg".to_string(),
+            path: PathBuf::from("src/demo_python_pkg"),
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            maintainers: Vec::new(),
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: vec!["ament_python".to_string()],
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        }];
+
+        assert!(builder.requires_ros_environment());
+        assert_eq!(builder.required_build_tools(), vec!["python3"]);
     }
 
     #[test]
