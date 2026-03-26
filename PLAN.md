@@ -756,3 +756,48 @@ Definition of done:
 7. revisit ROS preflight scope
 8. harden Python packaging behavior
 9. strengthen resume/build-state persistence semantics
+
+## Phase 7: Workspace UX And Test Hardening
+
+Objective:
+
+- make the remaining workspace commands consume the stricter build/test state we now persist instead of relying on heuristics
+
+### Slice 7.1: Make `roc work list` Consume Explicit Build State [complete]
+
+Problem:
+
+- `roc work list` still inferred build status from install/build directory shape
+- that could report `Built` or `Partial` even when the latest recorded build status was `failed` or `blocked`
+
+Tasks:
+
+- read `log/latest/workspace_state.txt` when it matches the current workspace root
+- fall back to per-package `status.txt` when the workspace state file is unavailable
+- keep directory-shape heuristics only as the last fallback
+- add tests for:
+  - explicit failed state overriding install-shape heuristics
+  - per-package state fallback
+  - stale workspace state rejection
+
+Definition of done:
+
+- `roc work list` reflects the explicit latest build status before falling back to filesystem guesses
+
+### Slice 7.2: Bring `roc work test` Up To The Hardened Discovery And Preflight Model
+
+Problem:
+
+- `roc work test` still uses permissive discovery and broad early ROS preflight
+- that leaves it behind the build path in both diagnostics and predictability
+
+Tasks:
+
+- add diagnostics-aware discovery and optional strict mode
+- validate requested test package filters explicitly
+- make test preflight package-aware instead of blanket
+- add tests for strict discovery and preflight policy
+
+Definition of done:
+
+- `roc work test` discovery and preflight behavior matches the hardened build path in clarity and failure quality

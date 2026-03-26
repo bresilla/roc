@@ -140,6 +140,8 @@ mod tests {
             &package_dir,
             &workspace.join("build"),
             &install_base,
+            &workspace.join("log"),
+            None,
         );
         assert!(list_status.contains("Built (merged)"));
 
