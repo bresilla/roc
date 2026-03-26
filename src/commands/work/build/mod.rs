@@ -17,7 +17,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
-use crate::shared::package_discovery::{discover_packages, DiscoveryConfig};
+use crate::shared::package_discovery::{
+    discover_packages_with_diagnostics, DiscoveryConfig, DiscoveryResult,
+};
 pub use crate::shared::package_discovery::{BuildType, Package as PackageMeta};
 
 #[derive(Debug, Clone)]
@@ -36,6 +38,7 @@ pub struct BuildConfig {
     pub cmake_args: Vec<String>,
     pub cmake_target: Option<String>,
     pub continue_on_error: bool,
+    pub strict_discovery: bool,
     pub workspace_root: PathBuf,
     pub install_base: PathBuf,
     pub build_base: PathBuf,
@@ -61,6 +64,7 @@ impl Default for BuildConfig {
             cmake_args: Vec::new(),
             cmake_target: None,
             continue_on_error: false,
+            strict_discovery: false,
             workspace_root: workspace_root.clone(),
             install_base: workspace_root.join("install"),
             build_base: workspace_root.join("build"),
@@ -102,14 +106,21 @@ impl ColconBuilder {
             ],
         };
 
-        self.packages =
-            discover_packages(&discovery_config).map_err(|e| -> Box<dyn std::error::Error> {
-                Box::new(std::io::Error::other(e.to_string()))
-            })?;
+        let DiscoveryResult {
+            packages,
+            diagnostics,
+        } = discover_packages_with_diagnostics(&discovery_config).map_err(
+            |e| -> Box<dyn std::error::Error> { Box::new(std::io::Error::other(e.to_string())) },
+        )?;
+        self.packages = packages;
+
+        self.report_discovery_diagnostics(&diagnostics)?;
 
         if self.packages.is_empty() {
             return Err("No ROS packages found in the selected base paths".into());
         }
+
+        self.validate_requested_packages()?;
 
         // Apply package filters
         self.apply_package_filters();
@@ -130,6 +141,74 @@ impl ColconBuilder {
         }
 
         Ok(())
+    }
+
+    fn report_discovery_diagnostics(
+        &self,
+        diagnostics: &[String],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if diagnostics.is_empty() {
+            return Ok(());
+        }
+
+        if self.config.strict_discovery {
+            let details = diagnostics
+                .iter()
+                .map(|line| format!("- {line}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Err(format!("Strict discovery failed:\n{details}").into());
+        }
+
+        for diagnostic in diagnostics {
+            eprintln!(
+                "{} {}",
+                "Discovery warning:".bright_yellow().bold(),
+                diagnostic
+            );
+        }
+        Ok(())
+    }
+
+    fn validate_requested_packages(&self) -> Result<(), Box<dyn std::error::Error>> {
+        if !self.config.strict_discovery {
+            return Ok(());
+        }
+
+        let discovered_names = self
+            .packages
+            .iter()
+            .map(|pkg| pkg.name.as_str())
+            .collect::<HashSet<_>>();
+        let mut missing = Vec::new();
+
+        if let Some(selected) = &self.config.packages_select {
+            for package in selected {
+                if !discovered_names.contains(package.as_str()) {
+                    missing.push(package.clone());
+                }
+            }
+        }
+
+        if let Some(up_to) = &self.config.packages_up_to {
+            for package in up_to {
+                if !discovered_names.contains(package.as_str()) {
+                    missing.push(package.clone());
+                }
+            }
+        }
+
+        missing.sort();
+        missing.dedup();
+        if missing.is_empty() {
+            return Ok(());
+        }
+
+        Err(format!(
+            "Strict discovery failed: requested packages not found: {}",
+            missing.join(", ")
+        )
+        .into())
     }
 
     pub fn resolve_dependencies(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -441,5 +520,32 @@ mod tests {
             .map(|pkg| pkg.name.as_str())
             .collect::<Vec<_>>();
         assert_eq!(selected, vec!["base", "fresh"]);
+    }
+
+    #[test]
+    fn strict_discovery_rejects_missing_requested_packages() {
+        let mut builder = ColconBuilder::new(BuildConfig {
+            strict_discovery: true,
+            packages_select: Some(vec!["missing_pkg".to_string()]),
+            ..BuildConfig::default()
+        });
+        builder.packages = vec![pkg("demo_pkg", &[])];
+
+        let error = builder.validate_requested_packages().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("requested packages not found: missing_pkg"));
+    }
+
+    #[test]
+    fn permissive_discovery_allows_missing_requested_packages() {
+        let mut builder = ColconBuilder::new(BuildConfig {
+            strict_discovery: false,
+            packages_select: Some(vec!["missing_pkg".to_string()]),
+            ..BuildConfig::default()
+        });
+        builder.packages = vec![pkg("demo_pkg", &[])];
+
+        builder.validate_requested_packages().unwrap();
     }
 }

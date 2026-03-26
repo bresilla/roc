@@ -629,7 +629,7 @@ Definition of done:
 
 - worker coordination is event-driven and easier to reason about than shared polling
 
-### Slice 6.6: Tighten Discovery Diagnostics And Add Strict Mode
+### Slice 6.6: Tighten Discovery Diagnostics And Add Strict Mode [complete]
 
 Problem:
 

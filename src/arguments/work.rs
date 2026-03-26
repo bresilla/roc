@@ -174,6 +174,13 @@ pub fn cmd() -> Command {
                     .help("Continue building other packages when a package fails")
             )
             .arg(
+                Arg::new("strict_discovery")
+                    .long("strict-discovery")
+                    .visible_alias("strict_discovery")
+                    .action(clap::ArgAction::SetTrue)
+                    .help("Fail fast on discovery warnings such as invalid manifests, duplicates, or missing requested packages")
+            )
+            .arg(
                 Arg::new("event_handlers")
                     .long("event-handlers")
                     .visible_alias("event_handlers")

@@ -69,6 +69,12 @@ pub struct DiscoveryConfig {
     pub exclude_patterns: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct DiscoveryResult {
+    pub packages: Vec<Package>,
+    pub diagnostics: Vec<String>,
+}
+
 impl Default for DiscoveryConfig {
     fn default() -> Self {
         Self {
@@ -91,31 +97,41 @@ impl Default for DiscoveryConfig {
 
 /// Discovers ROS2 packages in the specified paths
 pub fn discover_packages(config: &DiscoveryConfig) -> Result<Vec<Package>> {
-    let mut packages = Vec::new();
+    let result = discover_packages_with_diagnostics(config)?;
+    for diagnostic in &result.diagnostics {
+        eprintln!("Warning: {diagnostic}");
+    }
+    Ok(result.packages)
+}
+
+pub fn discover_packages_with_diagnostics(config: &DiscoveryConfig) -> Result<DiscoveryResult> {
+    let mut result = DiscoveryResult::default();
 
     for base_path in &config.base_paths {
         if !base_path.exists() {
-            eprintln!("Warning: Base path {} does not exist", base_path.display());
+            result
+                .diagnostics
+                .push(format!("Base path {} does not exist", base_path.display()));
             continue;
         }
 
         if !base_path.is_dir() {
-            eprintln!(
-                "Warning: Base path {} is not a directory",
+            result.diagnostics.push(format!(
+                "Base path {} is not a directory",
                 base_path.display()
-            );
+            ));
             continue;
         }
 
-        discover_packages_in_path(base_path, &mut packages, config)?;
+        discover_packages_in_path(base_path, &mut result, config)?;
     }
 
-    Ok(packages)
+    Ok(result)
 }
 
 fn discover_packages_in_path(
     path: &Path,
-    packages: &mut Vec<Package>,
+    result: &mut DiscoveryResult,
     config: &DiscoveryConfig,
 ) -> Result<()> {
     // Use walkdir with proper filtering to avoid excluded directories entirely
@@ -145,25 +161,36 @@ fn discover_packages_in_path(
                     if config.include_hidden || !is_hidden_package_relative(&package, path) {
                         // Check for duplicates by name and prefer source packages
                         if let Some(existing_idx) =
-                            packages.iter().position(|p| p.name == package.name)
+                            result.packages.iter().position(|p| p.name == package.name)
                         {
                             // If we found a duplicate, prefer the source package over installed package
-                            let existing_package = &packages[existing_idx];
+                            let existing_package = &result.packages[existing_idx];
                             let current_is_source = is_source_package(&package);
                             let existing_is_source = is_source_package(existing_package);
 
                             // Replace if this is a source package and existing is not
                             if current_is_source && !existing_is_source {
-                                packages[existing_idx] = package;
+                                result.packages[existing_idx] = package;
+                            } else {
+                                result.diagnostics.push(format!(
+                                    "Duplicate package '{}' discovered at {} and {}",
+                                    package.name,
+                                    existing_package.path.display(),
+                                    package.path.display()
+                                ));
                             }
                             // If both are source or both are installed, keep the first one found
                         } else {
-                            packages.push(package);
+                            result.packages.push(package);
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Warning: Failed to parse {}: {}", package_xml.display(), e);
+                    result.diagnostics.push(format!(
+                        "Failed to parse {}: {}",
+                        package_xml.display(),
+                        e
+                    ));
                 }
             }
         }
@@ -440,6 +467,7 @@ fn find_files_with_extension(dir: &Path, extension: &str, files: &mut Vec<PathBu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
     use std::fs;
     use tempfile::TempDir;
 
@@ -559,5 +587,80 @@ mod tests {
                     .to_string()
             )
         );
+    }
+
+    #[test]
+    fn discovery_with_diagnostics_reports_invalid_manifests_and_missing_paths() {
+        let temp_dir = TempDir::new().unwrap();
+        let broken_dir = temp_dir.path().join("broken_pkg");
+        fs::create_dir_all(&broken_dir).unwrap();
+        fs::write(broken_dir.join("package.xml"), "<package>").unwrap();
+
+        let result = discover_packages_with_diagnostics(&DiscoveryConfig {
+            base_paths: vec![
+                temp_dir.path().to_path_buf(),
+                temp_dir.path().join("missing"),
+            ],
+            ..Default::default()
+        })
+        .unwrap();
+
+        assert!(result.packages.is_empty());
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|line| line.contains("Failed to parse")));
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|line| line.contains("does not exist")));
+    }
+
+    #[test]
+    fn discovery_with_diagnostics_reports_duplicate_package_names() {
+        let temp_dir = TempDir::new().unwrap();
+        let first_dir = temp_dir.path().join("pkg_a");
+        let second_dir = temp_dir.path().join("nested/pkg_b");
+        fs::create_dir_all(&first_dir).unwrap();
+        fs::create_dir_all(&second_dir).unwrap();
+
+        let package_xml = r#"<?xml version="1.0"?>
+<package format="3">
+  <name>shared_name</name>
+  <version>1.0.0</version>
+  <description>Duplicate package</description>
+  <maintainer email="test@example.com">Test User</maintainer>
+  <license>MIT</license>
+</package>"#;
+
+        fs::write(first_dir.join("package.xml"), package_xml).unwrap();
+        fs::write(
+            first_dir.join("CMakeLists.txt"),
+            "cmake_minimum_required(VERSION 3.8)",
+        )
+        .unwrap();
+        fs::write(second_dir.join("package.xml"), package_xml).unwrap();
+        fs::write(
+            second_dir.join("CMakeLists.txt"),
+            "cmake_minimum_required(VERSION 3.8)",
+        )
+        .unwrap();
+
+        let result = discover_packages_with_diagnostics(&DiscoveryConfig {
+            base_paths: vec![temp_dir.path().to_path_buf()],
+            ..Default::default()
+        })
+        .unwrap();
+
+        let package_names = result
+            .packages
+            .iter()
+            .map(|package| package.name.as_str())
+            .collect::<HashSet<_>>();
+        assert_eq!(package_names, HashSet::from(["shared_name"]));
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|line| line.contains("Duplicate package 'shared_name'")));
     }
 }

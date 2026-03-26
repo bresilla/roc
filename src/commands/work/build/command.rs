@@ -51,6 +51,7 @@ fn config_from_matches(matches: &ArgMatches) -> Result<BuildConfig, Box<dyn std:
     config.merge_install = matches.get_flag("merge_install");
     config.symlink_install = matches.get_flag("symlink_install");
     config.continue_on_error = matches.get_flag("continue_on_error");
+    config.strict_discovery = matches.get_flag("strict_discovery");
 
     if let Some(cmake_args) = matches.get_many::<String>("cmake_args") {
         config.cmake_args = cmake_args.map(|s| s.to_string()).collect();
@@ -198,5 +199,17 @@ mod tests {
         ]);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn config_from_matches_enables_strict_discovery() {
+        let matches = crate::arguments::work::cmd()
+            .try_get_matches_from(["work", "build", "--strict-discovery"])
+            .unwrap();
+        let (_, submatches) = matches.subcommand().unwrap();
+
+        let config = config_from_matches(submatches).unwrap();
+
+        assert!(config.strict_discovery);
     }
 }
