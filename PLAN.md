@@ -822,3 +822,25 @@ Tasks:
 Definition of done:
 
 - pathological Python/CMake package shapes have stable fixture coverage and fail early with explicit reasons
+
+### Slice 7.4: Expand Fixture Coverage For Ambiguous And Ignored Package Shapes [complete]
+
+Problem:
+
+- there were still edge classes covered mostly by tempdir unit tests rather than durable workspace fixtures
+- ambiguous inferred build markers, unknown inferred build markers, and both ignore-marker styles are easy to regress
+
+Tasks:
+
+- add fixture workspaces for:
+  - ambiguous inferred build markers
+  - unknown inferred build markers
+  - missing Python resource markers
+  - missing `CMakeLists.txt`
+  - `AMENT_IGNORE` alongside `COLCON_IGNORE`
+- add compatibility tests that prove discovery semantics for each fixture
+- add fixture-backed builder validation tests for malformed Python and CMake layouts
+
+Definition of done:
+
+- ambiguous, unknown, ignored, and malformed package shapes are exercised through stable workspace fixtures instead of only synthetic unit setups

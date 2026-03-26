@@ -3669,6 +3669,29 @@ mod tests {
     }
 
     #[test]
+    fn validate_python_package_layout_rejects_missing_resource_fixture() {
+        let package = PackageMeta {
+            name: "demo_missing_resource_pkg".to_string(),
+            path: fixture_workspace_path("ament_python_missing_resource")
+                .join("src")
+                .join("demo_missing_resource_pkg"),
+            build_type: BuildType::AmentPython,
+            version: "0.1.0".to_string(),
+            description: "fixture".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: vec!["ament_python".to_string()],
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        let error = BuildExecutor::validate_python_package_layout(&package).unwrap_err();
+        assert!(error.contains("missing resource/demo_missing_resource_pkg marker"));
+    }
+
+    #[test]
     fn validate_cmake_package_layout_accepts_minimal_supported_shape() {
         let temp = tempdir().unwrap();
         let package_root = temp.path().join("src/demo_cmake_pkg");
@@ -3709,6 +3732,29 @@ mod tests {
             build_type: BuildType::AmentCmake,
             version: "0.1.0".to_string(),
             description: "demo".to_string(),
+            maintainers: vec!["Fixture".to_string()],
+            depend_deps: Vec::new(),
+            build_deps: Vec::new(),
+            buildtool_deps: vec!["ament_cmake".to_string()],
+            build_export_deps: Vec::new(),
+            exec_deps: Vec::new(),
+            test_deps: Vec::new(),
+        };
+
+        let error = BuildExecutor::validate_cmake_package_layout(&package).unwrap_err();
+        assert!(error.contains("missing CMakeLists.txt"));
+    }
+
+    #[test]
+    fn validate_cmake_package_layout_rejects_missing_cmakelists_fixture() {
+        let package = PackageMeta {
+            name: "demo_missing_cmake_pkg".to_string(),
+            path: fixture_workspace_path("ament_cmake_missing_cmakelists")
+                .join("src")
+                .join("demo_missing_cmake_pkg"),
+            build_type: BuildType::AmentCmake,
+            version: "0.1.0".to_string(),
+            description: "fixture".to_string(),
             maintainers: vec!["Fixture".to_string()],
             depend_deps: Vec::new(),
             build_deps: Vec::new(),

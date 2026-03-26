@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>hybrid_pkg</name>
+  <version>0.1.0</version>
+  <description>Fixture with both CMake and Python markers</description>
+  <maintainer email="fixtures@example.com">Fixture Maintainer</maintainer>
+  <license>Apache-2.0</license>
+</package>

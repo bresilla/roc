@@ -89,6 +89,44 @@ fn setup_cfg_only_python_fixture_is_discoverable_as_ament_python() {
 }
 
 #[test]
+fn missing_resource_python_fixture_is_discoverable_as_ament_python() {
+    let packages = discover_fixture_packages("ament_python_missing_resource");
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].name, "demo_missing_resource_pkg");
+    assert_eq!(
+        packages[0].build_type,
+        crate::commands::work::build::BuildType::AmentPython
+    );
+}
+
+#[test]
+fn ambiguous_inferred_build_fixture_is_preserved_as_other() {
+    let packages = discover_fixture_packages("ambiguous_inferred_build");
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].name, "hybrid_pkg");
+    assert_eq!(
+        packages[0].build_type,
+        crate::commands::work::build::BuildType::Other(
+            "ambiguous inferred build type (found both CMake and Python build markers)".to_string()
+        )
+    );
+}
+
+#[test]
+fn unknown_inferred_build_fixture_is_preserved_as_other() {
+    let packages = discover_fixture_packages("unknown_inferred_build");
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].name, "mystery_pkg");
+    assert_eq!(
+        packages[0].build_type,
+        crate::commands::work::build::BuildType::Other(
+            "unknown inferred build type (missing CMakeLists.txt and setup.py/setup.cfg)"
+                .to_string()
+        )
+    );
+}
+
+#[test]
 fn unsupported_build_type_fixture_is_preserved_as_other() {
     let packages = discover_fixture_packages("unsupported_build_type");
     assert_eq!(packages.len(), 1);
@@ -107,6 +145,17 @@ fn ignore_markers_exclude_hidden_packages_from_discovery() {
         .map(|pkg| pkg.name.as_str())
         .collect::<Vec<_>>();
     assert_eq!(names, vec!["visible_pkg"]);
+}
+
+#[test]
+fn missing_cmakelists_fixture_still_discovers_declared_ament_cmake_type() {
+    let packages = discover_fixture_packages("ament_cmake_missing_cmakelists");
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].name, "demo_missing_cmake_pkg");
+    assert_eq!(
+        packages[0].build_type,
+        crate::commands::work::build::BuildType::AmentCmake
+    );
 }
 
 #[test]
